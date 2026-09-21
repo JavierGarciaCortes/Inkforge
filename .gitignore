@@ -43,3 +43,5 @@ desktop.ini
 *.bak
 *.swp
 *.swo
+# Generated vault index
+web/src/data/
