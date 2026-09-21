@@ -1,8 +1,107 @@
 const path = require('node:path')
+const fs = require('node:fs/promises')
 const { app, BrowserWindow, ipcMain, session } = require('electron')
 
 const isDevelopment = process.argv.includes('--dev')
 const developmentUrl = 'http://127.0.0.1:5173'
+const vaultRoot = path.resolve(__dirname, '..', '..', 'vault')
+
+function isHidden(name) {
+  return name.startsWith('.')
+}
+
+function toVaultPath(...segments) {
+  return segments.filter(Boolean).join('/')
+}
+
+async function listMarkdownTree(directoryPath = vaultRoot, relativeDirectory = '') {
+  const entries = await fs.readdir(directoryPath, { withFileTypes: true })
+  const visibleEntries = entries
+    .filter((entry) => !isHidden(entry.name) && !entry.isSymbolicLink())
+    .sort((left, right) => {
+      if (left.isDirectory() !== right.isDirectory()) {
+        return left.isDirectory() ? -1 : 1
+      }
+
+      return left.name.localeCompare(right.name, 'es', { sensitivity: 'base' })
+    })
+  const nodes = []
+
+  for (const entry of visibleEntries) {
+    const relativePath = toVaultPath(relativeDirectory, entry.name)
+    const absolutePath = path.join(directoryPath, entry.name)
+
+    if (entry.isDirectory()) {
+      const children = await listMarkdownTree(absolutePath, relativePath)
+
+      nodes.push({
+        type: 'directory',
+        name: entry.name,
+        path: relativePath,
+        children,
+      })
+
+      continue
+    }
+
+    if (entry.isFile() && path.extname(entry.name).toLowerCase() === '.md') {
+      nodes.push({
+        type: 'document',
+        name: entry.name,
+        path: relativePath,
+      })
+    }
+  }
+
+  return nodes
+}
+
+function isPathInside(parentPath, candidatePath) {
+  const relativePath = path.relative(parentPath, candidatePath)
+
+  return (
+    relativePath !== '' &&
+    relativePath !== '..' &&
+    !relativePath.startsWith(`..${path.sep}`) &&
+    !path.isAbsolute(relativePath)
+  )
+}
+
+async function resolveMarkdownPath(relativePath) {
+  const hasFilesystemRoot =
+    typeof relativePath === 'string' &&
+    (path.win32.parse(relativePath).root !== '' || path.posix.parse(relativePath).root !== '')
+
+  if (typeof relativePath !== 'string' || relativePath.length === 0 || hasFilesystemRoot) {
+    throw new Error('Ruta de documento no válida.')
+  }
+
+  const vaultSegments = relativePath.replaceAll('\\', '/').split('/')
+
+  if (vaultSegments.some((segment) => !segment || segment === '.' || segment === '..' || isHidden(segment))) {
+    throw new Error('Ruta de documento no válida.')
+  }
+
+  if (path.posix.extname(vaultSegments.at(-1)).toLowerCase() !== '.md') {
+    throw new Error('Solo se pueden leer documentos Markdown.')
+  }
+
+  const realVaultRoot = await fs.realpath(vaultRoot)
+  const requestedPath = path.resolve(vaultRoot, ...vaultSegments)
+  const realRequestedPath = await fs.realpath(requestedPath)
+
+  if (!isPathInside(realVaultRoot, realRequestedPath)) {
+    throw new Error('El documento solicitado está fuera del vault.')
+  }
+
+  const fileStats = await fs.stat(realRequestedPath)
+
+  if (!fileStats.isFile()) {
+    throw new Error('El documento solicitado no es un archivo.')
+  }
+
+  return realRequestedPath
+}
 
 function configureContentSecurityPolicy() {
   const productionPolicy = [
@@ -79,6 +178,19 @@ app.whenReady().then(() => {
     name: 'Inkforge',
     version: app.getVersion(),
   }))
+
+  ipcMain.handle('vault:list', () => listMarkdownTree())
+
+  ipcMain.handle('vault:read', async (_event, relativePath) => {
+    const documentPath = await resolveMarkdownPath(relativePath)
+    const content = await fs.readFile(documentPath, 'utf8')
+
+    return {
+      name: path.basename(documentPath),
+      path: relativePath.replaceAll('\\', '/'),
+      content,
+    }
+  })
 
   createWindow()
 

@@ -19,20 +19,22 @@ Estado actual de `app/`:
 - `contextIsolation: true`;
 - `nodeIntegration: false`;
 - `sandbox: true`;
-- IPC mínimo mediante el canal explícito `app:get-info`;
-- shell visual inicial con cabecera Inkforge, panel Biblioteca, área Documento y panel Editor reservado para OpenCode;
+- IPC explícito mediante los canales `app:get-info`, `vault:list` y `vault:read`;
+- navegación real de los documentos Markdown del vault desde el panel Biblioteca;
+- apertura de documentos en modo de solo lectura en el área Documento;
+- panel Editor reservado para OpenCode;
 - arranque correcto de la shell en desarrollo y producción local;
 - build de producción funcional;
 - lint limpio.
 
-La interfaz actual es únicamente una shell visual. Los paneles Biblioteca, Documento y Editor todavía no tienen funcionalidad real. Inkforge aún no lee ni edita el vault y todavía no está conectado a OpenCode.
+La interfaz ya permite recorrer el vault actual y leer sus documentos Markdown. Todavía no permite editarlos ni guardarlos, y el panel Editor aún no está conectado a OpenCode.
 
 Fuera de `app/`, también siguen disponibles el sistema editorial heredado de fiction-vault mediante el uso directo de OpenCode y el dashboard Astro heredado en `web/`.
 
 Todavía no existen en la interfaz de escritorio:
 
 - conexión con OpenCode;
-- lectura o escritura del vault;
+- edición o guardado de documentos del vault;
 - gestión de proyectos o bibliotecas;
 - editor Markdown funcional;
 - chat editorial;
@@ -95,9 +97,9 @@ La compatibilidad con Windows ha sido adaptada respecto a la base original. Wind
 
 El proceso principal crea una ventana segura con `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true` y `webSecurity: true`. También bloquea ventanas nuevas y navegaciones externas inesperadas.
 
-El preload solo expone `window.inkforge.getAppInfo()`. No ofrece acceso genérico a Node, al sistema de archivos, a procesos ni a comandos del sistema.
+El preload expone la información de la aplicación y una API mínima de lectura del vault: `window.inkforge.vault.list()` y `window.inkforge.vault.read(relativePath)`. No ofrece acceso genérico a Node, al sistema de archivos, a procesos ni a comandos del sistema.
 
-La interfaz actual es una shell. Sus paneles representan la dirección del producto, pero todavía no gestionan documentos ni ejecutan acciones editoriales.
+La Biblioteca representa el árbol real de archivos Markdown del vault y el área Documento abre el contenido seleccionado como texto fuente en modo de solo lectura. No existen todavía edición, guardado ni acciones editoriales desde la interfaz.
 
 ## Sistema editorial heredado
 
@@ -168,7 +170,7 @@ Mientras se desarrolla esa integración, el flujo editorial existente puede util
 ## Roadmap inmediato
 
 1. Conectar Inkforge Desktop con OpenCode local.
-2. Abrir y navegar proyectos y vaults.
+2. Añadir selección y gestión de proyectos y vaults.
 3. Integrar un editor Markdown.
 4. Incorporar el chat editorial dentro de Inkforge.
 5. Preparar el empaquetado para Windows.
