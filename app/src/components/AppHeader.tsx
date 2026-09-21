@@ -1,3 +1,5 @@
+import type { InkforgeAppInfo } from '../types/inkforge'
+
 interface AppHeaderProps {
   appInfo: InkforgeAppInfo | null
 }
@@ -20,7 +22,7 @@ export function AppHeader({ appInfo }: AppHeaderProps) {
             {appInfo.name} Desktop v{appInfo.version}
           </span>
         )}
-        <span className="project-state">Sin proyecto</span>
+        <span className="project-state">Vault actual</span>
         <button className="icon-button" type="button" title="Ajustes (no disponible)" disabled>
           <span aria-hidden="true">&#9881;</span>
           <span className="sr-only">Ajustes</span>

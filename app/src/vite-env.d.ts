@@ -1,14 +1,11 @@
 /// <reference types="vite/client" />
 
-interface InkforgeAppInfo {
-  name: string
-  version: string
+import type { InkforgeBridge } from './types/inkforge'
+
+declare global {
+  interface Window {
+    inkforge?: InkforgeBridge
+  }
 }
 
-interface InkforgeBridge {
-  getAppInfo: () => Promise<InkforgeAppInfo>
-}
-
-interface Window {
-  inkforge?: InkforgeBridge
-}
+export {}
