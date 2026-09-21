@@ -1,0 +1,19 @@
+---
+import Dashboard from "../../layouts/Dashboard.astro";
+import MdContent from "../../components/MdContent.astro";
+import { getTrama, getConfig } from "../../lib/vault";
+import { buildSlugMap } from "../../lib/markdown";
+
+const trama = getTrama();
+const slugMap = buildSlugMap();
+const pageTitle = `Trama — ${getConfig().title}`;
+---
+
+<Dashboard title={pageTitle} section="trama">
+  <h2>Trama</h2>
+  <MdContent content={trama.content} slugMap={slugMap} />
+</Dashboard>
+
+<style>
+  h2 { font-size: var(--fs-h2); margin-bottom: 1rem; color: var(--heading); }
+</style>

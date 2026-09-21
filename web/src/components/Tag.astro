@@ -1,0 +1,18 @@
+---
+interface Props {
+  text: string;
+  color?: string;
+}
+const { text, color = "var(--text2)" } = Astro.props;
+---
+<span class="tag" style={`--tag-color:${color}`}>{text}</span>
+
+<style>
+  .tag {
+    display: inline-block; font-size: var(--fs-tag); padding: .15rem .5rem;
+    border-radius: 4px; margin-right: .35rem; margin-bottom: .35rem;
+    background: color-mix(in srgb, var(--tag-color) 13%, transparent);
+    color: var(--tag-color);
+    border: 1px solid color-mix(in srgb, var(--tag-color) 25%, transparent);
+  }
+</style>

@@ -1,0 +1,31 @@
+---
+export interface Props extends Record<string, unknown> {
+  id?: string;
+  name?: string;
+  type?: string;
+  placeholder?: string;
+  value?: string;
+  autocomplete?: string;
+  class?: string;
+  style?: string;
+}
+
+const { class: extraClass, style, ...attrs } = Astro.props as Props;
+---
+
+<input {...attrs} class={`input-base${extraClass ? ` ${extraClass}` : ""}`} style={style} />
+
+<style>
+  .input-base {
+    display: block; width: 100%; box-sizing: border-box;
+    padding: .55rem .75rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: var(--fs-body);
+    transition: .15s;
+  }
+  .input-base:focus { outline: none; border-color: var(--accent); }
+  .input-base::placeholder { color: var(--text2); }
+</style>

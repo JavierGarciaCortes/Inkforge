@@ -1,0 +1,28 @@
+---
+import Dashboard from "../../../layouts/Dashboard.astro";
+import BackLink from "../../../components/BackLink.astro";
+import MdContent from "../../../components/MdContent.astro";
+import { getEntityBySlug, getConfig } from "../../../lib/vault";
+import { renderMd, buildSlugMap } from "../../../lib/markdown";
+
+const { slug } = Astro.params;
+const entity = getEntityBySlug(slug!);
+
+if (!entity) return Astro.redirect("/dashboard/historia");
+
+const slugMap = buildSlugMap();
+const pageTitle = `${entity.name} — ${getConfig().title}`;
+---
+
+<Dashboard title={pageTitle} section="historia">
+  <BackLink href="/dashboard/historia" label="Volver a historia" />
+  <h2>{entity.name}</h2>
+  <div class="sub">{entity.cat === "faccion" ? "Facción" : "Lore"}</div>
+
+  <MdContent content={entity.content} slugMap={slugMap} />
+</Dashboard>
+
+<style>
+  h2 { font-size: var(--fs-h2d); margin: .25rem 0 .15rem; color: var(--heading); }
+  .sub { font-size: .9rem; color: var(--text2); margin-bottom: 1.5rem; }
+</style>

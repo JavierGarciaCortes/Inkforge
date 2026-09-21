@@ -1,0 +1,31 @@
+---
+interface Props {
+  href?: string;
+  dataTerm?: string;
+  class?: string;
+}
+const { href, dataTerm, class: extraClass } = Astro.props;
+---
+
+<div
+  class={`card${extraClass ? ` ${extraClass}` : ""}`}
+  data-term={dataTerm}
+  onclick={href ? `location.href='${href}'` : undefined}
+>
+  <slot />
+</div>
+
+<style>
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.25rem;
+    cursor: pointer;
+    transition: .15s;
+  }
+  .card:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+  }
+</style>

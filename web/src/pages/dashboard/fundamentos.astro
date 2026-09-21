@@ -1,0 +1,19 @@
+---
+import Dashboard from "../../layouts/Dashboard.astro";
+import MdContent from "../../components/MdContent.astro";
+import { getFundamentos, getConfig } from "../../lib/vault";
+import { buildSlugMap } from "../../lib/markdown";
+
+const content = getFundamentos();
+const slugMap = buildSlugMap();
+const pageTitle = `Fundamentos — ${getConfig().title}`;
+---
+
+<Dashboard title={pageTitle} section="fundamentos">
+  <h2>Fundamentos</h2>
+  <MdContent content={content} slugMap={slugMap} />
+</Dashboard>
+
+<style>
+  h2 { font-size: var(--fs-h2); margin-bottom: 1rem; color: var(--heading); }
+</style>

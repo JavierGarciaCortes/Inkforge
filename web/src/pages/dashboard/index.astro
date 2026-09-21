@@ -1,0 +1,90 @@
+---
+import Dashboard from "../../layouts/Dashboard.astro";
+import Input from "../../components/Input.astro";
+import { getConfig, getForeshadowing, getEstado, getSearchIndex } from "../../lib/vault";
+
+const cfg = getConfig();
+const est = getEstado();
+const openCount = getForeshadowing().filter((f) => f.estado.includes("🔴")).length;
+const searchIndex = getSearchIndex();
+const pageTitle = `Resumen — ${cfg.title}`;
+---
+
+<Dashboard title={pageTitle} section="resumen">
+  <h2>Resumen del proyecto</h2>
+
+  <div class="stats">
+    <div class="stat"><div class="num gold">{cfg.charCount}</div><div class="label">Personajes</div></div>
+    <div class="stat"><div class="num gold">{cfg.loreCount}</div><div class="label">Documentos de lore</div></div>
+    <div class="stat"><div class="num red">{openCount}</div><div class="label">Hilos abiertos</div></div>
+    <div class="stat"><div class="num green">{cfg.placeCount}</div><div class="label">Lugares</div></div>
+    {est.palabras > 0 && <div class="stat"><div class="num purple">{est.palabras.toLocaleString()}</div><div class="label">Palabras</div></div>}
+    {est.capitulos > 0 && <div class="stat"><div class="num green">{est.capitulos}</div><div class="label">Capítulos</div></div>}
+  </div>
+
+  <div class="search-wrap">
+    <Input type="text" id="search" placeholder="Buscar personajes, lugares, términos..." autocomplete="off" class="search-input" />
+  </div>
+
+  <span id="search-data" hidden>{JSON.stringify(searchIndex)}</span>
+  <script is:inline>
+    var searchData = JSON.parse(document.getElementById("search-data").textContent);
+    var input = document.getElementById("search");
+    var wrap = input.closest(".search-wrap");
+    var colors = { Personaje: "#c8a96e", Historia: "#7a5ea8", Lugar: "#4ac08a", "L\u00e9xico": "#e0a040", "Cronolog\u00eda": "#e34a4a" };
+
+    input.oninput = function() {
+      var old = document.getElementById("results");
+      if (old) old.remove();
+      var q = input.value.toLowerCase().trim();
+      if (q.length < 2) return;
+      var hits = searchData.filter(function(r) { return r.name.toLowerCase().indexOf(q) !== -1 || r.desc.toLowerCase().indexOf(q) !== -1; }).sort(function(a, b) {
+        var aName = a.name.toLowerCase().indexOf(q) !== -1;
+        var bName = b.name.toLowerCase().indexOf(q) !== -1;
+        if (aName && !bName) return -1;
+        if (!aName && bName) return 1;
+        var aPos = aName ? a.name.toLowerCase().indexOf(q) : a.desc.toLowerCase().indexOf(q);
+        var bPos = bName ? b.name.toLowerCase().indexOf(q) : b.desc.toLowerCase().indexOf(q);
+        return aPos - bPos;
+      }).slice(0, 8);
+      if (!hits.length) return;
+      var div = document.createElement("div");
+      div.id = "results";
+      div.className = "results";
+      div.innerHTML = hits.map(function(r) {
+        return '<a href="' + r.url + '" class="result-item"><span class="result-cat" style="color:' + (colors[r.cat] || "#888") + '">' + r.cat + '</span><span class="result-name">' + r.name + '</span><span class="result-desc">' + r.desc.slice(0, 100) + '</span></a>';
+      }).join("");
+      wrap.appendChild(div);
+    };
+
+    document.addEventListener("click", function(e) {
+      var r = document.getElementById("results");
+      if (r && !e.target.closest(".search-wrap")) r.remove();
+    });
+  </script>
+</Dashboard>
+
+<style>
+  h2 { font-size: var(--fs-h2); margin-bottom: .25rem; color: var(--heading); }
+  .section>p { margin-bottom: 1.5rem; color: var(--text2); font-size: .9rem; }
+  .stats { display: flex; gap: .75rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: .7rem 1.1rem; min-width: 120px; }
+  .stat .num { font-size: 1.5rem; font-weight: 600; color: var(--heading); }
+  .stat .label { font-size: var(--fs-label); color: var(--text2); margin-top: .15rem; }
+  .stat .num.gold { color: var(--accent); }
+  .stat .num.red { color: var(--danger); }
+  .stat .num.green { color: var(--ok); }
+  .stat .num.purple { color: var(--accent2); }
+  .search-wrap { position: relative; margin-bottom: 1.5rem; }
+</style>
+
+<style is:global>
+  .search-input { max-width: 500px; }
+  .results { position: absolute; top: 100%; left: 0; right: 0; max-width: 500px; background: var(--surface); border: 1px solid var(--border); border-radius: 0 0 8px 8px; margin-top: 2px; z-index: 10; overflow: hidden; }
+  .result-item { display: grid; grid-template-columns: 80px 1fr; gap: 0 .5rem; padding: .55rem .75rem; text-decoration: none; border-bottom: 1px solid var(--border); transition: .1s; }
+  .result-item:last-child { border-bottom: none; }
+  .result-item:hover { background: var(--surface2); }
+  .result-cat { font-size: var(--fs-tag); font-weight: 600; text-transform: uppercase; align-self: center; }
+  .result-name { font-size: var(--fs-small); color: var(--heading); grid-column: 2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .result-desc { font-size: var(--fs-xs); color: var(--text2); grid-column: 2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+</style>

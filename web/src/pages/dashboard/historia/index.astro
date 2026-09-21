@@ -1,0 +1,48 @@
+---
+import Dashboard from "../../../layouts/Dashboard.astro";
+import FilterInput from "../../../components/FilterInput.astro";
+import Card from "../../../components/Card.astro";
+import Tag from "../../../components/Tag.astro";
+import { getEntities, getConfig } from "../../../lib/vault";
+import { renderMd, buildSlugMap } from "../../../lib/markdown";
+
+const entities = getEntities();
+const slugMap = buildSlugMap();
+const pageTitle = `Historia — ${getConfig().title}`;
+const categories = ["lore", "faccion"] as const;
+const catLabels: Record<string, string> = { lore: "Lore", faccion: "Facciones" };
+---
+
+<Dashboard title={pageTitle} section="historia">
+  <h2>Entidades del mundo</h2>
+  <p>Lore, facciones, conceptos.</p>
+
+  <FilterInput placeholder="Filtrar entidades..." target=".entity-card" />
+
+  {categories.map((cat) => {
+    const items = entities.filter((e) => e.cat === cat);
+    if (!items.length) return null;
+    return (
+      <section>
+        <h3 class="cat-heading">{catLabels[cat]} ({items.length})</h3>
+        <div class="entity-grid">
+          {items.map((e) => (
+            <Card href={`/dashboard/historia/${e.slug}`} dataTerm={e.name.toLowerCase()} class="entity-card">
+              <Tag text={e.cat === "faccion" ? "Facción" : "Lore"} variant="phase" />
+              <h3>{e.name}</h3>
+              <div class="entry-desc" set:html={renderMd(e.desc, slugMap)} />
+            </Card>
+          ))}
+        </div>
+      </section>
+    );
+  })}
+</Dashboard>
+
+<style>
+  h2 { font-size: var(--fs-h2); margin-bottom: .25rem; color: var(--heading); }
+  .section>p { margin-bottom: 1.5rem; color: var(--text2); font-size: .9rem; }
+  section { margin-bottom: 2rem; }
+  .cat-heading { font-size: var(--fs-h3); color: var(--accent2); margin-bottom: .75rem; }
+  .entity-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: .75rem; }
+</style>

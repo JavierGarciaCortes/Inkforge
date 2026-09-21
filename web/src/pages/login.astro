@@ -1,0 +1,54 @@
+---
+import Base from "../layouts/Base.astro";
+import Input from "../components/Input.astro";
+import { checkCredentials, createToken, getCookieName } from "../lib/auth";
+
+let error = false;
+
+if (Astro.request.method === "POST") {
+  const formData = await Astro.request.formData();
+  const user = formData.get("user")?.toString() ?? "";
+  const pass = formData.get("pass")?.toString() ?? "";
+
+  if (checkCredentials(user, pass)) {
+    const token = createToken();
+    Astro.cookies.set(getCookieName(), token, {
+      path: "/",
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 365,
+    });
+    return Astro.redirect("/dashboard");
+  } else {
+    error = true;
+  }
+}
+---
+
+<Base title="Acceso">
+  <div id="login-screen">
+    <div class="login-box">
+      <h2>Fiction Vault</h2>
+      <p>Acceso restringido</p>
+      <form method="POST">
+        <Input type="text" name="user" placeholder="Usuario" autocomplete="off" required class="login-input" />
+        <Input type="password" name="pass" placeholder="Contraseña" required class="login-input" />
+        <button type="submit">Entrar</button>
+      </form>
+      {error && <div class="error">Usuario o contraseña incorrectos</div>}
+    </div>
+  </div>
+</Base>
+
+<style>
+  #login-screen { position: fixed; inset: 0; z-index: 999; background: var(--bg); display: flex; align-items: center; justify-content: center; }
+  .login-box { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 2.5rem; margin: 16px; width: 420px; max-width: calc(100vw - 32px); box-sizing: border-box; text-align: center; }
+  .login-box h2 { font-family: 'Cinzel', serif; font-weight: 700; color: var(--heading); font-size: 1.2rem; margin-bottom: .3rem; }
+  .login-box p { color: var(--text2); font-size: var(--fs-table); margin-bottom: 1.5rem; }
+  .login-input { margin-bottom: .7rem; }
+  .login-box button { width: 100%; padding: .55rem; background: var(--accent); color: var(--heading-inv); border: 1px solid var(--accent); border-radius: 8px; font-family: var(--font); font-weight: 600; font-size: var(--fs-body); cursor: pointer; transition: .15s; }
+  .login-box button:hover { opacity: .85; }
+  .login-box .error { color: var(--danger); font-size: var(--fs-card); margin-top: .5rem; }
+  @media(max-width:640px) { .login-box { padding: 16px; } }
+</style>

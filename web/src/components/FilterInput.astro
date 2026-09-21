@@ -1,0 +1,31 @@
+---
+import Input from "./Input.astro";
+
+interface Props {
+  placeholder?: string;
+  target: string;
+}
+const { placeholder = "Filtrar...", target } = Astro.props;
+---
+<div>
+  <Input
+    type="text"
+    class="filter-input"
+    data-target={target}
+    placeholder={placeholder}
+    autocomplete="off"
+  />
+</div>
+<script is:inline>
+  document.currentScript.previousElementSibling.querySelector("input").oninput = function() {
+    var q = this.value.toLowerCase();
+    var sel = this.dataset.target;
+    document.querySelectorAll(sel).forEach(function(r) {
+      r.style.display = (r.getAttribute("data-term") || "").toLowerCase().includes(q) ? "" : "none";
+    });
+  };
+</script>
+
+<style>
+  .filter-input { max-width: 400px; margin-bottom: 1rem; }
+</style>

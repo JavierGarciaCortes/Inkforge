@@ -1,0 +1,47 @@
+---
+import Dashboard from "../../layouts/Dashboard.astro";
+import FilterInput from "../../components/FilterInput.astro";
+import Tag from "../../components/Tag.astro";
+import Card from "../../components/Card.astro";
+import { getCharacters, getConfig } from "../../lib/vault";
+
+const chars = getCharacters();
+const pageTitle = `Personajes — ${getConfig().title}`;
+
+const propColors: Record<string, string> = {
+  Facción: "#7a5ea8", Origen: "#3d8a6e", Rol: "#8b6914",
+  Sangre: "#b33028", POV: "#b8770b",
+};
+const fallbackColors = ["#7a5ea8","#3d8a6e","#b8770b","#8b6914","#b33028","#4a7db8","#b86030"];
+let fallbackIdx = 0;
+function tagColor(key: string): string {
+  return propColors[key] ?? (fallbackColors[fallbackIdx++ % fallbackColors.length]);
+}
+---
+
+<Dashboard title={pageTitle} section="personajes">
+  <h2>Personajes</h2>
+  <p>{chars.length} personajes con ficha completa. Haz clic para ver detalle.</p>
+
+  <FilterInput placeholder="Filtrar personajes..." target=".card" />
+
+  <div class="grid">
+    {chars.map((c) => (
+      <Card href={`/dashboard/personajes/${c.slug}`} dataTerm={c.name.toLowerCase()}>
+        <div>
+          {Object.entries(c.properties).filter(([k]) => k !== "Rol" && k !== "Resumen").map(([k, v]) => <Tag text={v} color={tagColor(k)} />)}
+        </div>
+        <h3>{c.name}</h3>
+        <div class="sub">{c.role}</div>
+        <p>{c.desc}</p>
+      </Card>
+    ))}
+  </div>
+</Dashboard>
+
+<style>
+  h2 { font-size: var(--fs-h2); margin-bottom: .25rem; color: var(--heading); }
+  .section>p { margin-bottom: 1.5rem; color: var(--text2); font-size: .9rem; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1rem; }
+  @media(max-width:640px) { .grid { grid-template-columns: 1fr; } }
+</style>

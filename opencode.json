@@ -1,0 +1,38 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": ["AGENTS.md"],
+  "agent": {
+    "writer": {
+      "mode": "subagent",
+      "description": "Escritor creativo. Genera y edita prosa, diálogo, brainstorming y arcos de personaje. NO decide lore ni estructura. Consulta perfiles de voz y contexto de capítulo antes de escribir. Skills en .opencode/skills/writer_skill.md"
+    },
+    "editor": {
+      "mode": "primary",
+      "description": "Editor disciplinado. Coordina subagentes (structurer, critico, lector, writer), analiza consistencia y lore, aplica cambios. NUNCA improvisa de memoria: consulta MCP tools y .fiction/session_log.json antes de emitir juicios. Skills en .opencode/skills/editorial_skill.md"
+    },
+    "structurer": {
+      "mode": "subagent",
+      "description": "Estructurador narrativo. Outline, ritmo, sistemas de magia, agujeros de guion. Consulta get_pacing(), get_story_arc(), get_save_the_cat(), check_scenes(). Responde a cada objeción del critico. Skills en .opencode/skills/structurer_skill.md"
+    },
+    "lector": {
+      "mode": "subagent",
+      "description": "Lector beta con ojos frescos. Lee sin contexto de worldbuilding. NO consulta story bible. Juzga claridad, ritmo, diálogo natural y engagement emocional. Skills en .opencode/skills/lector_skill.md"
+    },
+    "critico": {
+      "mode": "subagent",
+      "description": "Crítico implacable. Busca agujeros de guion, clichés, hilos sueltos, reglas rotas. Consulta get_foreshadowing(), get_chekhov_gun(), check_continuity(), check_consistency(). Clasifica por gravedad: 🔴 crítico / 🟡 significativo / 🟢 menor. Skills en .opencode/skills/critico_skill.md"
+    },
+    "query": {
+      "mode": "subagent",
+      "description": "Creador de cartas editoriales. Genera loglines, sinopsis, comparables y cartas completas para presentar a editoriales o agentes literarios. NO spoilea la paradoja. Skills en .opencode/skills/query_skill.md"
+    }
+  },
+  "mcp": {
+    "fiction-context": {
+      "type": "local",
+      "command": ["python", ".tools/fiction_mcp.py"],
+      "enabled": true,
+      "description": "Contexto de escritura: personajes, lore, continuidad, foreshadowing"
+    }
+  }
+}

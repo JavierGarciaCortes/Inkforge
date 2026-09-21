@@ -1,0 +1,50 @@
+---
+import Dashboard from "../../layouts/Dashboard.astro";
+import { getForeshadowing, getConfig } from "../../lib/vault";
+
+const threads = getForeshadowing();
+const openCount = threads.filter((f) => f.estado.includes("🔴")).length;
+const pageTitle = `Foreshadowing — ${getConfig().title}`;
+---
+
+<Dashboard title={pageTitle} section="foreshadowing">
+  <h2>Foreshadowing</h2>
+  <p>{threads.length} hilos narrativos. {openCount} abiertos.</p>
+
+  <table class="fs-table">
+    <thead>
+      <tr>
+        <th>Hilo</th>
+        <th>Siembra</th>
+        <th>Pago</th>
+        <th>Estado</th>
+      </tr>
+    </thead>
+    <tbody>
+      {threads.map((f) => {
+        const cls = f.estado.includes("Abierta") ? "open" : f.estado.includes("Cerrada") ? "closed" : "partial";
+        return (
+          <tr>
+            <td>{f.hilo}</td>
+            <td>—</td>
+            <td>—</td>
+            <td><span class={`status-dot ${cls}`}></span>{f.estado}</td>
+          </tr>
+        );
+      })}
+    </tbody>
+  </table>
+</Dashboard>
+
+<style>
+  h2 { font-size: var(--fs-h2); margin-bottom: .25rem; color: var(--heading); }
+  .section>p { margin-bottom: 1.5rem; color: var(--text2); font-size: .9rem; }
+  .fs-table { width: 100%; border-collapse: collapse; font-size: var(--fs-small); }
+  .fs-table th { text-align: left; padding: .6rem .75rem; background: var(--surface2); color: var(--text2); font-weight: 500; border-bottom: 1px solid var(--border); }
+  .fs-table td { padding: .5rem .75rem; border-bottom: 1px solid var(--border); }
+  .fs-table tr:hover { background: var(--surface2); }
+  .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: .4rem; }
+  .status-dot.open { background: var(--danger); }
+  .status-dot.closed { background: var(--ok); }
+  .status-dot.partial { background: var(--warn); }
+</style>

@@ -1,0 +1,11 @@
+---
+import { renderMd, buildSlugMap } from "../lib/markdown";
+
+interface Props {
+  content: string;
+  slugMap?: Record<string, string>;
+}
+const { content, slugMap } = Astro.props;
+const map = slugMap ?? buildSlugMap();
+---
+<div class="md-content" set:html={renderMd(content, map)} />

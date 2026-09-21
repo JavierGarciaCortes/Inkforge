@@ -1,0 +1,50 @@
+:root {
+  --bg: #0d0d12;
+  --surface: #16161f;
+  --surface2: #1e1e2a;
+  --border: #2a2a3a;
+  --text: #c8c8d4;
+  --text2: #8888a0;
+  --heading: #eee;
+  --heading-inv: #0d0d12;
+  --accent: #c8a96e;
+  --accent2: #7a5ea8;
+  --danger: #e34a4a;
+  --warn: #e0a040;
+  --ok: #4ac08a;
+  --logout: #c07070;
+  --font: 'Inter', system-ui, -apple-system, sans-serif;
+  --fs-h1: 1.8rem;
+  --fs-h2: 1.3rem;
+  --fs-h2d: 1.4rem;
+  --fs-h3: 1.1rem;
+  --fs-h4: .95rem;
+  --fs-body: .88rem;
+  --fs-small: .82rem;
+  --fs-xs: .75rem;
+  --fs-card: .78rem;
+  --fs-tag: .7rem;
+  --fs-label: .75rem;
+  --fs-table: .8rem;
+  --tag-bg: #2a2a3a;
+  --tag-phase-bg: #1e2a1e;
+}
+
+[data-theme="light"] {
+  --bg: #ebebee;
+  --surface: #f9f9fb;
+  --surface2: #eeeeef;
+  --border: #d4d4da;
+  --text: #1a1a28;
+  --text2: #5a5a6e;
+  --heading: #111;
+  --heading-inv: #f9f9fb;
+  --accent: #8b6500;
+  --accent2: #482d70;
+  --danger: #b33028;
+  --warn: #8b6500;
+  --ok: #22703a;
+  --logout: #a05050;
+  --tag-bg: #e0e0e6;
+  --tag-phase-bg: #d4e8d4;
+}

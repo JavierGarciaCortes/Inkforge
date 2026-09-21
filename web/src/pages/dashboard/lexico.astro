@@ -1,0 +1,44 @@
+---
+import Dashboard from "../../layouts/Dashboard.astro";
+import { getLexico, getConfig } from "../../lib/vault";
+import { renderMd, buildSlugMap } from "../../lib/markdown";
+import FilterInput from "../../components/FilterInput.astro";
+
+const entries = getLexico();
+const slugMap = buildSlugMap();
+const pageTitle = `Léxico — ${getConfig().title}`;
+---
+
+<Dashboard title={pageTitle} section="lexico">
+  <h2>Léxico</h2>
+  <p>{entries.length} términos del mundo.</p>
+
+  <FilterInput placeholder="Filtrar términos..." target=".lex-row" />
+
+  <table class="lex-table">
+    <thead>
+      <tr><th>Término</th><th>Definición</th><th>Ficha</th></tr>
+    </thead>
+    <tbody>
+      {entries.map((e, i) => (
+        <tr data-term={e.term.toLowerCase()} class="lex-row">
+          <td class="term">{e.term}</td>
+          <td set:html={renderMd(e.def, slugMap)} />
+          <td class="ficha" set:html={renderMd(e.ficha, slugMap)} />
+        </tr>
+      ))}
+    </tbody>
+  </table>
+</Dashboard>
+
+<style>
+  h2 { font-size: var(--fs-h2); margin-bottom: .25rem; color: var(--heading); }
+  .section>p { margin-bottom: 1rem; color: var(--text2); font-size: .9rem; }
+  .lex-table { width: 100%; border-collapse: collapse; font-size: var(--fs-small); }
+  .lex-table th { text-align: left; padding: .6rem .75rem; background: var(--surface2); color: var(--text2); font-weight: 500; border-bottom: 1px solid var(--border); }
+  .lex-table td { padding: .5rem .75rem; border-bottom: 1px solid var(--border); vertical-align: top; font-size: var(--fs-small); line-height: 1.5; color: var(--text); }
+  .lex-table td :global(a) { color: var(--accent); text-decoration: underline; }
+  .lex-table tr:hover { background: var(--surface2); }
+  .lex-table .term { font-weight: 600; color: var(--heading); white-space: nowrap; }
+  .lex-table .ficha { font-size: var(--fs-card); color: var(--accent); }
+</style>

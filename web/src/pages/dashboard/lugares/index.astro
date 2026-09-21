@@ -1,0 +1,39 @@
+---
+import Dashboard from "../../../layouts/Dashboard.astro";
+import FilterInput from "../../../components/FilterInput.astro";
+import Tag from "../../../components/Tag.astro";
+import Card from "../../../components/Card.astro";
+import { getPlaces, getConfig } from "../../../lib/vault";
+import { renderMd, buildSlugMap } from "../../../lib/markdown";
+
+const places = getPlaces();
+const slugMap = buildSlugMap();
+const pageTitle = `Lugares — ${getConfig().title}`;
+---
+
+<Dashboard title={pageTitle} section="lugares">
+  <h2>Lugares</h2>
+  <p>Escenarios principales del mundo ({places.length}).</p>
+
+  <FilterInput placeholder="Filtrar lugares..." target=".card" />
+
+  <div class="grid">
+    {places.map((l) => (
+      <Card href={`/dashboard/lugares/${l.slug}`} dataTerm={l.name.toLowerCase()}>
+        <Tag text={l.type} variant="phase" />
+        <h3>{l.name}</h3>
+        <div class="entry-desc" set:html={renderMd(l.desc, slugMap)} />
+      </Card>
+    ))}
+  </div>
+</Dashboard>
+
+<style>
+  h2 { font-size: var(--fs-h2); margin-bottom: .25rem; color: var(--heading); }
+  .section>p { margin-bottom: 1.5rem; color: var(--text2); font-size: .9rem; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1rem; }
+  .card .entry-desc { font-size: var(--fs-small); line-height: 1.5; color: var(--text); }
+  .card .entry-desc :global(p) { font-size: var(--fs-small); line-height: 1.5; color: var(--text); margin: 0; }
+  .card .entry-desc :global(a) { color: var(--accent); }
+  @media(max-width:640px) { .grid { grid-template-columns: 1fr; } }
+</style>

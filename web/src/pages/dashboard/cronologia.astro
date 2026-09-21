@@ -1,0 +1,41 @@
+---
+import Dashboard from "../../layouts/Dashboard.astro";
+import { getTimeline, getConfig } from "../../lib/vault";
+import { renderMd, buildSlugMap } from "../../lib/markdown";
+
+const timeline = getTimeline();
+const slugMap = buildSlugMap();
+const pageTitle = `Cronología — ${getConfig().title}`;
+---
+
+<Dashboard title={pageTitle} section="cronologia">
+  <h2>Cronología</h2>
+  <p>Línea temporal del mundo. ~5000 años de historia ({timeline.length} eventos).</p>
+
+  <div class="timeline">
+    {timeline.map((t) => (
+      <div class={`tl-item ${t.cls}`}>
+        <div class="tl-year">{t.year}</div>
+        <div class="tl-title" set:html={renderMd(t.title, slugMap)} />
+        {t.desc && <div class="tl-desc" set:html={renderMd(t.desc, slugMap)} />}
+      </div>
+    ))}
+  </div>
+</Dashboard>
+
+<style>
+  h2 { font-size: var(--fs-h2); margin-bottom: .25rem; color: var(--heading); }
+  .section>p { margin-bottom: .75rem; color: var(--text2); font-size: .9rem; }
+  .timeline { position: relative; padding-left: 2rem; }
+  .timeline::before { content: ''; position: absolute; left: .5rem; top: 0; bottom: 0; width: 2px; background: var(--border); }
+  .tl-item { position: relative; padding-bottom: 1.5rem; }
+  .tl-item::before { content: ''; position: absolute; left: -1.75rem; top: .35rem; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); border: 2px solid var(--bg); }
+  .tl-item.ancient::before { background: var(--accent2); }
+  .tl-item.key::before { background: var(--warn); }
+  .tl-item.belkam::before { background: var(--ok); }
+  .tl-year { font-size: var(--fs-table); color: var(--accent); font-weight: 600; }
+  .tl-title { font-size: var(--fs-h4); color: var(--heading); font-weight: 500; }
+  .tl-title :global(a) { color: var(--accent); text-decoration: underline; }
+  .tl-desc { font-size: var(--fs-table); color: var(--text2); margin-top: .15rem; }
+  .tl-desc :global(a) { color: var(--accent); }
+</style>

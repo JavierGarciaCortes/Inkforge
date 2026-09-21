@@ -1,0 +1,45 @@
+{
+  "enableSmartQuotes": true,
+  "openingQuote": "«",
+  "closingQuote": "»",
+  "textReplacementRules": [
+    {
+      "from": "<<",
+      "to": "«"
+    },
+    {
+      "from": ">>",
+      "to": "»"
+    },
+    {
+      "from": "<=",
+      "to": "≤"
+    },
+    {
+      "from": ">=",
+      "to": "≥"
+    },
+    {
+      "from": "!=",
+      "to": "≠"
+    },
+    {
+      "from": "--",
+      "to": "—"
+    },
+    {
+      "from": "...",
+      "to": "…"
+    },
+    {
+      "from": "",
+      "to": ""
+    }
+  ],
+  "autoPairingRules": [
+    {
+      "open": "«",
+      "close": "»"
+    }
+  ]
+}

@@ -1,0 +1,101 @@
+---
+import Base from "./Base.astro";
+import { getConfig } from "../lib/vault";
+
+interface Props {
+  title?: string;
+  section: string;
+}
+const { title = "Dashboard", section } = Astro.props;
+const cfg = getConfig();
+
+const sections = [
+  { id: "resumen", label: "Resumen", href: "/dashboard" },
+  { id: "personajes", label: "Personajes", href: "/dashboard/personajes" },
+  { id: "historia", label: "Historia", href: "/dashboard/historia" },
+  { id: "lugares", label: "Lugares", href: "/dashboard/lugares" },
+  { id: "trama", label: "Trama", href: "/dashboard/trama" },
+  { id: "fundamentos", label: "Fundamentos", href: "/dashboard/fundamentos" },
+  { id: "lexico", label: "Léxico", href: "/dashboard/lexico" },
+  { id: "cronologia", label: "Cronología", href: "/dashboard/cronologia" },
+  { id: "foreshadowing", label: "Foreshadowing", href: "/dashboard/foreshadowing" },
+];
+---
+
+<Base title={title}>
+  <header>
+    <h1>{cfg.title}</h1>
+    <p>{cfg.subtitle}</p>
+  </header>
+  <nav>
+    {sections.map((s) => (
+      <a href={s.href} class:list={{ active: s.id === section }}>{s.label}</a>
+    ))}
+    <a href="/logout" class="logout">Salir</a>
+    <button id="theme-toggle" class="theme-btn" title="Cambiar tema">☀️</button>
+  </nav>
+  <main>
+    <slot />
+  </main>
+</Base>
+
+<script is:inline>
+  var btn = document.getElementById("theme-toggle");
+  btn.textContent = document.documentElement.getAttribute("data-theme") === "light" ? "🌙" : "☀️";
+  btn.onclick = function() {
+    var next = document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light";
+    document.documentElement.setAttribute("data-theme", next);
+    localStorage.setItem("theme", next);
+    btn.textContent = next === "light" ? "🌙" : "☀️";
+  };
+</script>
+
+<style>
+  header { padding: 1rem 2rem; border-bottom: 1px solid var(--border); }
+  header h1 { font-family: 'Cinzel', serif; font-size: var(--fs-h1); font-weight: 700; color: var(--heading); margin: 0; }
+  header p { color: var(--text2); margin-top: .25rem; font-size: .9rem; }
+  nav { display: flex; gap: .5rem; padding: 1rem 2rem; border-bottom: 1px solid var(--border); overflow-x: auto; flex-wrap: wrap; }
+  nav a { background: var(--surface); border: 1px solid var(--border); color: var(--text2); padding: .5rem 1rem; border-radius: 6px; font-size: var(--fs-small); white-space: nowrap; transition: .15s; text-decoration: none; }
+  nav a:hover { background: var(--surface2); color: var(--heading); text-decoration: none; }
+  nav a.active { background: var(--accent); color: var(--heading-inv); border-color: var(--accent); font-weight: 600; }
+  nav a.logout { background: var(--surface); border-color: var(--logout); color: var(--logout); margin-left: auto; }
+  .theme-btn { background: var(--surface); border: 1px solid var(--border); color: var(--text2); padding: .5rem .65rem; border-radius: 6px; font-size: .9rem; cursor: pointer; transition: .15s; line-height: 1; }
+  .theme-btn:hover { background: var(--surface2); color: var(--text); }
+  main { padding: 1.5rem 2rem; max-width: 1400px; }
+  @media(max-width:640px) {
+    header { padding: 1.2rem 1rem; }
+    nav { padding: .75rem 1rem; gap: .35rem; }
+    nav a { font-size: var(--fs-card); padding: .35rem .7rem; }
+    main { padding: 1rem; }
+  }
+</style>
+
+<style is:global>
+  .md-content { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem 1.5rem; }
+  .md-content p { font-size: var(--fs-body); line-height: 1.7; color: var(--text); margin-bottom: .6rem; }
+  .md-content p:last-child { margin-bottom: 0; }
+  .md-content a { color: var(--accent); text-decoration: underline; }
+  .md-content strong { color: var(--heading); font-weight: 600; }
+  .md-content h3 { font-size: var(--fs-h3); color: var(--accent); margin: 1.25rem 0 .5rem; }
+  .md-content h3:first-child { margin-top: 0; }
+  .md-content h4 { font-size: var(--fs-h4); color: var(--heading); margin: 1rem 0 .35rem; }
+  .md-content ul { font-size: var(--fs-body); line-height: 1.7; color: var(--text); padding-left: 1.25rem; margin-bottom: .6rem; }
+  .md-content li { margin-bottom: .25rem; }
+  .md-content blockquote { border-left: 3px solid var(--accent); padding-left: 1rem; margin: .75rem 0; color: var(--text2); font-style: italic; }
+  .md-content table { width: 100%; border-collapse: collapse; font-size: var(--fs-table); margin: .75rem 0; }
+  .md-content th { text-align: left; padding: .4rem .6rem; background: var(--surface2); color: var(--text2); font-weight: 500; border-bottom: 1px solid var(--border); }
+  .md-content td { padding: .4rem .6rem; border-bottom: 1px solid var(--border); }
+  .md-content hr { border: none; border-top: 1px solid var(--border); margin: 1.25rem 0; }
+  .card h3 { font-size: var(--fs-h3); margin-bottom: .35rem; color: var(--heading); }
+  .card h4 { font-size: var(--fs-small); margin-bottom: .2rem; color: var(--heading); }
+  .card .sub { font-size: var(--fs-table); color: var(--text2); margin-bottom: .6rem; }
+  .card p { font-size: var(--fs-small); line-height: 1.5; color: var(--text); }
+  .card .entry-desc { font-size: var(--fs-card); color: var(--text2); margin-top: .25rem; line-height: 1.4; overflow-wrap: break-word; word-break: break-word; }
+  .card .entry-desc p { font-size: var(--fs-card); color: var(--text2); line-height: 1.4; margin: 0; overflow-wrap: break-word; word-break: break-word; }
+  .card .entry-desc a { color: var(--accent); }
+  .entity-card { padding: .9rem 1rem; border-radius: 8px; }
+  .entity-card .entry-desc { margin-top: .4rem; }
+  .entity-card .entry-desc { font-size: var(--fs-card); color: var(--text2); line-height: 1.4; overflow-wrap: break-word; word-break: break-word; margin-top: .4rem; }
+  .entity-card .entry-desc p { font-size: var(--fs-card); color: var(--text2); line-height: 1.4; margin: 0; overflow-wrap: break-word; word-break: break-word; }
+  .entity-card .entry-desc a { color: var(--accent); }
+</style>
