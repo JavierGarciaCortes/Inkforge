@@ -121,7 +121,7 @@
   height: 100%;
   min-height: 0;
   display: grid;
-  grid-template-columns: 276px minmax(360px, 1fr) 292px;
+  grid-template-columns: 276px minmax(360px, 1fr) 320px;
   overflow: hidden;
 }
 
@@ -145,7 +145,7 @@
 }
 
 .editor-panel {
-  overflow: auto;
+  overflow: hidden;
   border-left: 1px solid var(--border-strong);
 }
 
@@ -651,6 +651,389 @@
   white-space: pre-wrap;
 }
 
+.opencode-panel {
+  display: grid;
+  grid-template-rows: 56px auto minmax(0, 1fr) auto;
+}
+
+.connection-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.connection-state::before {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-faint);
+  content: '';
+}
+
+.connection-connected {
+  color: #8fc3a5;
+}
+
+.connection-connected::before {
+  background: #65a982;
+}
+
+.connection-starting::before {
+  background: #d29b58;
+  animation: connection-pulse 1s ease-in-out infinite alternate;
+}
+
+.connection-error,
+.connection-incompatible,
+.connection-not_found {
+  color: #e4bbb2;
+}
+
+.connection-error::before,
+.connection-incompatible::before,
+.connection-not_found::before {
+  background: #c87969;
+}
+
+@keyframes connection-pulse {
+  to {
+    opacity: 0.35;
+  }
+}
+
+.opencode-controls {
+  display: grid;
+  padding: 12px 14px;
+  gap: 9px;
+  border-bottom: 1px solid var(--border);
+  background: #1a1d21;
+}
+
+.opencode-controls label {
+  display: grid;
+  gap: 5px;
+}
+
+.opencode-controls label > span {
+  color: var(--text-muted);
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.opencode-controls select {
+  width: 100%;
+  min-width: 0;
+  height: 30px;
+  padding: 0 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  background: var(--surface-deep);
+  font-size: 10px;
+  text-overflow: ellipsis;
+}
+
+.opencode-controls select:disabled {
+  color: var(--text-faint);
+  opacity: 0.75;
+}
+
+.opencode-messages {
+  min-height: 0;
+  padding: 14px;
+  overflow-y: auto;
+  scrollbar-color: var(--border-emphasis) transparent;
+  scrollbar-width: thin;
+}
+
+.opencode-empty {
+  display: grid;
+  justify-items: start;
+  padding: 10px 2px;
+}
+
+.opencode-empty .editor-monogram {
+  margin-bottom: 14px;
+}
+
+.opencode-empty h2 {
+  margin: 0 0 7px;
+  color: var(--text-strong);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.opencode-empty p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.opencode-empty button,
+.opencode-error button {
+  margin-top: 12px;
+  padding: 6px 9px;
+  border: 1px solid var(--border-emphasis);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  background: var(--surface-selected);
+  cursor: pointer;
+  font-size: 10px;
+}
+
+.chat-message {
+  margin-bottom: 12px;
+  padding: 10px 11px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: #1a1d21;
+}
+
+.chat-message-user {
+  margin-left: 18px;
+  border-color: rgb(193 138 88 / 32%);
+  background: rgb(93 64 42 / 24%);
+}
+
+.chat-message-assistant {
+  margin-right: 12px;
+}
+
+.chat-message > span {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--text-muted);
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.chat-message p {
+  margin: 0;
+  color: #d2d3d6;
+  font-size: 11px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.chat-message small {
+  display: block;
+  margin-top: 7px;
+  color: #d89a8e;
+  font-size: 9px;
+}
+
+.chat-message-error {
+  border-color: rgb(200 121 105 / 45%);
+}
+
+.opencode-activity {
+  margin: 4px 0 12px;
+  color: #d8b47d;
+  font-size: 10px;
+}
+
+.opencode-activity::before {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 7px;
+  border-radius: 50%;
+  background: #d29b58;
+  content: '';
+  animation: connection-pulse 1s ease-in-out infinite alternate;
+}
+
+.opencode-error,
+.opencode-request {
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid rgb(200 121 105 / 38%);
+  border-radius: 5px;
+  background: rgb(91 51 45 / 20%);
+}
+
+.opencode-error strong,
+.opencode-request h3 {
+  color: #edc7be;
+  font-size: 11px;
+}
+
+.opencode-error p,
+.opencode-request p {
+  margin: 6px 0 0;
+  color: var(--text-secondary);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.opencode-request {
+  border-color: rgb(193 138 88 / 38%);
+  background: rgb(93 64 42 / 18%);
+}
+
+.opencode-request h3 {
+  margin: 7px 0 0;
+  color: #e7c49e;
+}
+
+.opencode-resource-list {
+  margin: 9px 0 0;
+  padding-left: 17px;
+  color: var(--text-muted);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 9px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.opencode-request-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-top: 12px;
+  gap: 6px;
+}
+
+.opencode-request-actions button {
+  min-height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--border-emphasis);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  background: var(--surface-selected);
+  cursor: pointer;
+  font-size: 9px;
+}
+
+.opencode-request-actions .request-primary {
+  border-color: #8f6847;
+  color: #f0d2af;
+  background: #5d402a;
+}
+
+.opencode-request-actions button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.opencode-question {
+  min-width: 0;
+  margin: 12px 0 0;
+  padding: 10px;
+  border: 1px solid var(--border);
+}
+
+.opencode-question legend {
+  padding: 0 4px;
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.opencode-options {
+  display: grid;
+  margin-top: 9px;
+  gap: 6px;
+}
+
+.opencode-options label {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 7px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 10px;
+}
+
+.opencode-options input {
+  margin: 2px 0 0;
+  accent-color: var(--accent);
+}
+
+.opencode-options strong,
+.opencode-options small {
+  display: block;
+}
+
+.opencode-options small {
+  margin-top: 2px;
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+
+.opencode-custom-answer {
+  width: 100%;
+  margin-top: 9px;
+  padding: 7px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  background: var(--surface-deep);
+  font-size: 10px;
+}
+
+.opencode-composer {
+  padding: 12px;
+  border-top: 1px solid var(--border);
+  background: #1a1d21;
+}
+
+.opencode-composer textarea {
+  width: 100%;
+  height: 74px;
+  min-height: 54px;
+  padding: 9px 10px;
+  resize: vertical;
+  border: 1px solid var(--border-emphasis);
+  border-radius: 4px;
+  color: var(--text-strong);
+  background: var(--surface-deep);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.opencode-composer textarea:disabled {
+  color: var(--text-faint);
+}
+
+.opencode-composer-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  gap: 8px;
+}
+
+.opencode-composer-footer span {
+  color: var(--text-faint);
+  font-size: 9px;
+}
+
+.opencode-composer-footer button {
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid #8f6847;
+  border-radius: 4px;
+  color: #f0d2af;
+  background: #5d402a;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.opencode-composer-footer button:disabled {
+  border-color: var(--border);
+  color: var(--text-faint);
+  background: var(--surface-selected);
+  cursor: default;
+}
+
 .dialog-overlay {
   position: fixed;
   z-index: 20;
@@ -783,7 +1166,7 @@
 
 @media (max-width: 1080px) {
   .workspace-grid {
-    grid-template-columns: 238px minmax(340px, 1fr) 248px;
+    grid-template-columns: 228px minmax(340px, 1fr) 280px;
   }
 
   .desktop-status {
@@ -798,7 +1181,7 @@
 
   .workspace-grid {
     grid-template-columns: 210px minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr) minmax(96px, 120px);
+    grid-template-rows: minmax(0, 1fr) minmax(220px, 42%);
   }
 
   .editor-panel {
@@ -807,7 +1190,6 @@
     border-left: 0;
   }
 
-  .editor-panel .panel-heading,
   .editor-footer {
     display: none;
   }
@@ -850,8 +1232,8 @@
   }
 
   .editor-panel {
-    min-height: 120px;
-    flex: 0 0 120px;
+    min-height: 500px;
+    flex: 0 0 500px;
   }
 
   .document-editor {
@@ -882,7 +1264,9 @@
 
 @media (prefers-reduced-motion: reduce) {
   .folder-chevron,
-  .loading-mark {
+  .loading-mark,
+  .connection-starting::before,
+  .opencode-activity::before {
     transition: none;
     animation: none;
   }
