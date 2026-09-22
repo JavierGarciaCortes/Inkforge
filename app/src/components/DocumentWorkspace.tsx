@@ -1,10 +1,19 @@
-import type { LoadState, VaultDocument } from '../types/inkforge'
+import type { LoadState, SaveState, VaultDocument } from '../types/inkforge'
 
 interface DocumentWorkspaceProps {
   document: VaultDocument | null
   selectedPath: string | null
   state: LoadState
   error: string | null
+  content: string
+  isEditing: boolean
+  isDirty: boolean
+  saveState: SaveState
+  saveError: string | null
+  onEdit: () => void
+  onReadMode: () => void
+  onContentChange: (content: string) => void
+  onSave: () => void
 }
 
 export function DocumentWorkspace({
@@ -12,8 +21,30 @@ export function DocumentWorkspace({
   selectedPath,
   state,
   error,
+  content,
+  isEditing,
+  isDirty,
+  saveState,
+  saveError,
+  onEdit,
+  onReadMode,
+  onContentChange,
+  onSave,
 }: DocumentWorkspaceProps) {
   const documentName = document?.name ?? selectedPath?.split('/').at(-1) ?? 'Sin selección'
+
+  const saveStatus = saveState === 'saving'
+    ? 'Guardando…'
+    : saveState === 'error'
+      ? 'Error al guardar'
+      : isDirty
+        ? 'Sin guardar'
+        : 'Guardado'
+  const saveStatusClass = saveState === 'error'
+    ? 'save-state save-state-error'
+    : isDirty
+      ? 'save-state save-state-dirty'
+      : 'save-state'
 
   return (
     <main className="document-workspace">
@@ -22,7 +53,46 @@ export function DocumentWorkspace({
           <span className="eyebrow">Documento</span>
           <span className="document-title" title={selectedPath ?? undefined}>{documentName}</span>
         </div>
-        <span className="read-mode">Solo lectura</span>
+        {state === 'ready' && document ? (
+          <div className="document-actions">
+            {isEditing ? (
+              <>
+                <span className={saveStatusClass} role="status" aria-live="polite">
+                  {saveStatus}
+                </span>
+                <button
+                  className="workspace-button workspace-button-secondary"
+                  type="button"
+                  disabled={saveState === 'saving'}
+                  onClick={onReadMode}
+                >
+                  Modo lectura
+                </button>
+                <button
+                  className="save-button"
+                  type="button"
+                  disabled={!isDirty || saveState === 'saving'}
+                  onClick={onSave}
+                >
+                  Guardar
+                </button>
+              </>
+            ) : (
+              <>
+                <span className="edit-mode">Modo lectura</span>
+                <button
+                  className="workspace-button"
+                  type="button"
+                  onClick={onEdit}
+                >
+                  Editar
+                </button>
+              </>
+            )}
+          </div>
+        ) : (
+          <span className="edit-mode">Edición Markdown</span>
+        )}
       </div>
 
       <div className="document-surface" aria-busy={state === 'loading'}>
@@ -54,13 +124,26 @@ export function DocumentWorkspace({
         )}
 
         {state === 'ready' && document && (
-          <article className="document-reader">
-            <header className="document-reader-header">
+          <section className={isEditing ? 'document-editor' : 'document-reader'}>
+            <header className="document-content-header">
               <h1>{document.name}</h1>
               <p title={document.path}>{document.path}</p>
             </header>
-            <pre className="markdown-source" tabIndex={0}>{document.content}</pre>
-          </article>
+            {isEditing ? (
+              <>
+                {saveError && <p className="save-error" role="alert">{saveError}</p>}
+                <textarea
+                  className="markdown-editor"
+                  value={content}
+                  aria-label={`Editar ${document.name}`}
+                  onChange={(event) => onContentChange(event.target.value)}
+                  spellCheck
+                />
+              </>
+            ) : (
+              <pre className="markdown-source" tabIndex={0}>{document.content}</pre>
+            )}
+          </section>
         )}
       </div>
     </main>

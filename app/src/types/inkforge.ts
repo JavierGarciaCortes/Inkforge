@@ -4,6 +4,7 @@ export interface InkforgeAppInfo {
 }
 
 export type LoadState = 'idle' | 'loading' | 'ready' | 'error'
+export type SaveState = 'idle' | 'saving' | 'error'
 
 export interface VaultDirectoryNode {
   type: 'directory'
@@ -31,5 +32,6 @@ export interface InkforgeBridge {
   vault: {
     list: () => Promise<VaultTreeNode[]>
     read: (relativePath: string) => Promise<VaultDocument>
+    write: (relativePath: string, content: string) => Promise<VaultDocument>
   }
 }
