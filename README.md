@@ -26,23 +26,23 @@ Estado actual de `app/`:
 - guardado explícito mediante botón, `Ctrl+S` o `Cmd+S`;
 - modal integrado al cambiar de documento o volver a lectura con cambios sin guardar;
 - aviso nativo al cerrar con cambios sin guardar;
-- panel Editor reservado para OpenCode;
+- servidor OpenCode local gestionado por Electron y limitado a `127.0.0.1`;
+- chat integrado con streaming y selección dinámica de modelo y variante;
+- interfaz implementada para permisos y preguntas de OpenCode, pendiente de validación manual en una interacción real;
 - arranque correcto de la shell en desarrollo y producción local;
 - build de producción funcional;
 - lint limpio.
 
-La interfaz ya permite recorrer el vault actual y abre cada documento Markdown en modo lectura. La edición requiere pulsar `Editar`, y los cambios se guardan de forma explícita en los archivos reales. El panel Editor aún no está conectado a OpenCode.
+La interfaz permite recorrer el vault actual y abre cada documento Markdown en modo lectura. La edición requiere pulsar `Editar`, y los cambios se guardan de forma explícita en los archivos reales. El panel derecho conecta con OpenCode local y mantiene la misma sesión mientras se cambia de modelo o variante.
 
 Fuera de `app/`, también siguen disponibles el sistema editorial heredado de fiction-vault mediante el uso directo de OpenCode y el dashboard Astro heredado en `web/`.
 
 Todavía no existen en la interfaz de escritorio:
 
-- conexión con OpenCode;
 - gestión de proyectos o bibliotecas;
 - creación, renombrado o borrado de archivos y carpetas;
 - autosave e historial de versiones;
-- chat editorial;
-- proveedores adicionales como Codex u Ollama;
+- gestión propia de proveedores o credenciales fuera de OpenCode;
 - packaging, instalador o ejecutables distribuibles para Windows;
 - un sistema propio de canon, memoria o acciones semánticas.
 
@@ -130,6 +130,8 @@ Los archivos de `vault/` siguen siendo las fuentes de verdad. Las reglas complet
 - Python 3;
 - OpenCode.
 
+El ejecutable `opencode` debe estar disponible en el `PATH`. Inkforge lo inicia desde la raíz del proyecto, detecta la URL local anunciada y comprueba sus capacidades en tiempo de ejecución.
+
 El desarrollo actual se ha probado con Node.js 22. Esto describe el entorno utilizado, no establece por sí solo una versión mínima compatible.
 
 ## Desarrollo
@@ -167,16 +169,27 @@ npm run dev
 
 ## OpenCode
 
-`opencode.json` ya configura el sistema editorial y su servidor MCP. Inkforge Desktop todavía no inicia ni controla OpenCode desde la interfaz.
+`opencode.json` configura el sistema editorial, sus agentes y el servidor MCP. Inkforge Desktop inicia un servidor OpenCode local desde la raíz del proyecto, enlazado exclusivamente a `127.0.0.1`, y comprueba `/global/health` antes de habilitar el chat.
 
-Mientras se desarrolla esa integración, el flujo editorial existente puede utilizarse abriendo directamente la raíz de Inkforge con OpenCode. De este modo siguen disponibles las instrucciones de `AGENTS.md`, las skills, los subagentes y las herramientas que trabajan sobre el vault.
+El panel derecho obtiene dinámicamente de OpenCode los modelos de los proveedores conectados, sin priorizar ningún proveedor por nombre. Con varios proveedores no selecciona un modelo automáticamente; con uno solo utiliza su modelo predeterminado cuando está disponible en el catálogo. El usuario selecciona el modelo y, cuando existe, su variante.
+
+Inkforge lee la configuración efectiva de OpenCode, exige exactamente un agente con `mode="primary"` y lo utiliza como agente principal del proyecto; actualmente es `editor`. La interfaz no permite seleccionar agentes. Los subagentes continúan bajo la coordinación de OpenCode y del agente principal.
+
+Las respuestas se transmiten mediante SSE. La interfaz y el soporte para solicitudes de permiso y preguntas interactivas están implementados, pero todavía no se han validado manualmente en una interacción real. Los permisos nunca se aceptan automáticamente.
+
+Se han validado manualmente el catálogo dinámico de modelos, la selección sin proveedor preferido, el cambio de modelo dentro de la misma sesión, el streaming, el error por modelo no disponible, el cambio de modelo con reintento conservando el mismo `sessionID` y el cierre del proceso OpenCode gestionado por Inkforge. El soporte de variantes está implementado, pero pendiente de validación manual en una interacción real.
+
+La compatibilidad se decide por las capacidades disponibles, no por un número de versión rígido. La integración se probó inicialmente contra OpenCode 1.18.31, pero otras versiones compatibles pueden utilizarse si ofrecen los endpoints necesarios. Si el cambio de modelo por sesión no está disponible, Inkforge conserva la selección y la envía explícitamente con cada mensaje.
+
+Todo acceso a procesos, HTTP local y eventos SSE permanece en Electron main. El renderer recibe únicamente un contrato IPC tipado mediante el preload y no obtiene acceso directo a Node, `child_process` ni al servidor local.
+
+El flujo editorial existente también puede seguir utilizándose abriendo directamente la raíz de Inkforge con OpenCode. Las instrucciones de `AGENTS.md`, las skills, los subagentes, el MCP y el vault Markdown continúan siendo la fuente de comportamiento y contexto.
 
 ## Roadmap inmediato
 
-1. Conectar Inkforge Desktop con OpenCode local.
-2. Añadir selección y gestión de proyectos y vaults.
-3. Incorporar el chat editorial dentro de Inkforge.
-4. Preparar el empaquetado para Windows.
+1. Añadir selección y gestión de proyectos y vaults.
+2. Reforzar recuperación y persistencia de sesiones de chat entre aperturas.
+3. Preparar el empaquetado para Windows.
 
 ## Principios de desarrollo
 

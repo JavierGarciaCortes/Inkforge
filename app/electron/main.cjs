@@ -1,10 +1,14 @@
 const path = require('node:path')
 const fs = require('node:fs/promises')
 const { app, BrowserWindow, ipcMain, session } = require('electron')
+const { createOpenCodeClient, serializeError } = require('./opencode-client.cjs')
 
 const isDevelopment = process.argv.includes('--dev')
 const developmentUrl = 'http://127.0.0.1:5173'
-const vaultRoot = path.resolve(__dirname, '..', '..', 'vault')
+const projectRoot = path.resolve(__dirname, '..', '..')
+const vaultRoot = path.join(projectRoot, 'vault')
+let openCodeClient = null
+let quitReady = false
 
 function isHidden(name) {
   return name.startsWith('.')
@@ -137,6 +141,39 @@ function configureContentSecurityPolicy() {
   })
 }
 
+function broadcast(channel, payload) {
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed()) {
+      window.webContents.send(channel, payload)
+    }
+  }
+}
+
+function registerOpenCodeHandlers(client) {
+  const handle = (channel, action) => {
+    ipcMain.handle(channel, async (_event, payload) => {
+      try {
+        return { ok: true, value: await action(payload) }
+      } catch (error) {
+        return { ok: false, error: serializeError(error) }
+      }
+    })
+  }
+
+  handle('opencode:status', () => client.getStatus())
+  handle('opencode:start', () => client.start())
+  handle('opencode:list-models', () => client.listModels())
+  handle('opencode:list-agents', () => client.listAgents())
+  handle('opencode:create-session', (payload) => client.createSession(payload))
+  handle('opencode:get-messages', (payload) => client.getMessages(payload?.sessionID))
+  handle('opencode:send-message', (payload) => client.sendMessage(payload))
+  handle('opencode:switch-model', (payload) => client.switchModel(payload))
+  handle('opencode:switch-agent', (payload) => client.switchAgent(payload))
+  handle('opencode:reply-permission', (payload) => client.replyPermission(payload))
+  handle('opencode:reply-question', (payload) => client.replyQuestion(payload))
+  handle('opencode:reject-question', (payload) => client.rejectQuestion(payload))
+}
+
 function createWindow() {
   const mainWindow = new BrowserWindow({
     width: 1440,
@@ -173,6 +210,13 @@ function createWindow() {
 
 app.whenReady().then(() => {
   configureContentSecurityPolicy()
+
+  openCodeClient = createOpenCodeClient({
+    projectRoot,
+    onStatus: (status) => broadcast('opencode:status-changed', status),
+    onEvent: (event) => broadcast('opencode:event', event),
+  })
+  registerOpenCodeHandlers(openCodeClient)
 
   ipcMain.handle('app:get-info', () => ({
     name: 'Inkforge',
@@ -217,11 +261,24 @@ app.whenReady().then(() => {
   })
 
   createWindow()
+  void openCodeClient.start().catch(() => undefined)
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow()
     }
+  })
+})
+
+app.on('before-quit', (event) => {
+  if (quitReady || !openCodeClient) {
+    return
+  }
+
+  event.preventDefault()
+  void openCodeClient.stop().finally(() => {
+    quitReady = true
+    app.quit()
   })
 })
 
