@@ -137,7 +137,7 @@ export function Sidebar({
 
       <div className="sidebar-footer">
         <span className="sidebar-footer-label">Vault actual</span>
-        <span>Documentos Markdown en modo lectura</span>
+        <span>Lectura y edición Markdown</span>
       </div>
     </aside>
   )

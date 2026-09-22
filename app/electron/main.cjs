@@ -192,6 +192,30 @@ app.whenReady().then(() => {
     }
   })
 
+  ipcMain.handle('vault:write', async (_event, relativePath, content) => {
+    if (typeof content !== 'string') {
+      throw new Error('El contenido del documento no es válido.')
+    }
+
+    const documentPath = await resolveMarkdownPath(relativePath)
+    const fileHandle = await fs.open(documentPath, 'r+')
+
+    try {
+      const encodedContent = Buffer.from(content, 'utf8')
+      await fileHandle.writeFile(encodedContent)
+      await fileHandle.truncate(encodedContent.byteLength)
+      await fileHandle.sync()
+    } finally {
+      await fileHandle.close()
+    }
+
+    return {
+      name: path.basename(documentPath),
+      path: relativePath.replaceAll('\\', '/'),
+      content,
+    }
+  })
+
   createWindow()
 
   app.on('activate', () => {

@@ -19,24 +19,28 @@ Estado actual de `app/`:
 - `contextIsolation: true`;
 - `nodeIntegration: false`;
 - `sandbox: true`;
-- IPC explícito mediante los canales `app:get-info`, `vault:list` y `vault:read`;
+- IPC explícito mediante los canales `app:get-info`, `vault:list`, `vault:read` y `vault:write`;
 - navegación real de los documentos Markdown del vault desde el panel Biblioteca;
-- apertura de documentos en modo de solo lectura en el área Documento;
+- apertura de documentos Markdown en modo lectura por defecto;
+- edición mediante la acción explícita `Editar`;
+- guardado explícito mediante botón, `Ctrl+S` o `Cmd+S`;
+- modal integrado al cambiar de documento o volver a lectura con cambios sin guardar;
+- aviso nativo al cerrar con cambios sin guardar;
 - panel Editor reservado para OpenCode;
 - arranque correcto de la shell en desarrollo y producción local;
 - build de producción funcional;
 - lint limpio.
 
-La interfaz ya permite recorrer el vault actual y leer sus documentos Markdown. Todavía no permite editarlos ni guardarlos, y el panel Editor aún no está conectado a OpenCode.
+La interfaz ya permite recorrer el vault actual y abre cada documento Markdown en modo lectura. La edición requiere pulsar `Editar`, y los cambios se guardan de forma explícita en los archivos reales. El panel Editor aún no está conectado a OpenCode.
 
 Fuera de `app/`, también siguen disponibles el sistema editorial heredado de fiction-vault mediante el uso directo de OpenCode y el dashboard Astro heredado en `web/`.
 
 Todavía no existen en la interfaz de escritorio:
 
 - conexión con OpenCode;
-- edición o guardado de documentos del vault;
 - gestión de proyectos o bibliotecas;
-- editor Markdown funcional;
+- creación, renombrado o borrado de archivos y carpetas;
+- autosave e historial de versiones;
 - chat editorial;
 - proveedores adicionales como Codex u Ollama;
 - packaging, instalador o ejecutables distribuibles para Windows;
@@ -97,9 +101,9 @@ La compatibilidad con Windows ha sido adaptada respecto a la base original. Wind
 
 El proceso principal crea una ventana segura con `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true` y `webSecurity: true`. También bloquea ventanas nuevas y navegaciones externas inesperadas.
 
-El preload expone la información de la aplicación y una API mínima de lectura del vault: `window.inkforge.vault.list()` y `window.inkforge.vault.read(relativePath)`. No ofrece acceso genérico a Node, al sistema de archivos, a procesos ni a comandos del sistema.
+El preload expone la información de la aplicación y una API mínima del vault: `window.inkforge.vault.list()`, `window.inkforge.vault.read(relativePath)` y `window.inkforge.vault.write(relativePath, content)`. No ofrece acceso genérico a Node, al sistema de archivos, a procesos ni a comandos del sistema.
 
-La Biblioteca representa el árbol real de archivos Markdown del vault y el área Documento abre el contenido seleccionado como texto fuente en modo de solo lectura. No existen todavía edición, guardado ni acciones editoriales desde la interfaz.
+La Biblioteca representa el árbol real de archivos Markdown del vault y el área Documento muestra inicialmente el texto fuente en modo lectura. La acción `Editar` habilita el editor; el guardado es siempre explícito y solo admite documentos `.md` ya existentes cuya ruta real permanece dentro del vault. Un modal propio protege los cambios sin guardar al cambiar de documento o volver a lectura. No existen todavía autosave, historial ni acciones editoriales desde la interfaz.
 
 ## Sistema editorial heredado
 
@@ -171,9 +175,8 @@ Mientras se desarrolla esa integración, el flujo editorial existente puede util
 
 1. Conectar Inkforge Desktop con OpenCode local.
 2. Añadir selección y gestión de proyectos y vaults.
-3. Integrar un editor Markdown.
-4. Incorporar el chat editorial dentro de Inkforge.
-5. Preparar el empaquetado para Windows.
+3. Incorporar el chat editorial dentro de Inkforge.
+4. Preparar el empaquetado para Windows.
 
 ## Principios de desarrollo
 
