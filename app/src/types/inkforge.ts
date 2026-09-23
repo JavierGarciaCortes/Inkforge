@@ -156,6 +156,10 @@ export interface OpenCodeSwitchResult {
 
 export interface InkforgeBridge {
   getAppInfo: () => Promise<InkforgeAppInfo>
+  appWindow: {
+    onCloseRequested: (callback: () => void) => () => void
+    confirmClose: () => Promise<void>
+  }
   vault: {
     list: () => Promise<VaultTreeNode[]>
     read: (relativePath: string) => Promise<VaultDocument>
@@ -164,6 +168,7 @@ export interface InkforgeBridge {
       content: string,
       expectedRevision: string,
     ) => Promise<VaultWriteResult>
+    onChanged: (callback: () => void) => () => void
   }
   opencode: {
     status: () => Promise<OpenCodeResult<OpenCodeStatus>>
