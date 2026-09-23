@@ -286,7 +286,8 @@ function App() {
       !currentDocument ||
       contentToSave === currentDocument.content ||
       saveState === 'saving' ||
-      saveState === 'conflict'
+      saveState === 'conflict' ||
+      saveState === 'missing'
     ) {
       return
     }
@@ -318,8 +319,15 @@ function App() {
       }
 
       if (!result.ok) {
-        setConflictDocument(result.currentDocument)
-        setSaveState('conflict')
+        if (result.reason === 'conflict') {
+          setConflictDocument(result.currentDocument)
+          setSaveState('conflict')
+          setSaveError(null)
+          return
+        }
+
+        setConflictDocument(null)
+        setSaveState('missing')
         setSaveError(null)
         return
       }
@@ -354,7 +362,8 @@ function App() {
           isEditing &&
           isDirty &&
           saveState !== 'saving' &&
-          saveState !== 'conflict'
+          saveState !== 'conflict' &&
+          saveState !== 'missing'
         ) {
           void saveDocument()
         }

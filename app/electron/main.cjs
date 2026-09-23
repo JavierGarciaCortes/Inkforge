@@ -327,9 +327,32 @@ app.whenReady().then(() => {
       throw new Error('La revisión esperada del documento no es válida.')
     }
 
-    const documentPath = await resolveMarkdownPath(relativePath)
-    const normalizedPath = relativePath.replaceAll('\\', '/')
-    const fileHandle = await fs.open(documentPath, 'r+')
+    const normalizedPath = typeof relativePath === 'string'
+      ? relativePath.replaceAll('\\', '/')
+      : relativePath
+    let documentPath
+
+    try {
+      documentPath = await resolveMarkdownPath(relativePath)
+    } catch (error) {
+      if (error?.code === 'ENOENT') {
+        return { ok: false, reason: 'missing', path: normalizedPath }
+      }
+
+      throw error
+    }
+
+    let fileHandle
+
+    try {
+      fileHandle = await fs.open(documentPath, 'r+')
+    } catch (error) {
+      if (error?.code === 'ENOENT') {
+        return { ok: false, reason: 'missing', path: normalizedPath }
+      }
+
+      throw error
+    }
 
     try {
       const currentContent = await fileHandle.readFile('utf8')

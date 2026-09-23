@@ -4,7 +4,7 @@ export interface InkforgeAppInfo {
 }
 
 export type LoadState = 'idle' | 'loading' | 'ready' | 'error'
-export type SaveState = 'idle' | 'saving' | 'error' | 'conflict'
+export type SaveState = 'idle' | 'saving' | 'error' | 'conflict' | 'missing'
 
 export interface VaultDirectoryNode {
   type: 'directory'
@@ -37,6 +37,11 @@ export type VaultWriteResult =
       ok: false
       reason: 'conflict'
       currentDocument: VaultDocument
+    }
+  | {
+      ok: false
+      reason: 'missing'
+      path: string
     }
 
 export type OpenCodeConnectionState =
