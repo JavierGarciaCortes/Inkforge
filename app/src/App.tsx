@@ -24,6 +24,7 @@ async function readVaultTree(): Promise<VaultTreeNode[]> {
 type PendingAction =
   | { type: 'open-document'; relativePath: string }
   | { type: 'read-mode' }
+  | { type: 'close-window' }
 
 function App() {
   const [appInfo, setAppInfo] = useState<InkforgeAppInfo | null>(null)
@@ -49,7 +50,9 @@ function App() {
 
   const isDirty = documentState === 'ready' && document !== null && draftContent !== document.content
 
-  const loadVault = useCallback(async () => {
+  const loadVault = useCallback(async (
+    { background = false }: { background?: boolean } = {},
+  ) => {
     const requestId = vaultRequestId.current + 1
     vaultRequestId.current = requestId
 
@@ -62,8 +65,13 @@ function App() {
 
       setVaultTree(tree)
       setVaultState('ready')
+      setVaultError(null)
     } catch {
       if (!isMounted.current || vaultRequestId.current !== requestId) {
+        return
+      }
+
+      if (background) {
         return
       }
 
@@ -76,6 +84,11 @@ function App() {
   useEffect(() => {
     let isEffectActive = true
     isMounted.current = true
+    const unsubscribeVaultChanged = window.inkforge
+      ? window.inkforge.vault.onChanged(() => {
+          void loadVault({ background: true })
+        })
+      : () => undefined
 
     if (window.inkforge) {
       window.inkforge.getAppInfo().then((info) => {
@@ -85,30 +98,22 @@ function App() {
       }).catch(() => undefined)
     }
 
-        void readVaultTree()
-      .then((tree) => {
-        if (isEffectActive) {
-          setVaultTree(tree)
-          setVaultState('ready')
-        }
-      })
-      .catch(() => {
-        if (isEffectActive) {
-          setVaultTree([])
-          setVaultState('error')
-          setVaultError('No se pudo leer el vault del proyecto.')
-        }
-      })
+    void Promise.resolve().then(() => {
+      if (isEffectActive) {
+        return loadVault()
+      }
+    })
 
     return () => {
       isEffectActive = false
+      unsubscribeVaultChanged()
       isMounted.current = false
       selectedPathRef.current = null
       vaultRequestId.current += 1
       readRequestId.current += 1
       saveRequestId.current += 1
     }
-  }, [])
+  }, [loadVault])
 
   const openDocument = async (relativePath: string) => {
     if (relativePath === selectedPath) {
@@ -194,6 +199,16 @@ function App() {
 
     if (action.type === 'open-document') {
       void openDocument(action.relativePath)
+      return
+    }
+
+    if (action.type === 'close-window') {
+      const appWindow = window.inkforge?.appWindow
+
+      if (appWindow) {
+        void appWindow.confirmClose().catch(() => undefined)
+      }
+
       return
     }
 
@@ -351,17 +366,20 @@ function App() {
   }, [isDirty, isEditing, saveDocument, saveState])
 
   useEffect(() => {
-    if (!isDirty) {
+    const appWindow = window.inkforge?.appWindow
+
+    if (!appWindow) {
       return
     }
 
-    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      event.preventDefault()
-      event.returnValue = ''
-    }
+    return appWindow.onCloseRequested(() => {
+      if (isDirty) {
+        setPendingAction({ type: 'close-window' })
+        return
+      }
 
-    window.addEventListener('beforeunload', handleBeforeUnload)
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+      void appWindow.confirmClose().catch(() => undefined)
+    })
   }, [isDirty])
 
   const retryVault = () => {
@@ -370,9 +388,15 @@ function App() {
     void loadVault()
   }
 
-  const discardMessage = pendingAction?.type === 'read-mode'
-    ? 'Tienes cambios sin guardar. Si vuelves al modo lectura, se perderán.'
-    : 'Tienes cambios sin guardar. Si cambias de documento, se perderán.'
+  const isCloseWindowPending = pendingAction?.type === 'close-window'
+  const discardMessage = isCloseWindowPending
+    ? 'Tienes cambios sin guardar. Si cierras Inkforge, se perderán.'
+    : pendingAction?.type === 'read-mode'
+      ? 'Tienes cambios sin guardar. Si vuelves al modo lectura, se perderán.'
+      : 'Tienes cambios sin guardar. Si cambias de documento, se perderán.'
+  const discardConfirmLabel = isCloseWindowPending
+    ? 'Salir sin guardar'
+    : 'Descartar cambios'
 
   return (
     <div className="app-shell">
@@ -408,7 +432,7 @@ function App() {
         <ConfirmDialog
           title="Cambios sin guardar"
           message={discardMessage}
-          confirmLabel="Descartar cambios"
+          confirmLabel={discardConfirmLabel}
           onCancel={cancelPendingAction}
           onConfirm={discardPendingChanges}
         />

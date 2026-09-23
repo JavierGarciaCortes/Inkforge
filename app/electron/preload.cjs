@@ -8,12 +8,17 @@ function subscribe(channel, callback) {
 
 contextBridge.exposeInMainWorld('inkforge', {
   getAppInfo: () => ipcRenderer.invoke('app:get-info'),
+  appWindow: {
+    onCloseRequested: (callback) => subscribe('window:close-requested', callback),
+    confirmClose: () => ipcRenderer.invoke('window:confirm-close'),
+  },
   vault: {
     list: () => ipcRenderer.invoke('vault:list'),
     read: (relativePath) => ipcRenderer.invoke('vault:read', relativePath),
     write: (relativePath, content, expectedRevision) => (
       ipcRenderer.invoke('vault:write', relativePath, content, expectedRevision)
     ),
+    onChanged: (callback) => subscribe('vault:changed', callback),
   },
   opencode: {
     status: () => ipcRenderer.invoke('opencode:status'),

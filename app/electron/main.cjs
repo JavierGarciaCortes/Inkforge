@@ -1,4 +1,5 @@
 const path = require('node:path')
+const nativeFs = require('node:fs')
 const fs = require('node:fs/promises')
 const { createHash } = require('node:crypto')
 const { app, BrowserWindow, ipcMain, session } = require('electron')
@@ -10,6 +11,9 @@ const projectRoot = path.resolve(__dirname, '..', '..')
 const vaultRoot = path.join(projectRoot, 'vault')
 let openCodeClient = null
 let quitReady = false
+let vaultWatcher = null
+let vaultChangeTimer = null
+const approvedWindowCloses = new WeakSet()
 
 function isHidden(name) {
   return name.startsWith('.')
@@ -154,6 +158,54 @@ function broadcast(channel, payload) {
   }
 }
 
+function stopVaultWatcher() {
+  if (vaultChangeTimer) {
+    clearTimeout(vaultChangeTimer)
+    vaultChangeTimer = null
+  }
+
+  if (vaultWatcher) {
+    const watcher = vaultWatcher
+    vaultWatcher = null
+
+    try {
+      watcher.close()
+    } catch {
+      // The watcher may already be closed after a filesystem error.
+    }
+  }
+}
+
+function startVaultWatcher() {
+  stopVaultWatcher()
+
+  try {
+    const watcher = nativeFs.watch(vaultRoot, { recursive: true }, () => {
+      if (vaultWatcher !== watcher) {
+        return
+      }
+
+      if (vaultChangeTimer) {
+        clearTimeout(vaultChangeTimer)
+      }
+
+      vaultChangeTimer = setTimeout(() => {
+        vaultChangeTimer = null
+        broadcast('vault:changed')
+      }, 200)
+    })
+
+    vaultWatcher = watcher
+    watcher.on('error', () => {
+      if (vaultWatcher === watcher) {
+        stopVaultWatcher()
+      }
+    })
+  } catch {
+    stopVaultWatcher()
+  }
+}
+
 function registerOpenCodeHandlers(client) {
   const handle = (channel, action) => {
     ipcMain.handle(channel, async (_event, payload) => {
@@ -202,6 +254,18 @@ function createWindow() {
     event.preventDefault()
   })
 
+  mainWindow.on('close', (event) => {
+    if (approvedWindowCloses.delete(mainWindow) || quitReady) {
+      return
+    }
+
+    event.preventDefault()
+
+    if (!mainWindow.webContents.isDestroyed()) {
+      mainWindow.webContents.send('window:close-requested')
+    }
+  })
+
   mainWindow.once('ready-to-show', () => {
     mainWindow.show()
   })
@@ -215,6 +279,7 @@ function createWindow() {
 
 app.whenReady().then(() => {
   configureContentSecurityPolicy()
+  startVaultWatcher()
 
   openCodeClient = createOpenCodeClient({
     projectRoot,
@@ -227,6 +292,17 @@ app.whenReady().then(() => {
     name: 'Inkforge',
     version: app.getVersion(),
   }))
+
+  ipcMain.handle('window:confirm-close', (event) => {
+    const targetWindow = BrowserWindow.fromWebContents(event.sender)
+
+    if (!targetWindow || targetWindow.isDestroyed()) {
+      return
+    }
+
+    approvedWindowCloses.add(targetWindow)
+    targetWindow.close()
+  })
 
   ipcMain.handle('vault:list', () => listMarkdownTree())
 
@@ -299,6 +375,10 @@ app.whenReady().then(() => {
       createWindow()
     }
   })
+})
+
+app.on('will-quit', () => {
+  stopVaultWatcher()
 })
 
 app.on('before-quit', (event) => {
