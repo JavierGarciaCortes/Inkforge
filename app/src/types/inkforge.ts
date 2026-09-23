@@ -4,7 +4,7 @@ export interface InkforgeAppInfo {
 }
 
 export type LoadState = 'idle' | 'loading' | 'ready' | 'error'
-export type SaveState = 'idle' | 'saving' | 'error'
+export type SaveState = 'idle' | 'saving' | 'error' | 'conflict'
 
 export interface VaultDirectoryNode {
   type: 'directory'
@@ -25,7 +25,19 @@ export interface VaultDocument {
   name: string
   path: string
   content: string
+  revision: string
 }
+
+export type VaultWriteResult =
+  | {
+      ok: true
+      document: VaultDocument
+    }
+  | {
+      ok: false
+      reason: 'conflict'
+      currentDocument: VaultDocument
+    }
 
 export type OpenCodeConnectionState =
   | 'idle'
@@ -147,7 +159,11 @@ export interface InkforgeBridge {
   vault: {
     list: () => Promise<VaultTreeNode[]>
     read: (relativePath: string) => Promise<VaultDocument>
-    write: (relativePath: string, content: string) => Promise<VaultDocument>
+    write: (
+      relativePath: string,
+      content: string,
+      expectedRevision: string,
+    ) => Promise<VaultWriteResult>
   }
   opencode: {
     status: () => Promise<OpenCodeResult<OpenCodeStatus>>

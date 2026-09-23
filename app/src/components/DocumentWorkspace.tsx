@@ -10,6 +10,7 @@ interface DocumentWorkspaceProps {
   isDirty: boolean
   saveState: SaveState
   saveError: string | null
+  conflictDocument: VaultDocument | null
   onEdit: () => void
   onReadMode: () => void
   onContentChange: (content: string) => void
@@ -26,6 +27,7 @@ export function DocumentWorkspace({
   isDirty,
   saveState,
   saveError,
+  conflictDocument,
   onEdit,
   onReadMode,
   onContentChange,
@@ -35,12 +37,14 @@ export function DocumentWorkspace({
 
   const saveStatus = saveState === 'saving'
     ? 'Guardando…'
-    : saveState === 'error'
-      ? 'Error al guardar'
-      : isDirty
-        ? 'Sin guardar'
-        : 'Guardado'
-  const saveStatusClass = saveState === 'error'
+    : saveState === 'conflict'
+      ? 'Conflicto externo'
+      : saveState === 'error'
+        ? 'Error al guardar'
+        : isDirty
+          ? 'Sin guardar'
+          : 'Guardado'
+  const saveStatusClass = saveState === 'error' || saveState === 'conflict'
     ? 'save-state save-state-error'
     : isDirty
       ? 'save-state save-state-dirty'
@@ -71,7 +75,7 @@ export function DocumentWorkspace({
                 <button
                   className="save-button"
                   type="button"
-                  disabled={!isDirty || saveState === 'saving'}
+                  disabled={!isDirty || saveState === 'saving' || saveState === 'conflict'}
                   onClick={onSave}
                 >
                   Guardar
@@ -132,6 +136,12 @@ export function DocumentWorkspace({
             {isEditing ? (
               <>
                 {saveError && <p className="save-error" role="alert">{saveError}</p>}
+                {saveState === 'conflict' && conflictDocument && (
+                  <p className="save-error" role="alert">
+                    Este archivo cambió fuera de Inkforge desde que lo abriste. Tu borrador
+                    sigue intacto y el archivo del disco no se ha sobrescrito.
+                  </p>
+                )}
                 <textarea
                   className="markdown-editor"
                   value={content}

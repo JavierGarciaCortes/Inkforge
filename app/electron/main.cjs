@@ -1,5 +1,6 @@
 const path = require('node:path')
 const fs = require('node:fs/promises')
+const { createHash } = require('node:crypto')
 const { app, BrowserWindow, ipcMain, session } = require('electron')
 const { createOpenCodeClient, serializeError } = require('./opencode-client.cjs')
 
@@ -16,6 +17,10 @@ function isHidden(name) {
 
 function toVaultPath(...segments) {
   return segments.filter(Boolean).join('/')
+}
+
+function createContentRevision(content) {
+  return createHash('sha256').update(content, 'utf8').digest('hex')
 }
 
 async function listMarkdownTree(directoryPath = vaultRoot, relativeDirectory = '') {
@@ -233,30 +238,56 @@ app.whenReady().then(() => {
       name: path.basename(documentPath),
       path: relativePath.replaceAll('\\', '/'),
       content,
+      revision: createContentRevision(content),
     }
   })
 
-  ipcMain.handle('vault:write', async (_event, relativePath, content) => {
+  ipcMain.handle('vault:write', async (_event, relativePath, content, expectedRevision) => {
     if (typeof content !== 'string') {
       throw new Error('El contenido del documento no es válido.')
     }
 
+    if (typeof expectedRevision !== 'string' || expectedRevision.trim().length === 0) {
+      throw new Error('La revisión esperada del documento no es válida.')
+    }
+
     const documentPath = await resolveMarkdownPath(relativePath)
+    const normalizedPath = relativePath.replaceAll('\\', '/')
     const fileHandle = await fs.open(documentPath, 'r+')
 
     try {
+      const currentContent = await fileHandle.readFile('utf8')
+      const currentRevision = createContentRevision(currentContent)
+
+      if (currentRevision !== expectedRevision) {
+        return {
+          ok: false,
+          reason: 'conflict',
+          currentDocument: {
+            name: path.basename(documentPath),
+            path: normalizedPath,
+            content: currentContent,
+            revision: currentRevision,
+          },
+        }
+      }
+
       const encodedContent = Buffer.from(content, 'utf8')
-      await fileHandle.writeFile(encodedContent)
+      await fileHandle.write(encodedContent, 0, encodedContent.byteLength, 0)
       await fileHandle.truncate(encodedContent.byteLength)
       await fileHandle.sync()
+
+      return {
+        ok: true,
+        document: {
+          name: path.basename(documentPath),
+          path: normalizedPath,
+          content,
+          revision: createContentRevision(content),
+        },
+      }
     } finally {
       await fileHandle.close()
-    }
-
-    return {
-      name: path.basename(documentPath),
-      path: relativePath.replaceAll('\\', '/'),
-      content,
     }
   })
 

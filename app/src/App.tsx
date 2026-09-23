@@ -39,6 +39,7 @@ function App() {
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null)
   const [saveState, setSaveState] = useState<SaveState>('idle')
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [conflictDocument, setConflictDocument] = useState<VaultDocument | null>(null)
   const isMounted = useRef(false)
   const selectedPathRef = useRef<string | null>(null)
   const draftContentRef = useRef('')
@@ -127,6 +128,7 @@ function App() {
     setDocumentError(null)
     setSaveState('idle')
     setSaveError(null)
+    setConflictDocument(null)
 
     if (!window.inkforge) {
       setDocumentState('error')
@@ -141,6 +143,7 @@ function App() {
         setDocument(nextDocument)
         setDraftContent(nextDocument.content)
         draftContentRef.current = nextDocument.content
+        setConflictDocument(null)
         setDocumentState('ready')
       }
     } catch {
@@ -181,7 +184,7 @@ function App() {
     setPendingAction(null)
   }, [])
 
-  const discardPendingChanges = () => {
+  const discardPendingChanges = async () => {
     const action = pendingAction
     setPendingAction(null)
 
@@ -194,13 +197,63 @@ function App() {
       return
     }
 
-    if (document) {
-      draftContentRef.current = document.content
-      setDraftContent(document.content)
-      setSaveState('idle')
-      setSaveError(null)
-      setIsEditing(false)
+    if (!document) {
+      return
     }
+
+    if (saveState === 'conflict' && conflictDocument) {
+      if (!window.inkforge) {
+        setSaveError('No se pudo volver a leer el documento desde el disco.')
+        return
+      }
+
+      const relativePath = document.path
+      const requestId = readRequestId.current + 1
+      const draftAtRequest = draftContentRef.current
+      readRequestId.current = requestId
+
+      try {
+        const nextDocument = await window.inkforge.vault.read(relativePath)
+
+        if (
+          !isMounted.current ||
+          readRequestId.current !== requestId ||
+          selectedPathRef.current !== relativePath ||
+          draftContentRef.current !== draftAtRequest
+        ) {
+          return
+        }
+
+        setDocument(nextDocument)
+        draftContentRef.current = nextDocument.content
+        setDraftContent(nextDocument.content)
+        setSaveState('idle')
+        setSaveError(null)
+        setConflictDocument(null)
+        setIsEditing(false)
+      } catch {
+        if (
+          !isMounted.current ||
+          readRequestId.current !== requestId ||
+          selectedPathRef.current !== relativePath
+        ) {
+          return
+        }
+
+        setSaveError(
+          'No se pudo volver a leer el documento. Tu borrador y el conflicto siguen intactos.',
+        )
+      }
+
+      return
+    }
+
+    draftContentRef.current = document.content
+    setDraftContent(document.content)
+    setSaveState('idle')
+    setSaveError(null)
+    setConflictDocument(null)
+    setIsEditing(false)
   }
 
   const changeDocumentContent = useCallback((content: string) => {
@@ -217,7 +270,8 @@ function App() {
     if (
       !currentDocument ||
       contentToSave === currentDocument.content ||
-      saveState === 'saving'
+      saveState === 'saving' ||
+      saveState === 'conflict'
     ) {
       return
     }
@@ -234,9 +288,10 @@ function App() {
     setSaveError(null)
 
     try {
-      const savedDocument = await window.inkforge.vault.write(
+      const result = await window.inkforge.vault.write(
         currentDocument.path,
         contentToSave,
+        currentDocument.revision,
       )
 
       if (
@@ -247,7 +302,15 @@ function App() {
         return
       }
 
-      setDocument(savedDocument)
+      if (!result.ok) {
+        setConflictDocument(result.currentDocument)
+        setSaveState('conflict')
+        setSaveError(null)
+        return
+      }
+
+      setDocument(result.document)
+      setConflictDocument(null)
       setSaveState('idle')
     } catch {
       if (
@@ -272,7 +335,12 @@ function App() {
       ) {
         event.preventDefault()
 
-        if (isEditing && isDirty && saveState !== 'saving') {
+        if (
+          isEditing &&
+          isDirty &&
+          saveState !== 'saving' &&
+          saveState !== 'conflict'
+        ) {
           void saveDocument()
         }
       }
@@ -328,6 +396,7 @@ function App() {
           isDirty={isDirty}
           saveState={saveState}
           saveError={saveError}
+          conflictDocument={conflictDocument}
           onEdit={() => setIsEditing(true)}
           onReadMode={requestReadMode}
           onContentChange={changeDocumentContent}

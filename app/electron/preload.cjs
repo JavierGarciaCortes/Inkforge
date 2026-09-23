@@ -11,7 +11,9 @@ contextBridge.exposeInMainWorld('inkforge', {
   vault: {
     list: () => ipcRenderer.invoke('vault:list'),
     read: (relativePath) => ipcRenderer.invoke('vault:read', relativePath),
-    write: (relativePath, content) => ipcRenderer.invoke('vault:write', relativePath, content),
+    write: (relativePath, content, expectedRevision) => (
+      ipcRenderer.invoke('vault:write', relativePath, content, expectedRevision)
+    ),
   },
   opencode: {
     status: () => ipcRenderer.invoke('opencode:status'),
