@@ -39,12 +39,14 @@ export function DocumentWorkspace({
     ? 'Guardando…'
     : saveState === 'conflict'
       ? 'Conflicto externo'
-      : saveState === 'error'
+      : saveState === 'missing'
+        ? 'Archivo no encontrado'
+        : saveState === 'error'
         ? 'Error al guardar'
         : isDirty
           ? 'Sin guardar'
           : 'Guardado'
-  const saveStatusClass = saveState === 'error' || saveState === 'conflict'
+  const saveStatusClass = saveState === 'error' || saveState === 'conflict' || saveState === 'missing'
     ? 'save-state save-state-error'
     : isDirty
       ? 'save-state save-state-dirty'
@@ -75,7 +77,12 @@ export function DocumentWorkspace({
                 <button
                   className="save-button"
                   type="button"
-                  disabled={!isDirty || saveState === 'saving' || saveState === 'conflict'}
+                  disabled={
+                    !isDirty ||
+                    saveState === 'saving' ||
+                    saveState === 'conflict' ||
+                    saveState === 'missing'
+                  }
                   onClick={onSave}
                 >
                   Guardar
@@ -140,6 +147,12 @@ export function DocumentWorkspace({
                   <p className="save-error" role="alert">
                     Este archivo cambió fuera de Inkforge desde que lo abriste. Tu borrador
                     sigue intacto y el archivo del disco no se ha sobrescrito.
+                  </p>
+                )}
+                {saveState === 'missing' && (
+                  <p className="save-error" role="alert">
+                    El archivo ya no está disponible en la ruta original. Tu borrador sigue
+                    intacto. Inkforge no ha creado ni sobrescrito ningún archivo.
                   </p>
                 )}
                 <textarea
