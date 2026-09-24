@@ -1,204 +1,208 @@
 # Inkforge
 
-Inkforge es una aplicación de escritorio para escribir y desarrollar novelas con una bóveda Markdown y asistencia editorial mediante OpenCode.
+Inkforge es una aplicación de escritorio para gestionar proyectos de escritura narrativa basados en vaults Markdown. La aplicación principal utiliza Electron, React y TypeScript, y mantiene los archivos Markdown reales como fuente de verdad.
 
-El proyecto está en desarrollo temprano. Su objetivo actual es proporcionar una interfaz visual sobre el flujo editorial heredado de fiction-vault sin sustituir sus agentes, herramientas ni fuentes de verdad.
+El proyecto evoluciona desde [fiction-vault](https://github.com/quinwacca/fiction-vault): conserva su base editorial, sus herramientas y su organización en archivos, y añade una interfaz de escritorio para trabajar con novelas independientes, sagas, libros y asistencia mediante OpenCode.
 
-## Estado del proyecto
+## Estado actual
 
-Estado actual de `app/`:
+La aplicación de escritorio ya permite:
 
-- Electron;
-- React 19;
-- TypeScript 6;
-- Vite 8;
-- ESLint;
-- proceso principal de Electron seguro;
-- preload mediante `contextBridge`;
-- renderer sin acceso directo a Node;
-- `contextIsolation: true`;
-- `nodeIntegration: false`;
-- `sandbox: true`;
-- IPC explícito mediante los canales `app:get-info`, `vault:list`, `vault:read` y `vault:write`;
-- navegación real de los documentos Markdown del vault desde el panel Biblioteca;
-- apertura de documentos Markdown en modo lectura por defecto;
-- edición mediante la acción explícita `Editar`;
-- guardado explícito mediante botón, `Ctrl+S` o `Cmd+S`;
-- modal integrado al cambiar de documento o volver a lectura con cambios sin guardar;
-- aviso nativo al cerrar con cambios sin guardar;
-- servidor OpenCode local gestionado por Electron y limitado a `127.0.0.1`;
-- chat integrado con streaming y selección dinámica de modelo y variante;
-- interfaz implementada para permisos y preguntas de OpenCode, pendiente de validación manual en una interacción real;
-- arranque correcto de la shell en desarrollo y producción local;
-- build de producción funcional;
-- lint limpio.
+- navegar y leer documentos Markdown;
+- activar la edición de forma explícita;
+- guardar mediante el botón de la interfaz o con `Ctrl+S` / `Cmd+S`;
+- proteger cambios sin guardar al cambiar de documento, libro u obra y al cerrar la aplicación;
+- detectar conflictos causados por modificaciones externas;
+- conservar el borrador cuando la ruta original desaparece o se renombra fuera de Inkforge;
+- actualizar el árbol del vault mediante un watcher;
+- gestionar una Biblioteca con novelas independientes y sagas de varios libros;
+- crear obras, añadir libros, cambiar el libro activo y renombrar novelas, sagas y libros;
+- usar un chat integrado con OpenCode local, streaming y selección dinámica de modelos y proveedores;
+- reintentar en la misma sesión cuando el modelo elegido resulta incompatible.
 
-La interfaz permite recorrer el vault actual y abre cada documento Markdown en modo lectura. La edición requiere pulsar `Editar`, y los cambios se guardan de forma explícita en los archivos reales. El panel derecho conecta con OpenCode local y mantiene la misma sesión mientras se cambia de modelo o variante.
+Las solicitudes de permisos, las preguntas interactivas y las variantes de modelo están implementadas, pero todavía no se han validado por completo en interacciones reales.
 
-Fuera de `app/`, también siguen disponibles el sistema editorial heredado de fiction-vault mediante el uso directo de OpenCode y el dashboard Astro heredado en `web/`.
+## Arquitectura
 
-Todavía no existen en la interfaz de escritorio:
-
-- gestión de proyectos o bibliotecas;
-- creación, renombrado o borrado de archivos y carpetas;
-- autosave e historial de versiones;
-- gestión propia de proveedores o credenciales fuera de OpenCode;
-- packaging, instalador o ejecutables distribuibles para Windows;
-- un sistema propio de canon, memoria o acciones semánticas.
-
-## Objetivo
-
-Inkforge busca ofrecer una interfaz cómoda para trabajar con proyectos narrativos basados en archivos Markdown. OpenCode seguirá coordinando el editor, los subagentes, las skills y las herramientas MCP, mientras los documentos del vault permanecerán como fuentes de verdad.
-
-La arquitectura prevista sigue este flujo:
-
-```text
+~~~text
 Inkforge Desktop
-    |
-    v
-OpenCode
-    |
-    v
-editor + subagentes + skills + MCP
-    |
-    v
-archivos Markdown del vault
-```
+    ↓
+OpenCode local
+    ↓
+agente primary
+    ↓
+subagentes / skills / MCP
+    ↓
+vault Markdown
+~~~
 
-La interfaz debe crecer alrededor del sistema editorial existente. No debe exigir que el canon narrativo se reconstruya en una base de datos paralela.
+Markdown es la fuente de verdad. Inkforge no mantiene una base de datos paralela para el canon ni una memoria alternativa del manuscrito.
 
-## Origen
+OpenCode es el backend de integración con IA. Inkforge no implementa una abstracción propia de proveedores, no guarda claves de API y no se conecta directamente a servicios de modelos. El usuario puede utilizar los proveedores y modelos configurados en OpenCode, incluidos modelos locales como Ollama.
 
-Inkforge parte de [fiction-vault](https://github.com/quinwacca/fiction-vault), creado por quinwacca, y evoluciona su flujo de trabajo hacia una aplicación de escritorio.
+Actualmente Inkforge no incluye una pantalla para conectar proveedores ni administrar credenciales. Esa configuración se realiza fuera de la aplicación, mediante OpenCode.
 
-La base heredada conserva la bóveda Markdown, las skills de OpenCode, las herramientas editoriales en Python, el servidor MCP, la configuración local y el dashboard web. Inkforge añade una nueva capa de interfaz sin ocultar ni reemplazar ese origen.
+El proceso principal de Electron concentra el acceso al sistema de archivos, los procesos locales, HTTP y SSE. El renderer recibe únicamente APIs IPC estrechas y tipadas mediante el preload. La ventana utiliza:
 
-## Arquitectura actual
+~~~text
+contextIsolation: true
+nodeIntegration: false
+sandbox: true
+webSecurity: true
+~~~
 
-```text
-Inkforge/
-|-- app/           Aplicación principal de escritorio
-|-- vault/         Contenido narrativo y fuentes de verdad en Markdown
-|-- .opencode/     Skills del sistema editorial
-|-- .tools/        Herramientas Python y servidor MCP
-|-- .fiction/      Configuración y estado local del proyecto
-|-- web/           Dashboard Astro heredado
-|-- AGENTS.md      Reglas, contexto y flujo editorial
-`-- opencode.json  Configuración de OpenCode y del servidor MCP
-```
+## Biblioteca
 
-La compatibilidad con Windows ha sido adaptada respecto a la base original. Windows es actualmente la plataforma principal del proyecto.
+Los proyectos creados por la aplicación se guardan en:
 
-## Aplicación de escritorio
+~~~text
+vault/Proyectos/
+~~~
 
-`app/` contiene la aplicación principal de Inkforge:
+Ese directorio contiene manuscritos y datos locales, está incluido en `.gitignore` y no se versiona junto al código.
 
-- Electron para el proceso de escritorio;
-- React 19 para la interfaz;
-- TypeScript 6;
-- Vite 8 para desarrollo y build;
-- ESLint para análisis estático.
+Una novela independiente mantiene capítulos, planificación, canon, notas y recursos directamente bajo la raíz de la obra. Una saga separa las áreas compartidas de los libros:
 
-El proceso principal crea una ventana segura con `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true` y `webSecurity: true`. También bloquea ventanas nuevas y navegaciones externas inesperadas.
+~~~text
+Saga/
+├── Proyecto.md
+├── Mundo/
+├── Estilo/
+├── Referencias/
+└── Libros/
+    ├── 01 - Primer libro/
+    │   ├── Libro.md
+    │   ├── Capítulos/
+    │   ├── Planificación/
+    │   ├── Canon/
+    │   ├── Notas/
+    │   └── Recursos/
+    └── 02 - Segundo libro/
+        └── ...
+~~~
 
-El preload expone la información de la aplicación y una API mínima del vault: `window.inkforge.vault.list()`, `window.inkforge.vault.read(relativePath)` y `window.inkforge.vault.write(relativePath, content)`. No ofrece acceso genérico a Node, al sistema de archivos, a procesos ni a comandos del sistema.
+En una saga, el explorador muestra `Proyecto.md`, las áreas compartidas y solo el libro activo. Cambiar de documento nunca cambia de libro: la selección se realiza exclusivamente mediante `Libro activo`.
 
-La Biblioteca representa el árbol real de archivos Markdown del vault y el área Documento muestra inicialmente el texto fuente en modo lectura. La acción `Editar` habilita el editor; el guardado es siempre explícito y solo admite documentos `.md` ya existentes cuya ruta real permanece dentro del vault. Un modal propio protege los cambios sin guardar al cambiar de documento o volver a lectura. No existen todavía autosave, historial ni acciones editoriales desde la interfaz.
+Los títulos, manifiestos, rutas y ámbitos se validan en el proceso principal. La Biblioteca rechaza symlinks y colisiones, no sobrescribe contenido existente y conserva el resto del manifiesto al renombrar.
 
-## Sistema editorial heredado
+## Edición y seguridad del vault
 
-El sistema procedente de fiction-vault continúa operativo mediante OpenCode:
+Inkforge abre los documentos en modo lectura. La edición requiere la acción `Editar` y el guardado siempre es explícito.
 
-- **editor principal**: coordina el trabajo, reúne contexto y presenta propuestas;
-- **writer**: redacta o modifica prosa creativa;
-- **structurer**: analiza estructura, ritmo y arquitectura narrativa;
-- **lector**: evalúa el manuscrito con una lectura fresca;
-- **critico**: busca problemas, contradicciones y puntos débiles;
-- **query**: prepara consultas y materiales editoriales;
-- **fiction-context MCP**: consulta capítulos, personajes, lugares, continuidad, estilo y estructura.
+Cada lectura incluye una revisión SHA-256 del contenido UTF-8. Al guardar, Electron abre el archivo existente sin crearlo, relee su contenido mediante el mismo `FileHandle`, compara la revisión y solo entonces escribe, trunca y sincroniza.
 
-Los archivos de `vault/` siguen siendo las fuentes de verdad. Las reglas completas del workflow, las voces y las herramientas disponibles se documentan en [AGENTS.md](AGENTS.md).
+El resultado distingue tres casos:
 
-## Dashboard web heredado
+- **Guardado correcto:** actualiza el documento y su revisión.
+- **Conflicto externo:** no sobrescribe el archivo y conserva el borrador.
+- **Ruta desaparecida (`missing`):** no infiere renombres, no adopta otra ruta y no recrea el archivo anterior; el borrador permanece visible e intacto.
 
-`web/` conserva el dashboard Astro de fiction-vault para métricas, búsqueda y navegación del proyecto. Sigue siendo útil como herramienta secundaria, pero no es la aplicación principal de Inkforge.
-
-## Requisitos actuales
-
-- Windows como plataforma principal actual;
-- Node.js y npm;
-- Python 3;
-- OpenCode.
-
-El ejecutable `opencode` debe estar disponible en el `PATH`. Inkforge lo inicia desde la raíz del proyecto, detecta la URL local anunciada y comprueba sus capacidades en tiempo de ejecución.
-
-El desarrollo actual se ha probado con Node.js 22. Esto describe el entorno utilizado, no establece por sí solo una versión mínima compatible.
-
-## Desarrollo
-
-### Desktop
-
-Instalación y desarrollo:
-
-```powershell
-cd app
-npm install
-npm run dev
-```
-
-Build y ejecución local de la versión compilada:
-
-```powershell
-npm run build
-npx electron .
-```
-
-Lint:
-
-```powershell
-npm run lint
-```
-
-### Dashboard heredado
-
-```powershell
-cd web
-npm install
-npm run dev
-```
+El acceso al vault rechaza rutas absolutas, segmentos ocultos, `..`, archivos que no sean Markdown, symlinks y rutas reales fuera del ámbito activo.
 
 ## OpenCode
 
-`opencode.json` configura el sistema editorial, sus agentes y el servidor MCP. Inkforge Desktop inicia un servidor OpenCode local desde la raíz del proyecto, enlazado exclusivamente a `127.0.0.1`, y comprueba `/global/health` antes de habilitar el chat.
+Inkforge inicia un servidor OpenCode local enlazado a `127.0.0.1` y descubre sus capacidades en tiempo de ejecución. La integración:
 
-El panel derecho obtiene dinámicamente de OpenCode los modelos de los proveedores conectados, sin priorizar ningún proveedor por nombre. Con varios proveedores no selecciona un modelo automáticamente; con uno solo utiliza su modelo predeterminado cuando está disponible en el catálogo. El usuario selecciona el modelo y, cuando existe, su variante.
+- obtiene modelos y proveedores dinámicamente;
+- exige exactamente un agente con `mode: "primary"`;
+- conserva los subagentes, skills y MCP configurados en el proyecto;
+- transmite respuestas mediante SSE;
+- mantiene la sesión al cambiar de modelo;
+- permite reintentar tras un error de modelo incompatible;
+- detiene el proceso local al cerrar Inkforge.
 
-Inkforge lee la configuración efectiva de OpenCode, exige exactamente un agente con `mode="primary"` y lo utiliza como agente principal del proyecto; actualmente es `editor`. La interfaz no permite seleccionar agentes. Los subagentes continúan bajo la coordinación de OpenCode y del agente principal.
+El agente primary actual es `editor`. Los subagentes definidos en `opencode.json` son `writer`, `structurer`, `lector`, `critico` y `query`.
 
-Las respuestas se transmiten mediante SSE. La interfaz y el soporte para solicitudes de permiso y preguntas interactivas están implementados, pero todavía no se han validado manualmente en una interacción real. Los permisos nunca se aceptan automáticamente.
+La integración se validó inicialmente con OpenCode 1.18.31. La compatibilidad depende de las capacidades disponibles, no de una versión rígida.
 
-Se han validado manualmente el catálogo dinámico de modelos, la selección sin proveedor preferido, el cambio de modelo dentro de la misma sesión, el streaming, el error por modelo no disponible, el cambio de modelo con reintento conservando el mismo `sessionID` y el cierre del proceso OpenCode gestionado por Inkforge. El soporte de variantes está implementado, pero pendiente de validación manual en una interacción real.
+## Estructura del repositorio
 
-La compatibilidad se decide por las capacidades disponibles, no por un número de versión rígido. La integración se probó inicialmente contra OpenCode 1.18.31, pero otras versiones compatibles pueden utilizarse si ofrecen los endpoints necesarios. Si el cambio de modelo por sesión no está disponible, Inkforge conserva la selección y la envía explícitamente con cada mensaje.
+~~~text
+Inkforge/
+├── app/                         Aplicación Electron + React + TypeScript
+│   ├── electron/                Proceso principal, preload, Biblioteca y OpenCode
+│   └── src/                     Interfaz, componentes, hooks y tipos
+├── docs/
+│   └── DEVELOPMENT_STATUS.md    Estado operativo y decisiones cerradas
+├── vault/                       Contenido narrativo Markdown
+│   └── Proyectos/               Obras locales creadas por la Biblioteca
+├── .opencode/                   Skills editoriales
+├── .tools/                      Herramientas Python y servidor MCP
+├── .fiction/                    Configuración y estado local heredado
+├── web/                         Dashboard Astro heredado y secundario
+├── AGENTS.md                    Contexto y flujo editorial
+├── Makefile                     Atajos para herramientas heredadas
+└── opencode.json                Agentes y servidor MCP de OpenCode
+~~~
 
-Todo acceso a procesos, HTTP local y eventos SSE permanece en Electron main. El renderer recibe únicamente un contrato IPC tipado mediante el preload y no obtiene acceso directo a Node, `child_process` ni al servidor local.
+`web/` continúa presente como dashboard heredado para métricas, búsqueda y navegación. No es la aplicación principal de Inkforge.
 
-El flujo editorial existente también puede seguir utilizándose abriendo directamente la raíz de Inkforge con OpenCode. Las instrucciones de `AGENTS.md`, las skills, los subagentes, el MCP y el vault Markdown continúan siendo la fuente de comportamiento y contexto.
+## Requisitos
 
-## Roadmap inmediato
+- Windows como plataforma principal actual;
+- Node.js y npm;
+- Python 3 para las herramientas heredadas y el servidor MCP;
+- OpenCode disponible en el `PATH`.
 
-1. Añadir selección y gestión de proyectos y vaults.
-2. Reforzar recuperación y persistencia de sesiones de chat entre aperturas.
-3. Preparar el empaquetado para Windows.
+El desarrollo se ha probado con Node.js 22. Esto describe el entorno utilizado, no establece una versión mínima garantizada.
 
-## Principios de desarrollo
+En Windows, `opencode.json` ya utiliza `python` para iniciar `.tools/fiction_mcp.py`.
 
-- Markdown es la fuente de verdad del contenido narrativo.
-- El canon no debe duplicarse innecesariamente en capas paralelas.
-- El uso directo de OpenCode debe seguir siendo compatible.
-- Las capacidades se incorporan de forma incremental y verificable.
-- Si una capa nueva empeora el comportamiento editorial ya probado, debe revisarse antes de consolidarse.
+## Desarrollo de la aplicación
 
-## Créditos y origen
+Los comandos se ejecutan desde la raíz del repositorio.
 
-Inkforge existe gracias a la base y al enfoque de [fiction-vault](https://github.com/quinwacca/fiction-vault), proyecto original de quinwacca. La evolución hacia Inkforge mantiene ese sistema editorial como fundamento mientras desarrolla una experiencia de escritorio propia.
+Instalar dependencias:
+
+~~~powershell
+npm --prefix .\app install
+~~~
+
+Iniciar Vite y Electron en desarrollo:
+
+~~~powershell
+npm --prefix .\app run dev
+~~~
+
+Ejecutar ESLint:
+
+~~~powershell
+npm --prefix .\app run lint
+~~~
+
+Generar el build de producción:
+
+~~~powershell
+npm --prefix .\app run build
+~~~
+
+`app/package.json` no define actualmente un script `test`.
+
+### Dashboard heredado
+
+~~~powershell
+npm --prefix .\web install
+npm --prefix .\web run dev
+~~~
+
+También están disponibles los scripts `build` y `preview` de Astro.
+
+## Validado y pendiente
+
+Están validados la navegación y edición Markdown, el guardado seguro, los estados de conflicto y `missing`, el watcher, el cierre protegido, la Biblioteca básica, la navegación entre libros, el streaming de OpenCode, los modelos y proveedores dinámicos y el retry por modelo incompatible.
+
+Pendientes reales:
+
+- completar la ayuda integrada y mantener la documentación sincronizada con el producto;
+- internacionalización;
+- validar completamente permisos, preguntas y variantes de OpenCode en interacciones reales;
+- persistir sesiones de chat y el último modelo entre reinicios;
+- preparar packaging e instalador para Windows;
+- añadir perfiles de género y estilo y definir su herencia entre saga y libro;
+- mejorar la resolución de conflictos con diff, elección de versión y merge.
+
+El borrado de obras y libros se reserva para una etapa futura y no es prioritario. La Biblioteca básica ya está completada y no forma parte de estos pendientes.
+
+## Créditos
+
+Inkforge parte de [fiction-vault](https://github.com/quinwacca/fiction-vault), proyecto original de quinwacca. Conserva su enfoque basado en Markdown, sus herramientas editoriales y su integración con OpenCode como fundamento, mientras desarrolla una experiencia de escritorio propia.
