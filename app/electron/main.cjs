@@ -27,6 +27,43 @@ let libraryWatcher = null
 let libraryChangeTimer = null
 const approvedWindowCloses = new WeakSet()
 
+const SHARED_STRUCTURE_PRESENTATIONS = new Map([
+  ['Proyecto.md', 'vault.structure.projectManifest'],
+  ['Mundo', 'vault.structure.world'],
+  ['Estilo', 'vault.structure.style'],
+  ['Referencias', 'vault.structure.references'],
+])
+
+const MANUSCRIPT_STRUCTURE_PRESENTATIONS = new Map([
+  ['Capítulos', 'vault.structure.chapters'],
+  ['Planificación', 'vault.structure.planning'],
+  ['Canon', 'vault.structure.canon'],
+  ['Notas', 'vault.structure.notes'],
+  ['Recursos', 'vault.structure.resources'],
+  ['Planificación/Cronología.md', 'vault.structure.chronology'],
+  ['Planificación/Escaleta.md', 'vault.structure.chapterOutline'],
+  ['Planificación/Estado.md', 'vault.structure.status'],
+  ['Planificación/Foreshadowing.md', 'vault.structure.foreshadowing'],
+  ['Planificación/Fundamentos.md', 'vault.structure.foundations'],
+  ['Planificación/Guía editorial.md', 'vault.structure.editorialGuide'],
+  ['Planificación/Índice.md', 'vault.structure.index'],
+  ['Planificación/Léxico.md', 'vault.structure.lexicon'],
+  ['Planificación/Outliner.md', 'vault.structure.storyOutline'],
+  ['Planificación/Pendientes.md', 'vault.structure.pending'],
+  ['Planificación/Trama.md', 'vault.structure.plot'],
+  ['Canon/Canon de libro.md', 'vault.structure.bookCanon'],
+])
+
+const BOOK_STRUCTURE_PRESENTATIONS = new Map([
+  ['Libro.md', 'vault.structure.bookManifest'],
+  ...MANUSCRIPT_STRUCTURE_PRESENTATIONS,
+])
+
+const NOVEL_STRUCTURE_PRESENTATIONS = new Map([
+  ...SHARED_STRUCTURE_PRESENTATIONS,
+  ...MANUSCRIPT_STRUCTURE_PRESENTATIONS,
+])
+
 function isHidden(name) {
   return name.startsWith('.')
 }
@@ -43,6 +80,7 @@ async function listMarkdownTree(
   directoryPath = activeVaultRoot,
   relativeDirectory = '',
   managedProjectIds = null,
+  getPresentation = null,
 ) {
   const entries = await fs.readdir(directoryPath, { withFileTypes: true })
   const visibleEntries = entries
@@ -73,12 +111,14 @@ async function listMarkdownTree(
         absolutePath,
         relativePath,
         managedProjectIds,
+        getPresentation,
       )
 
       nodes.push({
         type: 'directory',
         name: entry.name,
         path: relativePath,
+        ...(getPresentation?.(relativePath) ?? {}),
         children,
       })
 
@@ -90,6 +130,7 @@ async function listMarkdownTree(
         type: 'document',
         name: entry.name,
         path: relativePath,
+        ...(getPresentation?.(relativePath) ?? {}),
       })
     }
   }
@@ -242,6 +283,49 @@ async function getVaultScopeSnapshot() {
   }
 }
 
+function getManagedNodePresentation(scope, relativePath) {
+  if (!scope.projectRecord || scope.project.type === 'legacy') {
+    return null
+  }
+
+  const normalizedPath = relativePath.replaceAll('\\', '/')
+
+  if (scope.project.type === 'novela') {
+    const presentationKey = NOVEL_STRUCTURE_PRESENTATIONS.get(normalizedPath)
+    return presentationKey ? { presentationKey } : null
+  }
+
+  const sharedPresentationKey = SHARED_STRUCTURE_PRESENTATIONS.get(normalizedPath)
+
+  if (sharedPresentationKey) {
+    return { presentationKey: sharedPresentationKey }
+  }
+
+  if (!scope.validActiveBook) {
+    return null
+  }
+
+  const bookPath = toVaultPath('Libros', scope.validActiveBook.id)
+
+  if (normalizedPath === bookPath) {
+    return {
+      presentationKey: 'vault.structure.bookSection',
+      presentationValues: { title: scope.validActiveBook.title },
+    }
+  }
+
+  const bookPrefix = `${bookPath}/`
+
+  if (!normalizedPath.startsWith(bookPrefix)) {
+    return null
+  }
+
+  const presentationKey = BOOK_STRUCTURE_PRESENTATIONS.get(
+    normalizedPath.slice(bookPrefix.length),
+  )
+  return presentationKey ? { presentationKey } : null
+}
+
 function isSagaRelativePathAllowed(relativePath, validActiveBook) {
   if (typeof relativePath !== 'string') {
     return false
@@ -296,6 +380,7 @@ async function listSagaTree(scope) {
       type: 'document',
       name: 'Proyecto.md',
       path: 'Proyecto.md',
+      ...(getManagedNodePresentation(scope, 'Proyecto.md') ?? {}),
     })
   }
 
@@ -310,9 +395,12 @@ async function listSagaTree(scope) {
       type: 'directory',
       name: directoryName,
       path: directoryName,
+      ...(getManagedNodePresentation(scope, directoryName) ?? {}),
       children: await listMarkdownTree(
         path.join(scope.vaultRoot, directoryName),
         directoryName,
+        null,
+        (relativePath) => getManagedNodePresentation(scope, relativePath),
       ),
     })
   }
@@ -325,9 +413,12 @@ async function listSagaTree(scope) {
       name: scope.validActiveBook.title,
       path: bookPath,
       presentation: 'book-section',
+      ...(getManagedNodePresentation(scope, bookPath) ?? {}),
       children: await listMarkdownTree(
         scope.validActiveBook.directoryPath,
         bookPath,
+        null,
+        (relativePath) => getManagedNodePresentation(scope, relativePath),
       ),
     })
   }
@@ -710,7 +801,12 @@ app.whenReady().then(() => {
     }
 
     if (scope.project.type === 'novela') {
-      return listMarkdownTree(scope.vaultRoot)
+      return listMarkdownTree(
+        scope.vaultRoot,
+        '',
+        null,
+        (relativePath) => getManagedNodePresentation(scope, relativePath),
+      )
     }
 
     const projects = await projectLibrary.listProjects()
@@ -723,10 +819,12 @@ app.whenReady().then(() => {
     const scope = await getVaultScopeSnapshot()
     const documentPath = await resolveVaultMarkdownPath(relativePath, scope)
     const content = await fs.readFile(documentPath, 'utf8')
+    const normalizedPath = relativePath.replaceAll('\\', '/')
 
     return {
       name: path.basename(documentPath),
-      path: relativePath.replaceAll('\\', '/'),
+      path: normalizedPath,
+      ...(getManagedNodePresentation(scope, normalizedPath) ?? {}),
       content,
       revision: createContentRevision(content),
     }
@@ -780,6 +878,7 @@ app.whenReady().then(() => {
           currentDocument: {
             name: path.basename(documentPath),
             path: normalizedPath,
+            ...(getManagedNodePresentation(scope, normalizedPath) ?? {}),
             content: currentContent,
             revision: currentRevision,
           },
@@ -796,6 +895,7 @@ app.whenReady().then(() => {
         document: {
           name: path.basename(documentPath),
           path: normalizedPath,
+          ...(getManagedNodePresentation(scope, normalizedPath) ?? {}),
           content,
           revision: createContentRevision(content),
         },

@@ -98,6 +98,25 @@
   color: var(--text-secondary);
 }
 
+.locale-selector select {
+  width: 104px;
+  height: 32px;
+  padding: 0 24px 0 9px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  background: var(--surface-panel);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.locale-selector select:focus {
+  border-color: var(--accent);
+  outline: 1px solid var(--accent);
+  outline-offset: 1px;
+}
+
 .icon-button {
   display: grid;
   width: 32px;
@@ -1324,6 +1343,14 @@
   .brand-block span:last-child,
   .project-state {
     display: none;
+  }
+
+  .header-actions {
+    gap: 6px;
+  }
+
+  .locale-selector select {
+    width: 92px;
   }
 
   .workspace-grid {

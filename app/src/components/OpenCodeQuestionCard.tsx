@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { OpenCodeQuestionRequest } from '../types/inkforge'
 
 interface OpenCodeQuestionCardProps {
@@ -12,6 +13,7 @@ export function OpenCodeQuestionCard({
   onReply,
   onReject,
 }: OpenCodeQuestionCardProps) {
+  const { t } = useTranslation()
   const [answers, setAnswers] = useState<string[][]>(() => request.questions.map(() => []))
   const [customAnswers, setCustomAnswers] = useState<string[]>(() => request.questions.map(() => ''))
 
@@ -38,8 +40,8 @@ export function OpenCodeQuestionCard({
   const canSubmit = request.questions.length > 0 && resolvedAnswers.every((answer) => answer.length > 0)
 
   return (
-    <section className="opencode-request" aria-label="Pregunta de OpenCode">
-      <span className="eyebrow">OpenCode pregunta</span>
+    <section className="opencode-request" aria-label={t('question.ariaLabel')}>
+      <span className="eyebrow">{t('question.eyebrow')}</span>
       {request.questions.map((question, questionIndex) => (
         <fieldset className="opencode-question" key={`${question.header}-${questionIndex}`}>
           <legend>{question.header}</legend>
@@ -65,7 +67,7 @@ export function OpenCodeQuestionCard({
               className="opencode-custom-answer"
               type="text"
               value={customAnswers[questionIndex] ?? ''}
-              placeholder="Respuesta personalizada"
+              placeholder={t('question.customAnswer')}
               onChange={(event) => {
                 const value = event.target.value
                 setCustomAnswers((current) => current.map((answer, index) => (
@@ -77,14 +79,14 @@ export function OpenCodeQuestionCard({
         </fieldset>
       ))}
       <div className="opencode-request-actions">
-        <button type="button" onClick={onReject}>Cancelar</button>
+        <button type="button" onClick={onReject}>{t('common.cancel')}</button>
         <button
           type="button"
           className="request-primary"
           disabled={!canSubmit}
           onClick={() => onReply(resolvedAnswers)}
         >
-          Responder
+          {t('question.answer')}
         </button>
       </div>
     </section>

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import './App.css'
 import { AppHeader } from './components/AppHeader'
 import { ConfirmDialog } from './components/ConfirmDialog'
@@ -7,6 +8,7 @@ import { EditorPanel } from './components/EditorPanel'
 import { NarrativeNameDialog } from './components/NarrativeNameDialog'
 import { ProjectDialog } from './components/ProjectDialog'
 import { Sidebar } from './components/Sidebar'
+import { i18n } from './i18n'
 import type {
   ActiveBook,
   ActiveProject,
@@ -23,7 +25,7 @@ import type {
 
 async function readVaultTree(): Promise<VaultTreeNode[]> {
   if (!window.inkforge) {
-    throw new Error('Inkforge Desktop no está disponible.')
+    throw new Error(i18n.t('errors.vaultRead'))
   }
 
   return window.inkforge.vault.list()
@@ -31,7 +33,7 @@ async function readVaultTree(): Promise<VaultTreeNode[]> {
 
 const LEGACY_PROJECT: ActiveProject = {
   id: null,
-  title: 'Vault actual',
+  title: '',
   type: 'legacy',
 }
 
@@ -64,6 +66,7 @@ type PendingAction =
 type NarrativeDialogKind = 'add-book' | 'rename-project' | 'rename-book'
 
 function App() {
+  const { t } = useTranslation()
   const [appInfo, setAppInfo] = useState<InkforgeAppInfo | null>(null)
   const [projects, setProjects] = useState<LibraryProjectSummary[]>([])
   const [activeProject, setActiveProject] = useState<ActiveProject>(LEGACY_PROJECT)
@@ -126,7 +129,7 @@ function App() {
 
       setVaultTree([])
       setVaultState('error')
-      setVaultError('No se pudo leer el vault de la obra.')
+      setVaultError(i18n.t('errors.vaultRead'))
     }
   }, [])
 
@@ -156,7 +159,7 @@ function App() {
         isMounted.current &&
         projectsRequestId.current === requestId
       ) {
-        setProjectError(getLibraryError(error, 'No se pudo cargar la Biblioteca.'))
+        setProjectError(getLibraryError(error, i18n.t('errors.libraryLoad')))
       }
     }
   }, [])
@@ -222,7 +225,7 @@ function App() {
         }
       }).catch((error: unknown) => {
         if (isEffectActive && libraryRequestId.current === requestId) {
-          setProjectError(getLibraryError(error, 'No se pudo cargar la Biblioteca.'))
+          setProjectError(getLibraryError(error, i18n.t('errors.libraryLoad')))
         }
       })
     }
@@ -294,7 +297,7 @@ function App() {
     const bridge = window.inkforge
 
     if (!bridge) {
-      setProjectError('La Biblioteca solo está disponible en Inkforge Desktop.')
+      setProjectError(i18n.t('errors.libraryDesktop'))
       return
     }
 
@@ -314,7 +317,7 @@ function App() {
       finishProjectActivation(nextScope)
     } catch (error) {
       if (isMounted.current && libraryRequestId.current === requestId) {
-        setProjectError(getLibraryError(error, 'No se pudo cambiar de obra.'))
+        setProjectError(getLibraryError(error, i18n.t('errors.changeWork')))
       }
     } finally {
       if (isMounted.current && libraryRequestId.current === requestId) {
@@ -328,7 +331,7 @@ function App() {
     const bridge = window.inkforge
 
     if (!bridge) {
-      setProjectError('La Biblioteca solo está disponible en Inkforge Desktop.')
+      setProjectError(i18n.t('errors.libraryDesktop'))
       return
     }
 
@@ -349,7 +352,7 @@ function App() {
       finishProjectActivation(result)
     } catch (error) {
       if (isMounted.current && libraryRequestId.current === requestId) {
-        setProjectError(getLibraryError(error, 'No se pudo crear la obra.'))
+        setProjectError(getLibraryError(error, i18n.t('errors.createWork')))
       }
     } finally {
       if (isMounted.current && libraryRequestId.current === requestId) {
@@ -363,7 +366,7 @@ function App() {
     const bridge = window.inkforge
 
     if (!bridge) {
-      setProjectError('La Biblioteca solo está disponible en Inkforge Desktop.')
+      setProjectError(i18n.t('errors.libraryDesktop'))
       return
     }
 
@@ -383,7 +386,7 @@ function App() {
       finishBookActivation(nextActiveBook)
     } catch (error) {
       if (isMounted.current && libraryRequestId.current === requestId) {
-        setProjectError(getLibraryError(error, 'No se pudo cambiar de libro.'))
+        setProjectError(getLibraryError(error, i18n.t('errors.changeBook')))
       }
     } finally {
       if (isMounted.current && libraryRequestId.current === requestId) {
@@ -397,7 +400,7 @@ function App() {
     const bridge = window.inkforge
 
     if (!bridge) {
-      setProjectError('La Biblioteca solo está disponible en Inkforge Desktop.')
+      setProjectError(i18n.t('errors.libraryDesktop'))
       return
     }
 
@@ -418,7 +421,7 @@ function App() {
       finishBookActivation(nextActiveBook)
     } catch (error) {
       if (isMounted.current && libraryRequestId.current === requestId) {
-        setProjectError(getLibraryError(error, 'No se pudo añadir el libro.'))
+        setProjectError(getLibraryError(error, i18n.t('errors.addBook')))
       }
     } finally {
       if (isMounted.current && libraryRequestId.current === requestId) {
@@ -432,7 +435,7 @@ function App() {
     const bridge = window.inkforge
 
     if (!bridge) {
-      setProjectError('La Biblioteca solo está disponible en Inkforge Desktop.')
+      setProjectError(i18n.t('errors.libraryDesktop'))
       return
     }
 
@@ -458,7 +461,7 @@ function App() {
       void loadVault()
     } catch (error) {
       if (isMounted.current && libraryRequestId.current === requestId) {
-        setProjectError(getLibraryError(error, 'No se pudo renombrar la obra.'))
+        setProjectError(getLibraryError(error, i18n.t('errors.renameWork')))
       }
     } finally {
       if (isMounted.current && libraryRequestId.current === requestId) {
@@ -472,7 +475,7 @@ function App() {
     const bridge = window.inkforge
 
     if (!bridge) {
-      setProjectError('La Biblioteca solo está disponible en Inkforge Desktop.')
+      setProjectError(i18n.t('errors.libraryDesktop'))
       return
     }
 
@@ -493,7 +496,7 @@ function App() {
       finishBookActivation(nextActiveBook)
     } catch (error) {
       if (isMounted.current && libraryRequestId.current === requestId) {
-        setProjectError(getLibraryError(error, 'No se pudo renombrar el libro.'))
+        setProjectError(getLibraryError(error, i18n.t('errors.renameBook')))
       }
     } finally {
       if (isMounted.current && libraryRequestId.current === requestId) {
@@ -535,7 +538,7 @@ function App() {
 
     if (!window.inkforge) {
       setDocumentState('error')
-      setDocumentError('El documento solo puede abrirse en Inkforge Desktop.')
+      setDocumentError(i18n.t('errors.documentDesktop'))
       return
     }
 
@@ -552,7 +555,7 @@ function App() {
     } catch {
       if (readRequestId.current === requestId) {
         setDocumentState('error')
-        setDocumentError('No se pudo abrir el documento seleccionado.')
+        setDocumentError(i18n.t('errors.documentOpen'))
       }
     }
   }
@@ -718,7 +721,7 @@ function App() {
 
     if (saveState === 'conflict' && conflictDocument) {
       if (!window.inkforge) {
-        setSaveError('No se pudo volver a leer el documento desde el disco.')
+        setSaveError(i18n.t('errors.rereadDisk'))
         return
       }
 
@@ -756,7 +759,7 @@ function App() {
         }
 
         setSaveError(
-          'No se pudo volver a leer el documento. Tu borrador y el conflicto siguen intactos.',
+          i18n.t('errors.rereadPreserved'),
         )
       }
 
@@ -795,7 +798,7 @@ function App() {
 
     if (!window.inkforge) {
       setSaveState('error')
-      setSaveError('El documento solo puede guardarse desde Inkforge Desktop.')
+      setSaveError(i18n.t('errors.saveDesktop'))
       return
     }
 
@@ -846,7 +849,7 @@ function App() {
       }
 
       setSaveState('error')
-      setSaveError('No se pudo guardar el documento. Los cambios siguen sin guardar.')
+      setSaveError(i18n.t('errors.saveFailed'))
     }
   }, [document, saveState])
 
@@ -915,24 +918,24 @@ function App() {
   }
 
   const narrativeDialogTitle = narrativeDialog === 'add-book'
-    ? 'Añadir libro'
+    ? t('dialogs.addBook')
     : narrativeDialog === 'rename-project'
       ? activeProject.type === 'saga'
-        ? 'Renombrar saga'
-        : 'Renombrar libro'
-      : 'Renombrar libro'
+        ? t('dialogs.renameSaga')
+        : t('dialogs.renameBook')
+      : t('dialogs.renameBook')
   const narrativeDialogLabel = narrativeDialog === 'rename-project' &&
     activeProject.type === 'saga'
-    ? 'Título de la saga'
-    : 'Título del libro'
+    ? t('dialogs.sagaTitle')
+    : t('dialogs.bookTitle')
   const narrativeDialogInitialValue = narrativeDialog === 'rename-project'
     ? activeProject.title
     : narrativeDialog === 'rename-book'
       ? activeBook?.title ?? ''
       : ''
   const narrativeDialogSubmitLabel = narrativeDialog === 'add-book'
-    ? 'Añadir libro'
-    : 'Renombrar'
+    ? t('dialogs.addBook')
+    : t('dialogs.rename')
   const isCloseWindowPending = pendingAction?.type === 'close-window'
   const isProjectChangePending = pendingAction?.type === 'switch-project'
     || pendingAction?.type === 'new-project'
@@ -941,19 +944,19 @@ function App() {
   const isRenamePending = pendingAction?.type === 'rename-project'
     || pendingAction?.type === 'rename-book'
   const discardMessage = isCloseWindowPending
-    ? 'Tienes cambios sin guardar. Si cierras Inkforge, se perderán.'
+    ? t('dialogs.closeMessage')
     : isProjectChangePending
-      ? 'Tienes cambios sin guardar. Si cambias de obra, se perderán.'
+      ? t('dialogs.workMessage')
       : isBookChangePending
-        ? 'Tienes cambios sin guardar. Si cambias de libro, se perderán.'
+        ? t('dialogs.bookMessage')
         : isRenamePending
-          ? 'Tienes cambios sin guardar. Si continúas, se perderán.'
+          ? t('dialogs.continueMessage')
           : pendingAction?.type === 'read-mode'
-            ? 'Tienes cambios sin guardar. Si vuelves al modo lectura, se perderán.'
-            : 'Tienes cambios sin guardar. Si cambias de documento, se perderán.'
+            ? t('dialogs.readModeMessage')
+            : t('dialogs.documentMessage')
   const discardConfirmLabel = isCloseWindowPending
-    ? 'Salir sin guardar'
-    : 'Descartar cambios'
+    ? t('dialogs.exitWithoutSaving')
+    : t('dialogs.discardChanges')
 
   return (
     <div className="app-shell">
@@ -1020,7 +1023,7 @@ function App() {
       )}
       {pendingAction && (
         <ConfirmDialog
-          title="Cambios sin guardar"
+          title={t('dialogs.unsavedTitle')}
           message={discardMessage}
           confirmLabel={discardConfirmLabel}
           onCancel={cancelPendingAction}

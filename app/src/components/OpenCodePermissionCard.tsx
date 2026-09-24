@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import type { OpenCodePermissionRequest } from '../types/inkforge'
 
 interface OpenCodePermissionCardProps {
@@ -6,9 +7,11 @@ interface OpenCodePermissionCardProps {
 }
 
 export function OpenCodePermissionCard({ request, onReply }: OpenCodePermissionCardProps) {
+  const { t } = useTranslation()
+
   return (
-    <section className="opencode-request" aria-label="Permiso solicitado por OpenCode">
-      <span className="eyebrow">Permiso requerido</span>
+    <section className="opencode-request" aria-label={t('permission.ariaLabel')}>
+      <span className="eyebrow">{t('permission.required')}</span>
       <h3>{request.action}</h3>
       {request.resources.length > 0 && (
         <ul className="opencode-resource-list">
@@ -16,10 +19,10 @@ export function OpenCodePermissionCard({ request, onReply }: OpenCodePermissionC
         </ul>
       )}
       <div className="opencode-request-actions">
-        <button type="button" onClick={() => onReply('reject')}>Rechazar</button>
-        <button type="button" onClick={() => onReply('once')}>Permitir una vez</button>
+        <button type="button" onClick={() => onReply('reject')}>{t('permission.reject')}</button>
+        <button type="button" onClick={() => onReply('once')}>{t('permission.allowOnce')}</button>
         <button type="button" className="request-primary" onClick={() => onReply('always')}>
-          Permitir siempre
+          {t('permission.allowAlways')}
         </button>
       </div>
     </section>

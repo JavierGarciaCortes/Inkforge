@@ -1,18 +1,11 @@
 import { useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useOpenCode } from '../hooks/useOpenCode'
 import { OpenCodePermissionCard } from './OpenCodePermissionCard'
 import { OpenCodeQuestionCard } from './OpenCodeQuestionCard'
 
-const statusLabels = {
-  idle: 'Inactivo',
-  starting: 'Iniciando',
-  connected: 'Conectado',
-  incompatible: 'Incompatible',
-  not_found: 'No encontrado',
-  error: 'Error',
-}
-
 export function EditorPanel() {
+  const { t } = useTranslation()
   const chat = useOpenCode()
   const messageListRef = useRef<HTMLDivElement>(null)
 
@@ -33,25 +26,25 @@ export function EditorPanel() {
   )
 
   return (
-    <aside className="editor-panel opencode-panel" aria-label="Editor con OpenCode">
+    <aside className="editor-panel opencode-panel" aria-label={t('editor.ariaLabel')}>
       <div className="panel-heading editor-heading">
         <span className="eyebrow">OpenCode</span>
         <span className={`connection-state connection-${chat.status.state}`}>
-          {statusLabels[chat.status.state]}
+          {t(`editor.status.${chat.status.state}`)}
         </span>
       </div>
 
       <div className="opencode-controls">
         <label>
-          <span>Modelo</span>
+          <span>{t('editor.model')}</span>
           <select
             value={chat.selectedModelKey}
             disabled={chat.status.state !== 'connected' || chat.models.length === 0}
             onChange={(event) => void chat.chooseModel(event.target.value)}
           >
             {chat.models.length === 0
-              ? <option value="">Sin modelos conectados</option>
-              : <option value="">Selecciona un modelo</option>}
+              ? <option value="">{t('editor.noModels')}</option>
+              : <option value="">{t('editor.selectModel')}</option>}
             {chat.models.map((model) => (
               <option
                 key={`${model.providerID}:${model.modelID}`}
@@ -64,13 +57,13 @@ export function EditorPanel() {
         </label>
         {chat.selectedModel && chat.selectedModel.variants.length > 0 && (
           <label>
-            <span>Variante</span>
+            <span>{t('editor.variant')}</span>
             <select
               value={chat.selectedVariant}
               disabled={chat.status.state !== 'connected'}
               onChange={(event) => void chat.chooseVariant(event.target.value)}
             >
-              <option value="">Predeterminado</option>
+              <option value="">{t('editor.defaultVariant')}</option>
               {chat.selectedModel.variants.map((variant) => (
                 <option key={variant} value={variant}>{variant}</option>
               ))}
@@ -83,18 +76,18 @@ export function EditorPanel() {
         {chat.messages.length === 0 && chat.status.state === 'connected' && (
           <div className="opencode-empty">
             <div className="editor-monogram" aria-hidden="true">O</div>
-            <h2>Asistente editorial</h2>
-            <p>La conversación utilizará los agentes, skills y herramientas configurados en este proyecto.</p>
+            <h2>{t('editor.assistantTitle')}</h2>
+            <p>{t('editor.assistantDescription')}</p>
           </div>
         )}
 
         {chat.status.state !== 'connected' && (
           <div className="opencode-empty">
             <div className="editor-monogram" aria-hidden="true">O</div>
-            <h2>{statusLabels[chat.status.state]}</h2>
+            <h2>{t(`editor.status.${chat.status.state}`)}</h2>
             <p>{chat.status.message}</p>
             {chat.status.state !== 'starting' && (
-              <button type="button" onClick={() => void chat.connect()}>Reintentar conexión</button>
+              <button type="button" onClick={() => void chat.connect()}>{t('editor.reconnect')}</button>
             )}
           </div>
         )}
@@ -104,9 +97,9 @@ export function EditorPanel() {
             className={`chat-message chat-message-${message.role}${message.status === 'error' ? ' chat-message-error' : ''}`}
             key={message.id}
           >
-            <span>{message.role === 'user' ? 'Tú' : 'Inkforge'}</span>
+            <span>{message.role === 'user' ? t('editor.you') : 'Inkforge'}</span>
             <p>{message.text}</p>
-            {message.status === 'error' && <small>No se pudo completar este envío.</small>}
+            {message.status === 'error' && <small>{t('editor.sendFailed')}</small>}
           </article>
         ))}
 
@@ -130,11 +123,11 @@ export function EditorPanel() {
 
         {chat.error && (
           <div className="opencode-error" role="alert">
-            <strong>No se pudo completar la operación</strong>
+            <strong>{t('editor.operationFailed')}</strong>
             <p>{chat.error.message}</p>
             {chat.error.retryable && (
               <button type="button" onClick={() => void chat.retryLastMessage()}>
-                Reintentar con el modelo seleccionado
+                {t('editor.retryModel')}
               </button>
             )}
           </div>
@@ -153,8 +146,8 @@ export function EditorPanel() {
       >
         <textarea
           value={chat.composer}
-          placeholder="Escribe al editor…"
-          aria-label="Mensaje para OpenCode"
+          placeholder={t('editor.composerPlaceholder')}
+          aria-label={t('editor.composerAria')}
           disabled={chat.status.state !== 'connected'}
           onChange={(event) => chat.setComposer(event.target.value)}
           onKeyDown={(event) => {
@@ -165,9 +158,9 @@ export function EditorPanel() {
           }}
         />
         <div className="opencode-composer-footer">
-          <span>{chat.sessionID ? 'Sesión activa' : 'Nueva sesión al enviar'}</span>
+          <span>{chat.sessionID ? t('editor.activeSession') : t('editor.newSession')}</span>
           <button type="submit" disabled={!canSend}>
-            {chat.isWorking ? 'Trabajando…' : 'Enviar'}
+            {chat.isWorking ? t('editor.working') : t('editor.send')}
           </button>
         </div>
       </form>

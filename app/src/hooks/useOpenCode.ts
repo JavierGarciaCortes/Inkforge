@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { i18n as appI18n } from '../i18n'
 import type {
   OpenCodeAgent,
   OpenCodeChatMessage,
@@ -10,23 +12,39 @@ import type {
   OpenCodeStatus,
 } from '../types/inkforge'
 
-const initialStatus: OpenCodeStatus = {
-  state: 'starting',
-  message: 'Conectando con OpenCode…',
-}
-
-const unavailableError: OpenCodeError = {
-  code: 'disconnected',
-  message: 'La integración de OpenCode solo está disponible en Inkforge Desktop.',
-  retryable: false,
-}
-
 function modelKey(model: OpenCodeModel) {
   return JSON.stringify([model.providerID, model.modelID])
 }
 
+type OpenCodeActivityKey =
+  | ''
+  | 'openCode.activity.writing'
+  | 'openCode.activity.waitingPermission'
+  | 'openCode.activity.waitingAnswer'
+  | 'openCode.activity.thinking'
+  | 'openCode.activity.retrying'
+  | 'openCode.activity.working'
+  | 'openCode.activity.sending'
+
 export function useOpenCode() {
+  const { i18n: translation } = useTranslation()
+  const language = translation.language
   const bridgeAvailable = window.inkforge?.opencode !== undefined
+  const initialStatus = useMemo<OpenCodeStatus>(() => {
+    const translate = translation.getFixedT(language)
+    return {
+      state: 'starting',
+      message: translate('openCode.connecting'),
+    }
+  }, [language, translation])
+  const unavailableError = useMemo<OpenCodeError>(() => {
+    const translate = translation.getFixedT(language)
+    return {
+      code: 'disconnected',
+      message: translate('openCode.unavailable'),
+      retryable: false,
+    }
+  }, [language, translation])
   const [status, setStatus] = useState<OpenCodeStatus>(
     bridgeAvailable ? initialStatus : { state: 'error', message: unavailableError.message },
   )
@@ -38,7 +56,7 @@ export function useOpenCode() {
   const [messages, setMessages] = useState<OpenCodeChatMessage[]>([])
   const [composer, setComposer] = useState('')
   const [isWorking, setIsWorking] = useState(false)
-  const [activity, setActivity] = useState('')
+  const [activityKey, setActivityKey] = useState<OpenCodeActivityKey>('')
   const [error, setError] = useState<OpenCodeError | null>(bridgeAvailable ? null : unavailableError)
   const [permission, setPermission] = useState<OpenCodePermissionRequest | null>(null)
   const [question, setQuestion] = useState<OpenCodeQuestionRequest | null>(null)
@@ -111,7 +129,7 @@ export function useOpenCode() {
       setPrimaryAgent(null)
       setError({
         code: 'incompatible',
-        message: 'OpenCode no devolvi\u00f3 un \u00fanico agente principal del proyecto.',
+        message: appI18n.t('openCode.primaryMissing'),
         retryable: false,
       })
       return
@@ -209,7 +227,7 @@ export function useOpenCode() {
       const messageID = event.assistantMessageID ?? `assistant-${currentSessionID}`
       updateAssistantPart(messageID, event.partID, event.delta, false)
       setIsWorking(true)
-      setActivity('Escribiendo…')
+      setActivityKey('openCode.activity.writing')
       return
     }
 
@@ -217,31 +235,26 @@ export function useOpenCode() {
       const messageID = event.assistantMessageID ?? `assistant-${currentSessionID}`
       updateAssistantPart(messageID, event.partID, event.text, true)
       setIsWorking(true)
-      setActivity('Escribiendo…')
+      setActivityKey('openCode.activity.writing')
       return
     }
 
     if (event.type === 'permission.v2.asked' && event.permission) {
       setPermission(event.permission)
-      setActivity('Esperando permiso')
+      setActivityKey('openCode.activity.waitingPermission')
       return
     }
 
     if (event.type === 'question.v2.asked' && event.question) {
       setQuestion(event.question)
-      setActivity('Esperando respuesta')
+      setActivityKey('openCode.activity.waitingAnswer')
       return
     }
 
     if (event.error) {
-      const nextError = event.error ?? {
-        code: 'unknown' as const,
-        message: 'OpenCode no pudo completar la respuesta.',
-        retryable: true,
-      }
-      setError(nextError)
+      setError(event.error)
       setIsWorking(false)
-      setActivity('')
+      setActivityKey('')
       setComposer((current) => current || lastSubmittedTextRef.current)
       failedMessageIDRef.current = lastUserMessageIDRef.current
       setMessages((current) => current.map((message) => (
@@ -252,19 +265,21 @@ export function useOpenCode() {
 
     if (event.type === 'session.idle') {
       setIsWorking(false)
-      setActivity('')
+      setActivityKey('')
       return
     }
 
     if (event.type.includes('reasoning')) {
       setIsWorking(true)
-      setActivity('Pensando…')
+      setActivityKey('openCode.activity.thinking')
       return
     }
 
     if (event.type.includes('tool') || event.type.includes('step') || event.type.includes('retried')) {
       setIsWorking(true)
-      setActivity(event.type.includes('retried') ? 'Reintentando…' : 'Trabajando…')
+      setActivityKey(event.type.includes('retried')
+        ? 'openCode.activity.retrying'
+        : 'openCode.activity.working')
     }
   }, [refreshHistory])
 
@@ -326,7 +341,7 @@ export function useOpenCode() {
       })
       setError(result.error)
     }
-  }, [applyStatus])
+  }, [applyStatus, initialStatus, unavailableError])
 
   const ensureSession = useCallback(async () => {
     if (sessionIDRef.current) {
@@ -338,7 +353,7 @@ export function useOpenCode() {
     if (!api || !primaryAgent) {
       setError({
         code: 'incompatible',
-        message: 'OpenCode no devolvió un agente principal utilizable.',
+        message: appI18n.t('openCode.primaryUnavailable'),
         retryable: false,
       })
       return null
@@ -388,7 +403,7 @@ export function useOpenCode() {
     ])
     setComposer('')
     setIsWorking(true)
-    setActivity('Enviando…')
+    setActivityKey('openCode.activity.sending')
 
     const result = await api.sendMessage({
       sessionID: currentSessionID,
@@ -419,7 +434,7 @@ export function useOpenCode() {
     setComposer((current) => current || text)
     setError(result.error)
     setIsWorking(false)
-    setActivity('')
+    setActivityKey('')
   }, [ensureSession, isWorking, primaryAgent, selectedModel, selectedVariant, status.state])
 
   const sendCurrentMessage = useCallback(() => {
@@ -515,7 +530,7 @@ export function useOpenCode() {
 
     if (result.ok) {
       setPermission(null)
-      setActivity('Trabajando…')
+      setActivityKey('openCode.activity.working')
     } else {
       setError(result.error)
     }
@@ -536,7 +551,7 @@ export function useOpenCode() {
 
     if (result.ok) {
       setQuestion(null)
-      setActivity('Trabajando…')
+      setActivityKey('openCode.activity.working')
     } else {
       setError(result.error)
     }
@@ -556,14 +571,23 @@ export function useOpenCode() {
 
     if (result.ok) {
       setQuestion(null)
-      setActivity('Trabajando…')
+      setActivityKey('openCode.activity.working')
     } else {
       setError(result.error)
     }
   }, [question])
 
+  const displayedStatus = status.state === 'starting'
+    ? initialStatus
+    : !bridgeAvailable && status.state === 'error'
+      ? { ...status, message: unavailableError.message }
+      : status
+  const displayedError = !bridgeAvailable && error?.code === 'disconnected'
+    ? unavailableError
+    : error
+
   return {
-    status,
+    status: displayedStatus,
     models,
     primaryAgent,
     selectedModelKey,
@@ -573,8 +597,8 @@ export function useOpenCode() {
     messages,
     composer,
     isWorking,
-    activity,
-    error,
+    activity: activityKey ? appI18n.t(activityKey) : '',
+    error: displayedError,
     permission,
     question,
     setComposer,

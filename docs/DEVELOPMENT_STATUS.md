@@ -154,7 +154,7 @@ Tras `1a847ef` se confirmó `## main...origin/main`; `main` y `origin/main` esta
 Rama de trabajo actual conocida:
 
 ```text
-feature/readme-and-branding
+feature/interface-localization
 ```
 
 El hito de Biblioteca —proyectos, sagas, libro activo, navegación y documentación— ya se ha comprometido localmente con este mensaje:
@@ -379,9 +379,71 @@ La revisión de implementación abarcó `main.cjs`, `preload.cjs`, `project-libr
 
 Estado: **revisado y validado** mediante `git diff --check`, lint, build y comprobación manual visual y de cambio de libro.
 
-## 15. Pendientes posteriores conocidos
+## 15. Internacionalización y pendientes posteriores
 
-- Diseñar e implementar la base de internacionalización antes de crear la ayuda integrada. Los idiomas iniciales serán español, inglés, catalán y coreano, con recursos extensibles para incorporar idiomas futuros. La internacionalización no debe traducir manuscritos Markdown, títulos creados por el usuario ni mensajes literales devueltos por OpenCode.
+La base de internacionalización del renderer está implementada con `i18next` y `react-i18next`:
+
+- recursos separados y estructuralmente equivalentes para español (`es`), inglés (`en`), catalán (`ca`) y coreano (`ko`);
+- español como idioma por defecto y fallback;
+- detección inicial limitada a esos cuatro idiomas mediante `navigator.language`;
+- selector accesible en `AppHeader`, independiente del botón de Ajustes;
+- persistencia local bajo la clave estable `inkforge:locale`;
+- cambio inmediato desde el selector del encabezado;
+- actualización de `document.documentElement.lang` al cambiar de idioma;
+- traducción del texto propio de la interfaz, incluidos estados, diálogos, ayudas, placeholders y errores locales del renderer;
+- exclusión deliberada de Markdown, rutas, nombres y títulos del usuario, contenido documental, proveedores y modelos, mensajes literales de OpenCode y mensajes procedentes del proceso principal Electron.
+
+`getLibraryError` conserva el comportamiento previo: presenta literalmente los errores remotos y solo localiza sus fallbacks generados en el renderer. La implementación mantiene recursos extensibles para idiomas futuros.
+
+Estado de validación: **implementado y validado**.
+
+Comprobaciones realizadas:
+
+```text
+npm --prefix .\app run lint   → correcto
+npm --prefix .\app run build  → correcto
+cambio manual entre los cuatro idiomas   → correcto
+persistencia del idioma tras reiniciar   → correcta
+diálogo «Nueva obra» en coreano           → correcto, sin desbordamientos
+```
+
+### Etiquetas estructurales localizadas — implementadas, pendientes de validación
+
+El proceso principal añade una clave de presentación opcional únicamente a carpetas estructurales, ficheros de sistema y presentaciones propias que reconoce dentro de proyectos gestionados por Biblioteca. El renderer resuelve esa clave en los recursos `es`, `en`, `ca` y `ko` y conserva el nombre físico como fallback.
+
+Comportamiento implementado:
+
+- solo se localizarán elementos explícitamente identificados como gestionados por Inkforge mediante claves estables;
+- los nombres físicos y las rutas permanecerán invariantes;
+- los nombres y títulos creados por el usuario permanecerán literales;
+- los vaults heredados y los elementos externos no reconocidos permanecerán literales;
+- no se inferirá que un elemento es estructural mediante coincidencias de texto.
+
+La cobertura actual se limita a la estructura que Inkforge crea y reconoce hoy: manifiestos de proyecto y libro, áreas compartidas, carpetas de manuscrito, documentos de planificación, canon de libro y rótulo del libro activo. Este último localiza solo su parte fija e interpola literalmente el título del usuario.
+
+Los metadatos de presentación acompañan el árbol y los documentos leídos o devueltos por el guardado; `name` y `path` reales continúan siendo la fuente operativa. No se han añadido migraciones, plantillas ni cambios al formato del proyecto.
+
+Estado: **implementado, pendiente de validación específica**. No se han ejecutado lint, build, tests ni Electron para este añadido. Permanecen válidas las comprobaciones ya registradas del selector de idioma, incluida su persistencia y el diálogo `Nueva obra` en coreano.
+
+### Decisión cerrada: primera importación de proyectos
+
+La primera versión de importación aceptará únicamente proyectos que ya sean compatibles con la estructura de Inkforge.
+
+Reglas cerradas:
+
+- no habrá importador genérico;
+- no se renombrarán ni adivinarán automáticamente carpetas, ficheros o ámbitos;
+- la entrada se validará antes de importar;
+- la operación será no destructiva y copiará el proyecto compatible dentro de la Biblioteca portable;
+- `El Cambio` será el caso de migración e importación de referencia;
+- la ayuda integrada futura incluirá una guía de preparación e importación.
+
+Estado: **decidido, todavía no implementado**. Se abordará después del hito de etiquetas estructurales localizadas.
+
+Pendientes posteriores conocidos:
+
+- Validar las etiquetas estructurales en los cuatro idiomas para novela, saga, cambio de libro y documento abierto.
+- Implementar después la importación validada y no destructiva de proyectos compatibles.
 - Diseñar ayuda dentro de la app para explicar solo funciones realmente implementadas: novelas y sagas, libro activo, contenido compartido, guardar, renombrar y comportamiento ante cambios externos. No prometer todavía acciones de chat no implementadas.
 - Persistencia de sesiones/chat entre reinicios.
 - Persistencia del último modelo.
@@ -410,4 +472,4 @@ README y ayuda en la app son piezas distintas:
 
 ## 18. Siguiente paso exacto
 
-Diseñar e implementar la base de internacionalización antes de crear la ayuda integrada.
+Validar el añadido de etiquetas estructurales localizadas antes de iniciar la importación compatible y su guía.
