@@ -154,7 +154,7 @@ Tras `1a847ef` se confirmó `## main...origin/main`; `main` y `origin/main` esta
 Rama de trabajo actual conocida:
 
 ```text
-feature/library-project-bootstrap
+feature/readme-and-branding
 ```
 
 El hito de Biblioteca —proyectos, sagas, libro activo, navegación y documentación— ya se ha comprometido localmente con este mensaje:
@@ -166,6 +166,10 @@ feat: add library projects and saga navigation
 No se ha solicitado push. Tampoco se ha registrado en este documento el estado exacto actual de `git status`; comprobarlo antes de cambiar de rama o continuar trabajo que dependa de esos datos.
 
 La Biblioteca funcional y su último ajuste visual están implementados, revisados y validados mediante diff, lint, build y comprobación manual (véase sección 14).
+
+`README.md` ya fue reescrito para reflejar la arquitectura actual, la Biblioteca, la seguridad del vault, OpenCode, los comandos reales y los pendientes vigentes.
+
+La marca definitiva es **Inkforge**. Se comprobó que no hay referencias a «Studio de Escritura» ni «Taller de Escritura» en los archivos de código y documentación buscados.
 
 ## 7. OpenCode — estado conocido
 
@@ -219,6 +223,8 @@ Se corrigió la selección accidental de `gpt-5.3-codex-spark`, incompatible con
 SSE trabajado con `message.updated`, `message.part.updated`, `message.part.delta`, `session.status` y `session.idle`. Se corrigieron mensajes duplicados usando `messageID → role`; la etiqueta visible del asistente es `Inkforge`. El retry de modelo incompatible está validado en la misma sesión y sin duplicados.
 
 Las variantes están implementadas pero no completamente validadas en vivo. Permisos y preguntas OpenCode están implementados (`OpenCodePermissionCard.tsx` y `OpenCodeQuestionCard.tsx`), pendientes de prueba manual real.
+
+La integración con otros modelos se realiza mediante la configuración de proveedores y modelos en OpenCode. No se debe crear un backend paralelo de IA dentro de Inkforge.
 
 ## 9. Vault y seguridad
 
@@ -375,7 +381,7 @@ Estado: **revisado y validado** mediante `git diff --check`, lint, build y compr
 
 ## 15. Pendientes posteriores conocidos
 
-- Crear/actualizar README: origen en fiction-vault, arquitectura, instalación, desarrollo, ejecución, tests, build Windows, estructura de vault y funcionalidades verificadas.
+- Diseñar e implementar la base de internacionalización antes de crear la ayuda integrada. Los idiomas iniciales serán español, inglés, catalán y coreano, con recursos extensibles para incorporar idiomas futuros. La internacionalización no debe traducir manuscritos Markdown, títulos creados por el usuario ni mensajes literales devueltos por OpenCode.
 - Diseñar ayuda dentro de la app para explicar solo funciones realmente implementadas: novelas y sagas, libro activo, contenido compartido, guardar, renombrar y comportamiento ante cambios externos. No prometer todavía acciones de chat no implementadas.
 - Persistencia de sesiones/chat entre reinicios.
 - Persistencia del último modelo.
@@ -389,7 +395,7 @@ Estado: **revisado y validado** mediante `git diff --check`, lint, build y compr
 
 README y ayuda en la app son piezas distintas:
 
-- **README:** documentación técnica y de desarrollo, con funcionalidades ya verificadas y sin marcar como validado aquello que solo esté implementado.
+- **README:** documentación técnica y de desarrollo ya actualizada con funcionalidades verificadas, arquitectura, comandos y pendientes actuales.
 - **Ayuda integrada:** guía de uso de producto, limitada a comportamientos existentes y comprobados.
 
 `docs/DEVELOPMENT_STATUS.md` es el estado operativo del desarrollo; debe conservar decisiones cerradas, separar implementación de validación y reflejar el siguiente paso real.
@@ -404,4 +410,4 @@ README y ayuda en la app son piezas distintas:
 
 ## 18. Siguiente paso exacto
 
-Planificar y actualizar README y la ayuda integrada de la app, limitándolos a funcionalidades ya verificadas.
+Diseñar e implementar la base de internacionalización antes de crear la ayuda integrada.
