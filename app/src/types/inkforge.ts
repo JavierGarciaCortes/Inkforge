@@ -4,12 +4,61 @@ export interface InkforgeAppInfo {
 }
 
 export type LoadState = 'idle' | 'loading' | 'ready' | 'error'
+
+export type InkforgeProjectType = 'novela' | 'saga'
+
+export interface LibraryProjectSummary {
+  id: string
+  title: string
+  type: InkforgeProjectType
+}
+
+export interface ActiveProject {
+  id: string | null
+  title: string
+  type: 'legacy' | InkforgeProjectType
+}
+
+export interface LibraryBookSummary {
+  id: string
+  title: string
+  number: number
+}
+
+export type ActiveBook = LibraryBookSummary | null
+
+export type CreateProjectInput =
+  | {
+      type: 'novela'
+      bookTitle: string
+    }
+  | {
+      type: 'saga'
+      sagaTitle: string
+      firstBookTitle: string
+    }
+
+export interface CreateBookInput {
+  bookTitle: string
+}
+
+export interface LibraryActivationResult {
+  activeProject: ActiveProject
+  activeBook: ActiveBook
+  books: LibraryBookSummary[]
+}
+
+export interface CreateProjectResult extends LibraryActivationResult {
+  project: LibraryProjectSummary
+}
+
 export type SaveState = 'idle' | 'saving' | 'error' | 'conflict' | 'missing'
 
 export interface VaultDirectoryNode {
   type: 'directory'
   name: string
   path: string
+  presentation?: 'book-section'
   children: VaultTreeNode[]
 }
 
@@ -164,6 +213,19 @@ export interface InkforgeBridge {
   appWindow: {
     onCloseRequested: (callback: () => void) => () => void
     confirmClose: () => Promise<void>
+  }
+  library: {
+    listProjects: () => Promise<LibraryProjectSummary[]>
+    getActiveProject: () => Promise<ActiveProject>
+    listBooks: (projectId?: string) => Promise<LibraryBookSummary[]>
+    getActiveBook: () => Promise<ActiveBook>
+    activateProject: (projectId: string | null) => Promise<LibraryActivationResult>
+    activateBook: (bookId: string) => Promise<LibraryBookSummary>
+    createProject: (input: CreateProjectInput) => Promise<CreateProjectResult>
+    createBook: (input: CreateBookInput) => Promise<LibraryBookSummary>
+    renameProject: (nextTitle: string) => Promise<ActiveProject>
+    renameActiveBook: (nextTitle: string) => Promise<LibraryBookSummary>
+    onChanged: (callback: () => void) => () => void
   }
   vault: {
     list: () => Promise<VaultTreeNode[]>

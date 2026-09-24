@@ -170,6 +170,81 @@
   font-size: 10px;
 }
 
+.project-switcher {
+  display: grid;
+  gap: 9px;
+  padding: 13px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.project-switcher label {
+  display: grid;
+  gap: 6px;
+}
+
+.project-switcher label > span,
+.project-dialog-field > span {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.project-switcher select,
+.project-dialog-field select,
+.project-dialog-field input {
+  width: 100%;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--border-emphasis);
+  border-radius: 4px;
+  color: var(--text-strong);
+  background: var(--surface-selected);
+  font: inherit;
+  outline: none;
+}
+
+.project-switcher select:focus,
+.project-dialog-field select:focus,
+.project-dialog-field input:focus {
+  border-color: var(--accent);
+}
+
+.project-switcher button {
+  min-height: 32px;
+  border: 1px solid var(--border-emphasis);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  background: transparent;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.project-switcher button:hover:not(:disabled) {
+  border-color: var(--text-muted);
+  color: var(--text-strong);
+  background: var(--surface-selected);
+}
+
+.project-switcher button:disabled,
+.project-switcher select:disabled,
+.project-dialog-field select:disabled,
+.project-dialog-field input:disabled,
+.project-dialog button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.project-switcher-error,
+.confirm-dialog .project-dialog-error {
+  margin: 0;
+  color: #e29a8d;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
 .vault-tree-scroll {
   flex: 1;
   min-height: 0;
@@ -191,6 +266,30 @@
   margin-left: 15px;
   padding-left: 8px;
   border-left: 1px solid var(--border);
+}
+
+.book-section {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.book-section-label {
+  display: flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 8px;
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.book-section > .vault-tree-list {
+  margin-left: 0;
+  padding-left: 0;
+  border-left: 0;
 }
 
 .tree-row {
@@ -1070,6 +1169,28 @@
   color: var(--text-secondary);
   font-size: 13px;
   line-height: 1.65;
+}
+
+.project-dialog {
+  width: min(440px, 100%);
+}
+
+.project-dialog-field {
+  display: grid;
+  gap: 7px;
+  margin-top: 16px;
+}
+
+.project-dialog-create {
+  border-color: var(--accent);
+  color: var(--surface-panel);
+  background: var(--accent);
+}
+
+.project-dialog-create:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--surface-panel);
+  filter: brightness(1.08);
 }
 
 .confirm-dialog-actions {

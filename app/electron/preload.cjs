@@ -12,6 +12,21 @@ contextBridge.exposeInMainWorld('inkforge', {
     onCloseRequested: (callback) => subscribe('window:close-requested', callback),
     confirmClose: () => ipcRenderer.invoke('window:confirm-close'),
   },
+  library: {
+    listProjects: () => ipcRenderer.invoke('library:list-projects'),
+    getActiveProject: () => ipcRenderer.invoke('library:get-active-project'),
+    listBooks: (projectId) => ipcRenderer.invoke('library:list-books', projectId),
+    getActiveBook: () => ipcRenderer.invoke('library:get-active-book'),
+    activateProject: (projectId) => ipcRenderer.invoke('library:activate-project', projectId),
+    activateBook: (bookId) => ipcRenderer.invoke('library:activate-book', bookId),
+    createProject: (input) => ipcRenderer.invoke('library:create-project', input),
+    createBook: (input) => ipcRenderer.invoke('library:create-book', input),
+    renameProject: (nextTitle) => ipcRenderer.invoke('library:rename-project', nextTitle),
+    renameActiveBook: (nextTitle) => (
+      ipcRenderer.invoke('library:rename-active-book', nextTitle)
+    ),
+    onChanged: (callback) => subscribe('library:changed', callback),
+  },
   vault: {
     list: () => ipcRenderer.invoke('vault:list'),
     read: (relativePath) => ipcRenderer.invoke('vault:read', relativePath),

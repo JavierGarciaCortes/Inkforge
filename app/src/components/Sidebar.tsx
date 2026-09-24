@@ -1,5 +1,9 @@
 import { useState } from 'react'
 import type {
+  ActiveBook,
+  ActiveProject,
+  LibraryBookSummary,
+  LibraryProjectSummary,
   LoadState,
   VaultDirectoryNode,
   VaultTreeNode,
@@ -10,7 +14,19 @@ interface SidebarProps {
   state: LoadState
   error: string | null
   selectedPath: string | null
+  projects: LibraryProjectSummary[]
+  activeProject: ActiveProject
+  books: LibraryBookSummary[]
+  activeBook: ActiveBook
+  isProjectBusy: boolean
+  projectError: string | null
   onSelectDocument: (relativePath: string) => void
+  onProjectChange: (projectId: string | null) => void
+  onBookChange: (bookId: string) => void
+  onNewProject: () => void
+  onAddBook: () => void
+  onRenameProject: () => void
+  onRenameBook: () => void
   onReload: () => void
 }
 
@@ -34,6 +50,21 @@ function countDocuments(nodes: VaultTreeNode[]): number {
 
 function DirectoryNode({ node, selectedPath, onSelectDocument }: DirectoryNodeProps) {
   const [isOpen, setIsOpen] = useState(true)
+
+  if (node.presentation === 'book-section') {
+    return (
+      <li className="tree-directory book-section">
+        <div className="book-section-label">
+          <span className="tree-label">{node.name}</span>
+        </div>
+        <TreeNodes
+          nodes={node.children}
+          selectedPath={selectedPath}
+          onSelectDocument={onSelectDocument}
+        />
+      </li>
+    )
+  }
 
   return (
     <li className="tree-directory">
@@ -93,18 +124,112 @@ export function Sidebar({
   state,
   error,
   selectedPath,
+  projects,
+  activeProject,
+  books,
+  activeBook,
+  isProjectBusy,
+  projectError,
   onSelectDocument,
+  onProjectChange,
+  onBookChange,
+  onNewProject,
+  onAddBook,
+  onRenameProject,
+  onRenameBook,
   onReload,
 }: SidebarProps) {
   const documentCount = countDocuments(tree)
+  const activeProjectIsDiscovered = activeProject.id === null || projects.some(
+    (project) => project.id === activeProject.id,
+  )
+  const activeBookIsDiscovered = activeBook === null || books.some(
+    (book) => book.id === activeBook.id,
+  )
 
   return (
     <aside className="sidebar" aria-label="Biblioteca">
       <div className="panel-heading">
         <span className="eyebrow">Biblioteca</span>
         <span className="panel-note">
-          {state === 'ready' ? `${documentCount} documentos` : 'Vault del proyecto'}
+          {state === 'ready' ? `${documentCount} documentos` : 'Vault de la obra'}
         </span>
+      </div>
+
+      <div className="project-switcher">
+        <button type="button" disabled={isProjectBusy} onClick={onNewProject}>
+          Nueva obra
+        </button>
+        <label>
+          <span>Obra activa</span>
+          <select
+            value={activeProject.id ?? ''}
+            disabled={isProjectBusy}
+            onChange={(event) => onProjectChange(event.target.value || null)}
+          >
+            <option value="">Vault actual</option>
+            {!activeProjectIsDiscovered && activeProject.id !== null && (
+              <option value={activeProject.id}>
+                {activeProject.title} (no disponible)
+              </option>
+            )}
+            {projects.map((project) => (
+              <option key={project.id} value={project.id}>
+                {project.title}
+              </option>
+            ))}
+          </select>
+        </label>
+        {activeProject.type !== 'legacy' && (
+          <button type="button" disabled={isProjectBusy} onClick={onRenameProject}>
+            {activeProject.type === 'saga' ? 'Renombrar saga' : 'Renombrar libro'}
+          </button>
+        )}
+        {activeProject.type === 'saga' && (
+          <>
+            <button type="button" disabled={isProjectBusy} onClick={onAddBook}>
+              Añadir libro
+            </button>
+            <label>
+              <span>Libro activo</span>
+              <select
+                value={activeBook?.id ?? ''}
+                disabled={isProjectBusy || (books.length === 0 && activeBook === null)}
+                onChange={(event) => {
+                  if (event.target.value) {
+                    onBookChange(event.target.value)
+                  }
+                }}
+              >
+                {activeBook === null && (
+                  <option value="">Sin libro activo</option>
+                )}
+                {!activeBookIsDiscovered && activeBook !== null && (
+                  <option value={activeBook.id}>
+                    {activeBook.title} (no disponible)
+                  </option>
+                )}
+                {books.map((book) => (
+                  <option key={book.id} value={book.id}>
+                    {String(book.number).padStart(2, '0')} · {book.title}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {activeBook !== null && (
+              <button
+                type="button"
+                disabled={isProjectBusy || !activeBookIsDiscovered}
+                onClick={onRenameBook}
+              >
+                Renombrar libro
+              </button>
+            )}
+          </>
+        )}
+        {projectError && (
+          <p className="project-switcher-error" role="alert">{projectError}</p>
+        )}
       </div>
 
       <nav className="vault-tree-scroll" aria-label="Documentos del vault" aria-busy={state === 'loading'}>
@@ -136,8 +261,14 @@ export function Sidebar({
       </nav>
 
       <div className="sidebar-footer">
-        <span className="sidebar-footer-label">Vault actual</span>
-        <span>Lectura y edición Markdown</span>
+        <span className="sidebar-footer-label">{activeProject.title}</span>
+        <span>
+          {activeProject.type === 'legacy'
+            ? 'Vault heredado'
+            : activeProject.type === 'saga'
+              ? 'Saga'
+              : 'Novela'}
+        </span>
       </div>
     </aside>
   )
