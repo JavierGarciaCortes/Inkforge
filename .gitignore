@@ -21,6 +21,7 @@ venv/
 
 # Runtime / local state
 .fiction/session_log.json
+vault/Proyectos/
 *.log
 *.tmp
 *.temp
