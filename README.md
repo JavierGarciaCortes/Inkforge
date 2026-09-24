@@ -17,10 +17,21 @@ La aplicación de escritorio ya permite:
 - actualizar el árbol del vault mediante un watcher;
 - gestionar una Biblioteca con novelas independientes y sagas de varios libros;
 - crear obras, añadir libros, cambiar el libro activo y renombrar novelas, sagas y libros;
+- utilizar la interfaz en español, inglés, catalán o coreano;
 - usar un chat integrado con OpenCode local, streaming y selección dinámica de modelos y proveedores;
 - reintentar en la misma sesión cuando el modelo elegido resulta incompatible.
 
 Las solicitudes de permisos, las preguntas interactivas y las variantes de modelo están implementadas, pero todavía no se han validado por completo en interacciones reales.
+
+## Idiomas de interfaz
+
+Inkforge ofrece la interfaz en español, inglés, catalán y coreano. Español es el idioma por defecto y de respaldo. Un selector integrado en el encabezado aplica el cambio inmediatamente y actualiza `document.documentElement.lang`. En el primer arranque se utiliza un idioma compatible de `navigator.language` cuando existe; las selecciones posteriores se guardan localmente con la clave `inkforge:locale` y se recuperan al reiniciar el renderer.
+
+La traducción se limita al texto propio de la interfaz. No se traducen manuscritos Markdown, rutas, nombres o títulos creados por el usuario, contenido documental, proveedores o modelos, ni mensajes literales recibidos desde OpenCode o desde el proceso principal de Electron.
+
+La implementación está validada mediante lint y build. También se comprobó manualmente el cambio de idioma, la persistencia tras reiniciar y el diálogo `Nueva obra` en coreano, sin desbordamientos.
+
+En los proyectos gestionados por Inkforge, el explorador también puede mostrar etiquetas localizadas para sus carpetas estructurales y ficheros de sistema. La presentación traducida es independiente del almacenamiento: los nombres físicos, las rutas y el contenido del vault permanecen intactos. Los vaults heredados, los elementos externos no reconocidos y los nombres creados por el usuario se muestran literalmente.
 
 ## Arquitectura
 
@@ -121,7 +132,7 @@ La integración se validó inicialmente con OpenCode 1.18.31. La compatibilidad 
 Inkforge/
 ├── app/                         Aplicación Electron + React + TypeScript
 │   ├── electron/                Proceso principal, preload, Biblioteca y OpenCode
-│   └── src/                     Interfaz, componentes, hooks y tipos
+│   └── src/                     Interfaz, i18n, componentes, hooks y tipos
 ├── docs/
 │   └── DEVELOPMENT_STATUS.md    Estado operativo y decisiones cerradas
 ├── vault/                       Contenido narrativo Markdown
@@ -189,12 +200,19 @@ También están disponibles los scripts `build` y `preview` de Astro.
 
 ## Validado y pendiente
 
-Están validados la navegación y edición Markdown, el guardado seguro, los estados de conflicto y `missing`, el watcher, el cierre protegido, la Biblioteca básica, la navegación entre libros, el streaming de OpenCode, los modelos y proveedores dinámicos y el retry por modelo incompatible.
+Están validados la navegación y edición Markdown, el guardado seguro, los estados de conflicto y `missing`, el watcher, el cierre protegido, la Biblioteca básica, la navegación entre libros, la internacionalización del interfaz, el streaming de OpenCode, los modelos y proveedores dinámicos y el retry por modelo incompatible.
+
+### Estructura localizada e importación futura
+
+La localización de etiquetas estructurales está implementada mediante claves explícitas que el proceso principal añade exclusivamente a nodos reconocidos de proyectos gestionados. El renderer conserva siempre `name` y `path` reales y usa el nombre físico como fallback. Las validaciones específicas de este añadido siguen pendientes; no sustituyen ni invalidan las comprobaciones ya completadas del selector de idioma.
+
+La primera versión de importación aceptará únicamente proyectos ya compatibles con la estructura de Inkforge. Será una operación validada y no destructiva, orientada a copiar el proyecto compatible dentro de la Biblioteca portable: no incluirá un importador genérico ni renombrado o adivinación automática. `El Cambio` será el caso de migración e importación de referencia, y la ayuda integrada futura incluirá una guía para preparar e importar proyectos. Esta importación todavía no está implementada.
 
 Pendientes reales:
 
+- validar las etiquetas estructurales en los cuatro idiomas, tanto en novela como en saga y documento abierto;
+- implementar después la importación validada de proyectos compatibles y su guía de preparación;
 - completar la ayuda integrada y mantener la documentación sincronizada con el producto;
-- internacionalización;
 - validar completamente permisos, preguntas y variantes de OpenCode en interacciones reales;
 - persistir sesiones de chat y el último modelo entre reinicios;
 - preparar packaging e instalador para Windows;

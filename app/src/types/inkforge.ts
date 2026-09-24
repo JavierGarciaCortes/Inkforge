@@ -54,7 +54,37 @@ export interface CreateProjectResult extends LibraryActivationResult {
 
 export type SaveState = 'idle' | 'saving' | 'error' | 'conflict' | 'missing'
 
-export interface VaultDirectoryNode {
+export type VaultPresentationKey =
+  | 'vault.structure.projectManifest'
+  | 'vault.structure.bookManifest'
+  | 'vault.structure.world'
+  | 'vault.structure.style'
+  | 'vault.structure.references'
+  | 'vault.structure.chapters'
+  | 'vault.structure.planning'
+  | 'vault.structure.canon'
+  | 'vault.structure.notes'
+  | 'vault.structure.resources'
+  | 'vault.structure.chronology'
+  | 'vault.structure.chapterOutline'
+  | 'vault.structure.status'
+  | 'vault.structure.foreshadowing'
+  | 'vault.structure.foundations'
+  | 'vault.structure.editorialGuide'
+  | 'vault.structure.index'
+  | 'vault.structure.lexicon'
+  | 'vault.structure.storyOutline'
+  | 'vault.structure.pending'
+  | 'vault.structure.plot'
+  | 'vault.structure.bookCanon'
+  | 'vault.structure.bookSection'
+
+export interface VaultPresentation {
+  presentationKey?: VaultPresentationKey
+  presentationValues?: Readonly<Record<string, string | number>>
+}
+
+export interface VaultDirectoryNode extends VaultPresentation {
   type: 'directory'
   name: string
   path: string
@@ -62,7 +92,7 @@ export interface VaultDirectoryNode {
   children: VaultTreeNode[]
 }
 
-export interface VaultDocumentNode {
+export interface VaultDocumentNode extends VaultPresentation {
   type: 'document'
   name: string
   path: string
@@ -70,7 +100,7 @@ export interface VaultDocumentNode {
 
 export type VaultTreeNode = VaultDirectoryNode | VaultDocumentNode
 
-export interface VaultDocument {
+export interface VaultDocument extends VaultPresentation {
   name: string
   path: string
   content: string

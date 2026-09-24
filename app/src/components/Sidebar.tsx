@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { getVaultPresentationLabel } from '../i18n/vault-presentation'
 import type {
   ActiveBook,
   ActiveProject,
@@ -49,13 +51,15 @@ function countDocuments(nodes: VaultTreeNode[]): number {
 }
 
 function DirectoryNode({ node, selectedPath, onSelectDocument }: DirectoryNodeProps) {
+  const { t } = useTranslation()
   const [isOpen, setIsOpen] = useState(true)
+  const label = getVaultPresentationLabel(node, t)
 
   if (node.presentation === 'book-section') {
     return (
       <li className="tree-directory book-section">
         <div className="book-section-label">
-          <span className="tree-label">{node.name}</span>
+          <span className="tree-label">{label}</span>
         </div>
         <TreeNodes
           nodes={node.children}
@@ -76,7 +80,7 @@ function DirectoryNode({ node, selectedPath, onSelectDocument }: DirectoryNodePr
       >
         <span className={isOpen ? 'folder-chevron folder-chevron-open' : 'folder-chevron'} aria-hidden="true" />
         <span className="folder-mark" aria-hidden="true" />
-        <span className="tree-label">{node.name}</span>
+        <span className="tree-label">{label}</span>
       </button>
       {isOpen && (
         <TreeNodes
@@ -90,6 +94,8 @@ function DirectoryNode({ node, selectedPath, onSelectDocument }: DirectoryNodePr
 }
 
 function TreeNodes({ nodes, selectedPath, onSelectDocument }: TreeNodesProps) {
+  const { t } = useTranslation()
+
   return (
     <ul className="vault-tree-list">
       {nodes.map((node) => (
@@ -110,7 +116,7 @@ function TreeNodes({ nodes, selectedPath, onSelectDocument }: TreeNodesProps) {
               onClick={() => onSelectDocument(node.path)}
             >
               <span className="document-mark" aria-hidden="true" />
-              <span className="tree-label">{node.name}</span>
+              <span className="tree-label">{getVaultPresentationLabel(node, t)}</span>
             </button>
           </li>
         )
@@ -139,6 +145,7 @@ export function Sidebar({
   onRenameBook,
   onReload,
 }: SidebarProps) {
+  const { t } = useTranslation()
   const documentCount = countDocuments(tree)
   const activeProjectIsDiscovered = activeProject.id === null || projects.some(
     (project) => project.id === activeProject.id,
@@ -148,29 +155,29 @@ export function Sidebar({
   )
 
   return (
-    <aside className="sidebar" aria-label="Biblioteca">
+    <aside className="sidebar" aria-label={t('sidebar.ariaLabel')}>
       <div className="panel-heading">
-        <span className="eyebrow">Biblioteca</span>
+        <span className="eyebrow">{t('common.library')}</span>
         <span className="panel-note">
-          {state === 'ready' ? `${documentCount} documentos` : 'Vault de la obra'}
+          {state === 'ready' ? t('sidebar.documentCount', { count: documentCount }) : t('sidebar.workVault')}
         </span>
       </div>
 
       <div className="project-switcher">
         <button type="button" disabled={isProjectBusy} onClick={onNewProject}>
-          Nueva obra
+          {t('sidebar.newWork')}
         </button>
         <label>
-          <span>Obra activa</span>
+          <span>{t('sidebar.activeWork')}</span>
           <select
             value={activeProject.id ?? ''}
             disabled={isProjectBusy}
             onChange={(event) => onProjectChange(event.target.value || null)}
           >
-            <option value="">Vault actual</option>
+            <option value="">{t('common.currentVault')}</option>
             {!activeProjectIsDiscovered && activeProject.id !== null && (
               <option value={activeProject.id}>
-                {activeProject.title} (no disponible)
+                {t('common.unavailable', { title: activeProject.title })}
               </option>
             )}
             {projects.map((project) => (
@@ -182,16 +189,16 @@ export function Sidebar({
         </label>
         {activeProject.type !== 'legacy' && (
           <button type="button" disabled={isProjectBusy} onClick={onRenameProject}>
-            {activeProject.type === 'saga' ? 'Renombrar saga' : 'Renombrar libro'}
+            {activeProject.type === 'saga' ? t('sidebar.renameSaga') : t('sidebar.renameBook')}
           </button>
         )}
         {activeProject.type === 'saga' && (
           <>
             <button type="button" disabled={isProjectBusy} onClick={onAddBook}>
-              Añadir libro
+              {t('sidebar.addBook')}
             </button>
             <label>
-              <span>Libro activo</span>
+              <span>{t('sidebar.activeBook')}</span>
               <select
                 value={activeBook?.id ?? ''}
                 disabled={isProjectBusy || (books.length === 0 && activeBook === null)}
@@ -202,11 +209,11 @@ export function Sidebar({
                 }}
               >
                 {activeBook === null && (
-                  <option value="">Sin libro activo</option>
+                  <option value="">{t('sidebar.noActiveBook')}</option>
                 )}
                 {!activeBookIsDiscovered && activeBook !== null && (
                   <option value={activeBook.id}>
-                    {activeBook.title} (no disponible)
+                    {t('common.unavailable', { title: activeBook.title })}
                   </option>
                 )}
                 {books.map((book) => (
@@ -222,7 +229,7 @@ export function Sidebar({
                 disabled={isProjectBusy || !activeBookIsDiscovered}
                 onClick={onRenameBook}
               >
-                Renombrar libro
+                {t('sidebar.renameBook')}
               </button>
             )}
           </>
@@ -232,23 +239,23 @@ export function Sidebar({
         )}
       </div>
 
-      <nav className="vault-tree-scroll" aria-label="Documentos del vault" aria-busy={state === 'loading'}>
+      <nav className="vault-tree-scroll" aria-label={t('sidebar.documentsAria')} aria-busy={state === 'loading'}>
         {state === 'loading' && (
           <div className="sidebar-state">
             <span className="loading-mark" aria-hidden="true" />
-            <span>Cargando vault...</span>
+            <span>{t('sidebar.loading')}</span>
           </div>
         )}
 
         {state === 'error' && (
           <div className="sidebar-state sidebar-error" role="alert">
             <span>{error}</span>
-            <button type="button" onClick={onReload}>Reintentar</button>
+            <button type="button" onClick={onReload}>{t('common.retry')}</button>
           </div>
         )}
 
         {state === 'ready' && tree.length === 0 && (
-          <div className="sidebar-state">No hay documentos Markdown.</div>
+          <div className="sidebar-state">{t('sidebar.empty')}</div>
         )}
 
         {state === 'ready' && tree.length > 0 && (
@@ -261,13 +268,15 @@ export function Sidebar({
       </nav>
 
       <div className="sidebar-footer">
-        <span className="sidebar-footer-label">{activeProject.title}</span>
+        <span className="sidebar-footer-label">
+          {activeProject.type === 'legacy' ? t('common.currentVault') : activeProject.title}
+        </span>
         <span>
           {activeProject.type === 'legacy'
-            ? 'Vault heredado'
+            ? t('sidebar.inheritedVault')
             : activeProject.type === 'saga'
-              ? 'Saga'
-              : 'Novela'}
+              ? t('sidebar.saga')
+              : t('sidebar.novel')}
         </span>
       </div>
     </aside>

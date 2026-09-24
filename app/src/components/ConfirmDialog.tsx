@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 
 interface ConfirmDialogProps {
   title: string
@@ -15,6 +16,7 @@ export function ConfirmDialog({
   onCancel,
   onConfirm,
 }: ConfirmDialogProps) {
+  const { t } = useTranslation()
   const cancelButtonRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
@@ -46,7 +48,7 @@ export function ConfirmDialog({
         aria-labelledby="confirm-dialog-title"
         aria-describedby="confirm-dialog-message"
       >
-        <span className="eyebrow">Confirmación</span>
+        <span className="eyebrow">{t('dialogs.confirmation')}</span>
         <h2 id="confirm-dialog-title">{title}</h2>
         <p id="confirm-dialog-message">{message}</p>
         <div className="confirm-dialog-actions">
@@ -56,7 +58,7 @@ export function ConfirmDialog({
             type="button"
             onClick={onCancel}
           >
-            Cancelar
+            {t('common.cancel')}
           </button>
           <button
             className="dialog-button dialog-button-danger"

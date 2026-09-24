@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next'
+import { getVaultPresentationLabel } from '../i18n/vault-presentation'
 import type { LoadState, SaveState, VaultDocument } from '../types/inkforge'
 
 interface DocumentWorkspaceProps {
@@ -33,19 +35,22 @@ export function DocumentWorkspace({
   onContentChange,
   onSave,
 }: DocumentWorkspaceProps) {
-  const documentName = document?.name ?? selectedPath?.split('/').at(-1) ?? 'Sin selección'
+  const { t } = useTranslation()
+  const documentName = document
+    ? getVaultPresentationLabel(document, t)
+    : selectedPath?.split('/').at(-1) ?? t('document.noSelection')
 
   const saveStatus = saveState === 'saving'
-    ? 'Guardando…'
+    ? t('document.status.saving')
     : saveState === 'conflict'
-      ? 'Conflicto externo'
+      ? t('document.status.conflict')
       : saveState === 'missing'
-        ? 'Archivo no encontrado'
+        ? t('document.status.missing')
         : saveState === 'error'
-        ? 'Error al guardar'
+        ? t('document.status.error')
         : isDirty
-          ? 'Sin guardar'
-          : 'Guardado'
+          ? t('document.status.dirty')
+          : t('document.status.saved')
   const saveStatusClass = saveState === 'error' || saveState === 'conflict' || saveState === 'missing'
     ? 'save-state save-state-error'
     : isDirty
@@ -56,7 +61,7 @@ export function DocumentWorkspace({
     <main className="document-workspace">
       <div className="workspace-toolbar">
         <div>
-          <span className="eyebrow">Documento</span>
+          <span className="eyebrow">{t('document.eyebrow')}</span>
           <span className="document-title" title={selectedPath ?? undefined}>{documentName}</span>
         </div>
         {state === 'ready' && document ? (
@@ -72,7 +77,7 @@ export function DocumentWorkspace({
                   disabled={saveState === 'saving'}
                   onClick={onReadMode}
                 >
-                  Modo lectura
+                  {t('document.readMode')}
                 </button>
                 <button
                   className="save-button"
@@ -85,24 +90,24 @@ export function DocumentWorkspace({
                   }
                   onClick={onSave}
                 >
-                  Guardar
+                  {t('document.save')}
                 </button>
               </>
             ) : (
               <>
-                <span className="edit-mode">Modo lectura</span>
+                <span className="edit-mode">{t('document.readMode')}</span>
                 <button
                   className="workspace-button"
                   type="button"
                   onClick={onEdit}
                 >
-                  Editar
+                  {t('document.edit')}
                 </button>
               </>
             )}
           </div>
         ) : (
-          <span className="edit-mode">Edición Markdown</span>
+          <span className="edit-mode">{t('document.markdownEditing')}</span>
         )}
       </div>
 
@@ -114,22 +119,22 @@ export function DocumentWorkspace({
               <span />
               <span />
             </div>
-            <h1>Selecciona un documento</h1>
-            <p>Elige un archivo Markdown de la Biblioteca para abrirlo en modo lectura.</p>
+            <h1>{t('document.selectTitle')}</h1>
+            <p>{t('document.selectDescription')}</p>
           </div>
         )}
 
         {state === 'loading' && (
           <div className="document-state">
             <span className="loading-mark" aria-hidden="true" />
-            <h1>Abriendo documento</h1>
+            <h1>{t('document.opening')}</h1>
             <p>{selectedPath}</p>
           </div>
         )}
 
         {state === 'error' && (
           <div className="document-state document-error" role="alert">
-            <h1>No se pudo abrir el documento</h1>
+            <h1>{t('document.openError')}</h1>
             <p>{error}</p>
           </div>
         )}
@@ -137,7 +142,7 @@ export function DocumentWorkspace({
         {state === 'ready' && document && (
           <section className={isEditing ? 'document-editor' : 'document-reader'}>
             <header className="document-content-header">
-              <h1>{document.name}</h1>
+              <h1>{documentName}</h1>
               <p title={document.path}>{document.path}</p>
             </header>
             {isEditing ? (
@@ -145,20 +150,18 @@ export function DocumentWorkspace({
                 {saveError && <p className="save-error" role="alert">{saveError}</p>}
                 {saveState === 'conflict' && conflictDocument && (
                   <p className="save-error" role="alert">
-                    Este archivo cambió fuera de Inkforge desde que lo abriste. Tu borrador
-                    sigue intacto y el archivo del disco no se ha sobrescrito.
+                    {t('document.conflictNotice')}
                   </p>
                 )}
                 {saveState === 'missing' && (
                   <p className="save-error" role="alert">
-                    El archivo ya no está disponible en la ruta original. Tu borrador sigue
-                    intacto. Inkforge no ha creado ni sobrescrito ningún archivo.
+                    {t('document.missingNotice')}
                   </p>
                 )}
                 <textarea
                   className="markdown-editor"
                   value={content}
-                  aria-label={`Editar ${document.name}`}
+                  aria-label={t('document.editorAria', { name: documentName })}
                   onChange={(event) => onContentChange(event.target.value)}
                   spellCheck
                 />

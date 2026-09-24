@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
+import { useTranslation } from 'react-i18next'
 
 interface NarrativeNameDialogProps {
   title: string
@@ -22,9 +23,10 @@ export function NarrativeNameDialog({
   onCancel,
   onSubmit,
 }: NarrativeNameDialogProps) {
+  const { t } = useTranslation()
   const inputRef = useRef<HTMLInputElement>(null)
   const [narrativeTitle, setNarrativeTitle] = useState(initialValue)
-  const [validationError, setValidationError] = useState<string | null>(null)
+  const [hasValidationError, setHasValidationError] = useState(false)
 
   useEffect(() => {
     inputRef.current?.focus()
@@ -44,11 +46,11 @@ export function NarrativeNameDialog({
     event.preventDefault()
 
     if (narrativeTitle.trim().length === 0) {
-      setValidationError('Escribe un título.')
+      setHasValidationError(true)
       return
     }
 
-    setValidationError(null)
+    setHasValidationError(false)
     onSubmit(narrativeTitle)
   }
 
@@ -68,7 +70,7 @@ export function NarrativeNameDialog({
         aria-labelledby="narrative-name-dialog-title"
         onSubmit={submitName}
       >
-        <span className="eyebrow">Biblioteca</span>
+        <span className="eyebrow">{t('common.library')}</span>
         <h2 id="narrative-name-dialog-title">{title}</h2>
 
         <label className="project-dialog-field">
@@ -81,14 +83,14 @@ export function NarrativeNameDialog({
             autoComplete="off"
             onChange={(event) => {
               setNarrativeTitle(event.target.value)
-              setValidationError(null)
+              setHasValidationError(false)
             }}
           />
         </label>
 
-        {(validationError || error) && (
+        {(hasValidationError || error) && (
           <p className="project-dialog-error" role="alert">
-            {validationError ?? error}
+            {hasValidationError ? t('nameDialog.titleRequired') : error}
           </p>
         )}
 
@@ -99,14 +101,14 @@ export function NarrativeNameDialog({
             disabled={isSubmitting}
             onClick={onCancel}
           >
-            Cancelar
+            {t('common.cancel')}
           </button>
           <button
             className="dialog-button project-dialog-create"
             type="submit"
             disabled={isSubmitting}
           >
-            {isSubmitting ? 'Guardando…' : submitLabel}
+            {isSubmitting ? t('nameDialog.submitting') : submitLabel}
           </button>
         </div>
       </form>

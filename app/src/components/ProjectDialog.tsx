@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { CreateProjectInput, InkforgeProjectType } from '../types/inkforge'
 
 interface ProjectDialogProps {
@@ -15,11 +16,14 @@ export function ProjectDialog({
   onCancel,
   onCreate,
 }: ProjectDialogProps) {
+  const { t } = useTranslation()
   const titleInputRef = useRef<HTMLInputElement>(null)
   const [type, setType] = useState<InkforgeProjectType>('novela')
   const [narrativeTitle, setNarrativeTitle] = useState('')
   const [firstBookTitle, setFirstBookTitle] = useState('')
-  const [validationError, setValidationError] = useState<string | null>(null)
+  const [validationError, setValidationError] = useState<
+    'saga-title' | 'book-title' | 'first-book-title' | null
+  >(null)
 
   useEffect(() => {
     titleInputRef.current?.focus()
@@ -38,16 +42,12 @@ export function ProjectDialog({
     event.preventDefault()
 
     if (narrativeTitle.trim().length === 0) {
-      setValidationError(
-        type === 'saga'
-          ? 'Escribe un título para la saga.'
-          : 'Escribe un título para el libro.',
-      )
+      setValidationError(type === 'saga' ? 'saga-title' : 'book-title')
       return
     }
 
     if (type === 'saga' && firstBookTitle.trim().length === 0) {
-      setValidationError('Escribe el título del primer libro.')
+      setValidationError('first-book-title')
       return
     }
 
@@ -80,11 +80,11 @@ export function ProjectDialog({
         aria-labelledby="project-dialog-title"
         onSubmit={submitProject}
       >
-        <span className="eyebrow">Biblioteca</span>
-        <h2 id="project-dialog-title">Nueva obra</h2>
+        <span className="eyebrow">{t('common.library')}</span>
+        <h2 id="project-dialog-title">{t('projectDialog.newWork')}</h2>
 
         <label className="project-dialog-field">
-          <span>Tipo de obra</span>
+          <span>{t('projectDialog.workType')}</span>
           <select
             value={type}
             disabled={isCreating}
@@ -93,13 +93,13 @@ export function ProjectDialog({
               setValidationError(null)
             }}
           >
-            <option value="novela">Novela independiente</option>
-            <option value="saga">Saga</option>
+            <option value="novela">{t('projectDialog.standaloneNovel')}</option>
+            <option value="saga">{t('projectDialog.saga')}</option>
           </select>
         </label>
 
         <label className="project-dialog-field">
-          <span>{type === 'saga' ? 'Título de la saga' : 'Título del libro'}</span>
+          <span>{type === 'saga' ? t('projectDialog.sagaTitle') : t('projectDialog.bookTitle')}</span>
           <input
             ref={titleInputRef}
             type="text"
@@ -115,7 +115,7 @@ export function ProjectDialog({
 
         {type === 'saga' && (
           <label className="project-dialog-field">
-            <span>Título del primer libro</span>
+            <span>{t('projectDialog.firstBookTitle')}</span>
             <input
               type="text"
               value={firstBookTitle}
@@ -131,7 +131,13 @@ export function ProjectDialog({
 
         {(validationError || error) && (
           <p className="project-dialog-error" role="alert">
-            {validationError ?? error}
+            {validationError === 'saga-title'
+              ? t('projectDialog.sagaTitleRequired')
+              : validationError === 'book-title'
+                ? t('projectDialog.bookTitleRequired')
+                : validationError === 'first-book-title'
+                  ? t('projectDialog.firstBookTitleRequired')
+                  : error}
           </p>
         )}
 
@@ -142,14 +148,14 @@ export function ProjectDialog({
             disabled={isCreating}
             onClick={onCancel}
           >
-            Cancelar
+            {t('common.cancel')}
           </button>
           <button
             className="dialog-button project-dialog-create"
             type="submit"
             disabled={isCreating}
           >
-            {isCreating ? 'Creando…' : 'Crear'}
+            {isCreating ? t('projectDialog.creating') : t('projectDialog.create')}
           </button>
         </div>
       </form>
