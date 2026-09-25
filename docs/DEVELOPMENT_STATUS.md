@@ -145,25 +145,29 @@ ce356bf merge: add file reconciliation
 
 cb8f8a6 feat: sync vault tree and protect window close
 1a847ef merge: sync vault tree and protect window close
+
+57e2c4c feat: localize interface and managed vault labels
+f25db41 Merge branch 'feature/interface-localization'
 ```
 
-Tras `1a847ef` se confirmó `## main...origin/main`; `main` y `origin/main` estaban sincronizados. La rama `feature/vault-tree-sync` fue eliminada.
+Tras el push de `f25db41` se confirmó `## main...origin/main`; `main` quedó limpia y sincronizada con `origin/main`. La rama local `feature/interface-localization` fue eliminada.
 
 ## 6. Rama y estado de trabajo actual
 
 Rama de trabajo actual conocida:
 
 ```text
-feature/interface-localization
+feature/help-import-guide
 ```
 
-El hito de Biblioteca —proyectos, sagas, libro activo, navegación y documentación— ya se ha comprometido localmente con este mensaje:
+El hito de internacionalización y localización de la interfaz y de las etiquetas estructurales gestionadas está integrado en `main` mediante:
 
 ```text
-feat: add library projects and saga navigation
+57e2c4c feat: localize interface and managed vault labels
+f25db41 Merge branch 'feature/interface-localization'
 ```
 
-No se ha solicitado push. Tampoco se ha registrado en este documento el estado exacto actual de `git status`; comprobarlo antes de cambiar de rama o continuar trabajo que dependa de esos datos.
+El merge fue enviado a `origin/main`. Tras el push se comprobó `## main...origin/main`, por lo que `main` quedó limpia y sincronizada con `origin/main`. La rama local `feature/interface-localization` ya fue eliminada.
 
 La Biblioteca funcional y su último ajuste visual están implementados, revisados y validados mediante diff, lint, build y comprobación manual (véase sección 14).
 
@@ -400,14 +404,15 @@ Estado de validación: **implementado y validado**.
 Comprobaciones realizadas:
 
 ```text
+git diff --check                    → correcto (solo avisos LF/CRLF)
 npm --prefix .\app run lint   → correcto
 npm --prefix .\app run build  → correcto
 cambio manual entre los cuatro idiomas   → correcto
-persistencia del idioma tras reiniciar   → correcta
+persistencia del idioma tras reiniciar usando catalán   → correcta
 diálogo «Nueva obra» en coreano           → correcto, sin desbordamientos
 ```
 
-### Etiquetas estructurales localizadas — implementadas, pendientes de validación
+### Etiquetas estructurales localizadas — implementadas y validadas
 
 El proceso principal añade una clave de presentación opcional únicamente a carpetas estructurales, ficheros de sistema y presentaciones propias que reconoce dentro de proyectos gestionados por Biblioteca. El renderer resuelve esa clave en los recursos `es`, `en`, `ca` y `ko` y conserva el nombre físico como fallback.
 
@@ -423,7 +428,16 @@ La cobertura actual se limita a la estructura que Inkforge crea y reconoce hoy: 
 
 Los metadatos de presentación acompañan el árbol y los documentos leídos o devueltos por el guardado; `name` y `path` reales continúan siendo la fuente operativa. No se han añadido migraciones, plantillas ni cambios al formato del proyecto.
 
-Estado: **implementado, pendiente de validación específica**. No se han ejecutado lint, build, tests ni Electron para este añadido. Permanecen válidas las comprobaciones ya registradas del selector de idioma, incluida su persistencia y el diálogo `Nueva obra` en coreano.
+Estado: **implementadas y validadas**.
+
+Validaciones manuales realizadas:
+
+- estructura localizada correctamente en una saga gestionada;
+- estructura localizada correctamente en una novela independiente gestionada;
+- el cambio de libro activo mantiene correctamente la presentación localizada;
+- los títulos y nombres introducidos por el usuario permanecen literales;
+- el vault heredado o no gestionado conserva los nombres físicos sin traducir;
+- las rutas y los nombres físicos no se modifican.
 
 ### Decisión cerrada: primera importación de proyectos
 
@@ -432,19 +446,20 @@ La primera versión de importación aceptará únicamente proyectos que ya sean 
 Reglas cerradas:
 
 - no habrá importador genérico;
-- no se renombrarán ni adivinarán automáticamente carpetas, ficheros o ámbitos;
+- no se renombrarán automáticamente carpetas ni ficheros;
+- no se inferirán ni adivinarán ámbitos o estructuras;
+- la entrada deberá ser compatible con la estructura de Inkforge;
 - la entrada se validará antes de importar;
 - la operación será no destructiva y copiará el proyecto compatible dentro de la Biblioteca portable;
 - `El Cambio` será el caso de migración e importación de referencia;
-- la ayuda integrada futura incluirá una guía de preparación e importación.
+- habrá una guía de preparación e importación.
 
-Estado: **decidido, todavía no implementado**. Se abordará después del hito de etiquetas estructurales localizadas.
+Estado: **decidido, todavía no implementado**.
 
 Pendientes posteriores conocidos:
 
-- Validar las etiquetas estructurales en los cuatro idiomas para novela, saga, cambio de libro y documento abierto.
-- Implementar después la importación validada y no destructiva de proyectos compatibles.
-- Diseñar ayuda dentro de la app para explicar solo funciones realmente implementadas: novelas y sagas, libro activo, contenido compartido, guardar, renombrar y comportamiento ante cambios externos. No prometer todavía acciones de chat no implementadas.
+- Definir e implementar la ayuda integrada y la guía de preparación/importación para proyectos compatibles con la estructura Inkforge, documentando solo funciones realmente implementadas y verificadas.
+- Implementar después la importación validada y no destructiva de proyectos compatibles, sin importador genérico, renombrado automático ni inferencia de estructura.
 - Persistencia de sesiones/chat entre reinicios.
 - Persistencia del último modelo.
 - Validación real de permisos y preguntas OpenCode.
@@ -452,6 +467,8 @@ Pendientes posteriores conocidos:
 - Packaging Windows y revisión de `projectRoot` para app empaquetada.
 - Perfiles de género/estilo, herencia Saga/Libro y eliminación de supuestos de fantasía heredados.
 - Mejoras futuras de conflictos: diff, elección de versión y merge.
+- Modo portable Windows/Linux.
+- Motores de IA mediante Codex con cuenta ChatGPT y OpenCode multiproveedor.
 
 ## 16. Documentación
 
@@ -472,4 +489,6 @@ README y ayuda en la app son piezas distintas:
 
 ## 18. Siguiente paso exacto
 
-Validar el añadido de etiquetas estructurales localizadas antes de iniciar la importación compatible y su guía.
+Definir y después implementar el alcance de la ayuda integrada dentro de Inkforge y de la guía de preparación/importación para proyectos compatibles con la estructura Inkforge.
+
+La ayuda documentará únicamente funciones realmente implementadas y verificadas. Este hito respetará las decisiones cerradas: sin importador genérico, sin renombrado automático y sin inferencia o adivinación de estructura.
