@@ -169,6 +169,8 @@ f25db41 Merge branch 'feature/interface-localization'
 
 El merge fue enviado a `origin/main`. Tras el push se comprobó `## main...origin/main`, por lo que `main` quedó limpia y sincronizada con `origin/main`. La rama local `feature/interface-localization` ya fue eliminada.
 
+El hito actual de Ayuda integrada y guía informativa de preparación para importación compatible está **implementado y validado** en `feature/help-import-guide`.
+
 La Biblioteca funcional y su último ajuste visual están implementados, revisados y validados mediante diff, lint, build y comprobación manual (véase sección 14).
 
 `README.md` ya fue reescrito para reflejar la arquitectura actual, la Biblioteca, la seguridad del vault, OpenCode, los comandos reales y los pendientes vigentes.
@@ -439,6 +441,43 @@ Validaciones manuales realizadas:
 - el vault heredado o no gestionado conserva los nombres físicos sin traducir;
 - las rutas y los nombres físicos no se modifican.
 
+### Ayuda integrada y guía de preparación — implementadas y validadas
+
+La primera versión de Ayuda integrada está disponible desde el botón `?` de `AppHeader`, situado entre el selector de idioma y el botón Ajustes, que continúa deshabilitado. `App.tsx` controla el nuevo `HelpDialog` mediante el estado local `isHelpOpen`.
+
+La Ayuda:
+
+- se cierra mediante el botón `Cerrar`, Escape o un clic en el overlay exterior;
+- dispone de scroll y se adapta a ventanas pequeñas;
+- está localizada en español, inglés, catalán y coreano;
+- documenta Biblioteca, novelas y sagas, obra y libro activos, exploración y edición Markdown, guardado explícito sin autosave, protección ante cambios externos, comportamiento básico validado de OpenCode/modelos e idiomas;
+- no forma parte de `PendingAction` y abrirla o cerrarla no cambia documento, borrador, obra ni libro;
+- incluye una guía informativa para preparar proyectos compatibles con una futura importación.
+
+La guía muestra literalmente las estructuras físicas de referencia de novela independiente y saga. Sus nombres no se traducen y la localización visual no modifica las rutas reales. Indica de forma explícita que la importación todavía no está disponible y no incorpora botón, selector de carpeta ni acción de importación.
+
+Validaciones realizadas:
+
+```text
+git diff --check                  → correcto (solo avisos LF/CRLF informativos)
+npm --prefix .\app run lint       → correcto
+npm --prefix .\app run build      → correcto
+```
+
+Validación manual en Electron:
+
+- Inkforge arranca correctamente y el botón `?` aparece entre idioma y Ajustes;
+- la Ayuda abre y cierra correctamente mediante Escape, overlay y `Cerrar`;
+- abrirla y cerrarla con un borrador sin guardar no modifica ni pierde el borrador;
+- el contenido es correcto en español, inglés, catalán y coreano;
+- coreano no presenta desbordamientos apreciables;
+- en una ventana pequeña, todo el contenido sigue accesible mediante scroll;
+- los bloques de estructura física permanecen literalmente en castellano en todos los idiomas;
+- la guía deja claro que la importación no está disponible y no ofrece botones, selección de carpetas ni acciones de importación;
+- Ajustes continúa deshabilitado.
+
+El idioma se selecciona antes de abrir la Ayuda; no se establece como requisito cambiarlo mientras el modal está abierto, ya que el overlay bloquea correctamente la interfaz posterior.
+
 ### Decisión cerrada: primera importación de proyectos
 
 La primera versión de importación aceptará únicamente proyectos que ya sean compatibles con la estructura de Inkforge.
@@ -450,16 +489,16 @@ Reglas cerradas:
 - no se inferirán ni adivinarán ámbitos o estructuras;
 - la entrada deberá ser compatible con la estructura de Inkforge;
 - la entrada se validará antes de importar;
-- la operación será no destructiva y copiará el proyecto compatible dentro de la Biblioteca portable;
-- `El Cambio` será el caso de migración e importación de referencia;
-- habrá una guía de preparación e importación.
+- la operación será no destructiva, copiará el proyecto compatible dentro de la Biblioteca portable y no modificará el proyecto fuente;
+- `El Cambio` será el caso de referencia de desarrollo, no un requisito del usuario;
+- la solución será general para cualquier proyecto compatible;
+- la guía informativa de preparación ya está implementada en la Ayuda integrada.
 
-Estado: **decidido, todavía no implementado**.
+Estado de la importación real: **decidida, todavía no implementada**. Siguen pendientes la selección de un proyecto externo, su validación real, la copia, la migración, el drag-and-drop y cualquier IPC de importación.
 
 Pendientes posteriores conocidos:
 
-- Definir e implementar la ayuda integrada y la guía de preparación/importación para proyectos compatibles con la estructura Inkforge, documentando solo funciones realmente implementadas y verificadas.
-- Implementar después la importación validada y no destructiva de proyectos compatibles, sin importador genérico, renombrado automático ni inferencia de estructura.
+- Implementar la importación validada y no destructiva de proyectos ya compatibles, sin importador genérico, renombrado automático ni inferencia de estructura.
 - Persistencia de sesiones/chat entre reinicios.
 - Persistencia del último modelo.
 - Validación real de permisos y preguntas OpenCode.
@@ -489,6 +528,6 @@ README y ayuda en la app son piezas distintas:
 
 ## 18. Siguiente paso exacto
 
-Definir y después implementar el alcance de la ayuda integrada dentro de Inkforge y de la guía de preparación/importación para proyectos compatibles con la estructura Inkforge.
+Diseñar e implementar la primera importación validada y no destructiva de proyectos que ya sean compatibles con la estructura Inkforge.
 
-La ayuda documentará únicamente funciones realmente implementadas y verificadas. Este hito respetará las decisiones cerradas: sin importador genérico, sin renombrado automático y sin inferencia o adivinación de estructura.
+El hito deberá validar antes de copiar, no modificar el proyecto fuente y copiar el proyecto compatible hacia la Biblioteca portable. Se mantienen las decisiones cerradas: sin importador genérico, sin renombrado automático y sin inferencia o adivinación de estructura. `El Cambio` servirá como caso de referencia para probar el flujo, sin acoplar la arquitectura a ese proyecto.

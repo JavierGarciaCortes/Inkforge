@@ -18,6 +18,8 @@ La aplicación de escritorio ya permite:
 - gestionar una Biblioteca con novelas independientes y sagas de varios libros;
 - crear obras, añadir libros, cambiar el libro activo y renombrar novelas, sagas y libros;
 - utilizar la interfaz en español, inglés, catalán o coreano;
+- abrir una Ayuda integrada y localizada con documentación de las funciones disponibles;
+- consultar una guía informativa para preparar proyectos compatibles con una futura importación;
 - usar un chat integrado con OpenCode local, streaming y selección dinámica de modelos y proveedores;
 - reintentar en la misma sesión cuando el modelo elegido resulta incompatible.
 
@@ -32,6 +34,12 @@ La traducción se limita al texto propio de la interfaz. No se traducen manuscri
 La implementación está validada mediante lint y build. También se comprobó manualmente el cambio de idioma, la persistencia tras reiniciar y el diálogo `Nueva obra` en coreano, sin desbordamientos.
 
 En los proyectos gestionados por Inkforge, el explorador también puede mostrar etiquetas localizadas para sus carpetas estructurales y ficheros de sistema. La presentación traducida es independiente del almacenamiento: los nombres físicos, las rutas y el contenido del vault permanecen intactos. Los vaults heredados, los elementos externos no reconocidos y los nombres creados por el usuario se muestran literalmente.
+
+## Ayuda integrada
+
+El botón `?` del encabezado abre una Ayuda localizada en los cuatro idiomas de la interfaz. Resume el uso de la Biblioteca, novelas y sagas, lectura y edición Markdown, guardado explícito, protección ante cambios externos, OpenCode y localización. Abrirla o cerrarla no altera el documento, el borrador, la obra ni el libro activos.
+
+La Ayuda incluye una guía de preparación que muestra las estructuras físicas de referencia para una novela independiente y una saga. Es únicamente documentación: la importación real, la selección y validación de proyectos externos y la copia a la Biblioteca todavía no están implementadas.
 
 ## Arquitectura
 
@@ -200,24 +208,24 @@ También están disponibles los scripts `build` y `preview` de Astro.
 
 ## Validado y pendiente
 
-Están validados la navegación y edición Markdown, el guardado seguro, los estados de conflicto y `missing`, el watcher, el cierre protegido, la Biblioteca básica, la navegación entre libros, la internacionalización del interfaz, el streaming de OpenCode, los modelos y proveedores dinámicos y el retry por modelo incompatible.
+Están validados la navegación y edición Markdown, el guardado seguro, los estados de conflicto y `missing`, el watcher, el cierre protegido, la Biblioteca básica, la navegación entre libros, la internacionalización del interfaz, las etiquetas estructurales localizadas, la Ayuda integrada con su guía de preparación, el streaming de OpenCode, los modelos y proveedores dinámicos y el retry por modelo incompatible.
 
 ### Estructura localizada e importación futura
 
-La localización de etiquetas estructurales está implementada mediante claves explícitas que el proceso principal añade exclusivamente a nodos reconocidos de proyectos gestionados. El renderer conserva siempre `name` y `path` reales y usa el nombre físico como fallback. Las validaciones específicas de este añadido siguen pendientes; no sustituyen ni invalidan las comprobaciones ya completadas del selector de idioma.
+La localización de etiquetas estructurales está implementada y validada mediante claves explícitas que el proceso principal añade exclusivamente a nodos reconocidos de proyectos gestionados. El renderer conserva siempre `name` y `path` reales y usa el nombre físico como fallback.
 
-La primera versión de importación aceptará únicamente proyectos ya compatibles con la estructura de Inkforge. Será una operación validada y no destructiva, orientada a copiar el proyecto compatible dentro de la Biblioteca portable: no incluirá un importador genérico ni renombrado o adivinación automática. `El Cambio` será el caso de migración e importación de referencia, y la ayuda integrada futura incluirá una guía para preparar e importar proyectos. Esta importación todavía no está implementada.
+La guía informativa de preparación ya está disponible en la Ayuda integrada. La primera versión de importación real aceptará únicamente proyectos ya compatibles con la estructura de Inkforge. Será una operación validada y no destructiva, orientada a copiar el proyecto compatible dentro de la Biblioteca portable sin modificar el original: no incluirá un importador genérico ni renombrado, conversión o inferencia automática. `El Cambio` será el caso de referencia de desarrollo, no un requisito para el usuario. Esta importación todavía no está implementada.
 
 Pendientes reales:
 
-- validar las etiquetas estructurales en los cuatro idiomas, tanto en novela como en saga y documento abierto;
-- implementar después la importación validada de proyectos compatibles y su guía de preparación;
-- completar la ayuda integrada y mantener la documentación sincronizada con el producto;
+- implementar la importación validada y no destructiva de proyectos ya compatibles, sin importador genérico, renombrado automático ni inferencia de estructura;
 - validar completamente permisos, preguntas y variantes de OpenCode en interacciones reales;
 - persistir sesiones de chat y el último modelo entre reinicios;
-- preparar packaging e instalador para Windows;
-- añadir perfiles de género y estilo y definir su herencia entre saga y libro;
-- mejorar la resolución de conflictos con diff, elección de versión y merge.
+- preparar packaging para Windows y revisar `projectRoot` en la aplicación empaquetada;
+- desarrollar el modo portable para Windows y Linux;
+- añadir perfiles de género y estilo, definir su herencia entre saga y libro y eliminar supuestos heredados de fantasía;
+- mejorar la resolución de conflictos con diff, elección de versión y merge;
+- integrar motores de IA mediante Codex con cuenta ChatGPT y OpenCode multiproveedor.
 
 El borrado de obras y libros se reserva para una etapa futura y no es prioritario. La Biblioteca básica ya está completada y no forma parte de estos pendientes.
 

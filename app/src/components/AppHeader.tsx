@@ -9,9 +9,10 @@ import type { InkforgeAppInfo } from '../types/inkforge'
 
 interface AppHeaderProps {
   appInfo: InkforgeAppInfo | null
+  onHelp: () => void
 }
 
-export function AppHeader({ appInfo }: AppHeaderProps) {
+export function AppHeader({ appInfo, onHelp }: AppHeaderProps) {
   const { t, i18n } = useTranslation()
 
   return (
@@ -48,6 +49,10 @@ export function AppHeader({ appInfo }: AppHeaderProps) {
             ))}
           </select>
         </label>
+        <button className="icon-button" type="button" title={t('header.openHelp')} onClick={onHelp}>
+          <span aria-hidden="true">?</span>
+          <span className="sr-only">{t('header.help')}</span>
+        </button>
         <button className="icon-button" type="button" title={t('header.settingsUnavailable')} disabled>
           <span aria-hidden="true">&#9881;</span>
           <span className="sr-only">{t('header.settings')}</span>

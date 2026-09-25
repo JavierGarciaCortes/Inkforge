@@ -5,6 +5,7 @@ import { AppHeader } from './components/AppHeader'
 import { ConfirmDialog } from './components/ConfirmDialog'
 import { DocumentWorkspace } from './components/DocumentWorkspace'
 import { EditorPanel } from './components/EditorPanel'
+import { HelpDialog } from './components/HelpDialog'
 import { NarrativeNameDialog } from './components/NarrativeNameDialog'
 import { ProjectDialog } from './components/ProjectDialog'
 import { Sidebar } from './components/Sidebar'
@@ -75,6 +76,7 @@ function App() {
   const [isProjectBusy, setIsProjectBusy] = useState(false)
   const [projectError, setProjectError] = useState<string | null>(null)
   const [isProjectDialogOpen, setIsProjectDialogOpen] = useState(false)
+  const [isHelpOpen, setIsHelpOpen] = useState(false)
   const [narrativeDialog, setNarrativeDialog] = useState<NarrativeDialogKind | null>(null)
   const [vaultTree, setVaultTree] = useState<VaultTreeNode[]>([])
   const [vaultState, setVaultState] = useState<LoadState>('loading')
@@ -960,7 +962,7 @@ function App() {
 
   return (
     <div className="app-shell">
-      <AppHeader appInfo={appInfo} />
+      <AppHeader appInfo={appInfo} onHelp={() => setIsHelpOpen(true)} />
       <div className="workspace-grid">
         <Sidebar
           tree={vaultTree}
@@ -1020,6 +1022,9 @@ function App() {
           onCancel={cancelNarrativeDialog}
           onSubmit={submitNarrativeDialog}
         />
+      )}
+      {isHelpOpen && (
+        <HelpDialog onClose={() => setIsHelpOpen(false)} />
       )}
       {pendingAction && (
         <ConfirmDialog
