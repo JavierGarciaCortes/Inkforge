@@ -360,6 +360,15 @@ async function createBookStructure(booksRoot, title, number) {
 function createProjectLibrary(libraryRoot) {
   const projectsRoot = path.join(libraryRoot, 'Proyectos')
 
+  async function readDirectoryIfPresent(directoryPath) {
+    try {
+      return await fs.readdir(directoryPath, { withFileTypes: true })
+    } catch (error) {
+      if (error?.code === 'ENOENT') return []
+      throw error
+    }
+  }
+
   async function resolveProjectsRoot(createIfMissing = false) {
     let projectsStats
 
@@ -406,7 +415,7 @@ function createProjectLibrary(libraryRoot) {
       return []
     }
 
-    const entries = await fs.readdir(realProjectsRoot, { withFileTypes: true })
+    const entries = await readDirectoryIfPresent(realProjectsRoot)
     const projects = []
 
     for (const entry of entries) {
@@ -515,7 +524,7 @@ function createProjectLibrary(libraryRoot) {
       return []
     }
 
-    const entries = await fs.readdir(realBooksRoot, { withFileTypes: true })
+    const entries = await readDirectoryIfPresent(realBooksRoot)
     const books = []
 
     for (const entry of entries) {

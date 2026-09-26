@@ -1,7 +1,8 @@
 :root {
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  color: #c8cbd0;
-  background: #17191d;
+  color: var(--text-body);
+  background: var(--surface-deep);
+  color-scheme: dark;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -20,6 +21,103 @@
   --text-muted: #7f858e;
   --text-faint: #60656d;
   --accent: #c18a58;
+  --surface-input: #1b1d21;
+  --surface-chat: #1a1d21;
+  --surface-hover: #30343a;
+  --text-body: #d2d3d6;
+  --accent-strong: #bd8a5d;
+  --accent-text: #f0c391;
+  --focus-ring: rgb(189 138 93 / 55%);
+  --primary-border: #8f6847;
+  --primary-text: #f0d2af;
+  --primary-bg: #5d402a;
+  --primary-hover: #69492f;
+  --success: #65a982;
+  --success-text: #8fc3a5;
+  --success-halo: rgb(101 169 130 / 12%);
+  --warning: #d29b58;
+  --warning-text: #d8b47d;
+  --warning-halo: rgb(210 155 88 / 12%);
+  --error: #c87969;
+  --error-text: #e4bbb2;
+  --error-border: rgb(200 121 105 / 38%);
+  --error-bg: rgb(91 51 45 / 20%);
+  --error-halo: rgb(200 121 105 / 12%);
+  --danger-border: #8e554a;
+  --danger-text: #f0c7bd;
+  --danger-bg: #5b332d;
+  --danger-hover: #683a33;
+  --request-text: #e7c49e;
+  --request-border: rgb(193 138 88 / 38%);
+  --request-bg: rgb(93 64 42 / 18%);
+  --user-message-bg: rgb(93 64 42 / 24%);
+  --hover-tint: rgb(255 255 255 / 3%);
+  --overlay: rgb(8 9 11 / 74%);
+  --modal-backdrop: rgb(0 0 0 / 60%);
+  --shadow-small: rgb(0 0 0 / 18%);
+  --shadow-dialog: rgb(0 0 0 / 48%);
+  --selection-text: #17191d;
+  --selection-bg: #d9a878;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --surface-top: #f4f5f7;
+  --surface-deep: #eef0f3;
+  --surface-panel: #f8f9fb;
+  --surface-document: #ffffff;
+  --surface-selected: #e4e8ed;
+  --border: #ced4dc;
+  --border-strong: #b8c0cb;
+  --border-emphasis: #929dab;
+  --text-strong: #202630;
+  --text-secondary: #414b59;
+  --text-muted: #586474;
+  --text-faint: #667180;
+  --accent: #875024;
+  --surface-input: #ffffff;
+  --surface-chat: #f5f6f8;
+  --surface-hover: #e0e4e9;
+  --text-body: #303640;
+  --accent-strong: #875024;
+  --accent-text: #754015;
+  --focus-ring: #875024;
+  --primary-border: #875024;
+  --primary-text: #ffffff;
+  --primary-bg: #875024;
+  --primary-hover: #6d3e19;
+  --success: #25814a;
+  --success-text: #24683e;
+  --success-halo: rgb(37 129 74 / 16%);
+  --warning: #b46c13;
+  --warning-text: #805016;
+  --warning-halo: rgb(180 108 19 / 16%);
+  --error: #b53d2c;
+  --error-text: #972e20;
+  --error-border: #cc8b80;
+  --error-bg: #fff0ed;
+  --error-halo: rgb(181 61 44 / 16%);
+  --danger-border: #a13224;
+  --danger-text: #ffffff;
+  --danger-bg: #a13224;
+  --danger-hover: #822619;
+  --request-text: #754015;
+  --request-border: #caa582;
+  --request-bg: #fff4e7;
+  --user-message-bg: #f8ebdb;
+  --hover-tint: rgb(20 30 45 / 5%);
+  --overlay: rgb(30 40 55 / 35%);
+  --modal-backdrop: rgb(30 40 55 / 35%);
+  --shadow-small: rgb(30 40 55 / 12%);
+  --shadow-dialog: rgb(30 40 55 / 22%);
+  --selection-text: #202630;
+  --selection-bg: #e6c8a7;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-muted);
+  opacity: 1;
 }
 
 * {
@@ -55,7 +153,7 @@ button:focus-visible,
 }
 
 ::selection {
-  color: #17191d;
-  background: #d9a878;
+  color: var(--selection-text);
+  background: var(--selection-bg);
 }
 

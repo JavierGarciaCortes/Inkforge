@@ -1,34 +1,31 @@
 # Inkforge — Development Status
 
 > Documento vivo para continuar el desarrollo entre conversaciones.
-> Actualizarlo al cerrar hitos importantes o antes de cambiar de chat.
+> Fuente principal del estado técnico, decisiones cerradas, validaciones, problemas conocidos y siguiente paso.
 
 ## 1. Proyecto
 
 **Nombre:** Inkforge
 **Repositorio:** https://github.com/JavierGarciaCortes/Inkforge.git
-**Ruta local habitual:** `D:\\Proyectos\\Inkforge`
-**Origen técnico:** `https://github.com/quinwacca/fiction-vault`
+**Ruta local habitual:** `D:\Proyectos\Inkforge`
+**Origen técnico:** https://github.com/quinwacca/fiction-vault
 
-Objetivo: aplicación de escritorio estable para escritura y gestión de novelas y sagas, basada inicialmente en fiction-vault, Electron, React, TypeScript y OpenCode.
+Inkforge es una aplicación de escritorio para escritura y gestión de novelas y sagas, basada inicialmente en fiction-vault, Electron, React, TypeScript y OpenCode. Está en fase alfa y desarrollo activo.
 
 ## 2. Forma de trabajo
 
-- Trabajar siempre paso a paso.
-- Para comprobaciones de código, Git, lint, build o comportamiento, dar **un solo comando o una sola comprobación por turno**.
-- Si se pide ejecutar un comando y devolver la salida, esperar esa respuesta antes de seguir.
-- Para cambios importantes de código, preparar un prompt completo para Codex.
-- Todo prompt para Codex debe indicar modelo y nivel de razonamiento.
-- Modelo habitual: **GPT-5.6 Sol**. Usar High para arquitectura, concurrencia o cambios delicados; Medium para cambios normales; Low para cambios triviales.
-- Salvo petición expresa, Codex modifica código únicamente: no ejecuta Git, PowerShell, tests, lint, build, Electron, staging ni crea temporales de validación.
-- Las comprobaciones deterministas se realizan manualmente.
-- Priorizar integridad de manuscritos, datos y arquitectura frente a rapidez.
-- No cambiar decisiones arquitectónicas cerradas sin señalarlo.
-- Mostrar principalmente lo nuevo, lo que cambia, los problemas y el siguiente paso.
+- Trabajar paso a paso y respetar el alcance autorizado.
+- Para comprobaciones de código, Git, lint, build o comportamiento, dar un solo comando o una sola comprobación por turno y esperar el resultado.
+- Para cambios importantes, preparar un prompt completo con modelo y nivel de razonamiento.
+- Modelo habitual: **GPT-5.6 Sol**; High para arquitectura y concurrencia, Medium para cambios normales y Low para cambios triviales.
+- Salvo petición expresa, modificar únicamente mediante `apply_patch`, sin ejecutar Git, PowerShell, npm, tests, lint, build, Electron, OpenCode, staging ni temporales de validación.
+- Priorizar integridad de manuscritos, datos y arquitectura.
+- No cambiar decisiones cerradas sin señalarlo.
+- Separar implementación, validación comunicada y comprobaciones nuevas.
+
+Esta actualización documental recoge resultados de validación comunicados por el responsable del proyecto. No se han ejecutado nuevas comprobaciones para redactarla.
 
 ## 3. Arquitectura cerrada
-
-Los Markdown reales del vault son la fuente de verdad.
 
 ```text
 Inkforge Desktop
@@ -39,21 +36,35 @@ agente primary
     ↓
 subagentes / skills / MCP
     ↓
-vault Markdown real
+Markdown reales de la obra
 ```
 
 Principios:
 
-- No introducir una base de datos propia de canon si OpenCode/fiction-vault ya resuelven el problema.
-- No introducir memoria paralela innecesaria.
-- No crear una abstracción propia de proveedores/modelos.
-- OpenCode controla modelos y proveedores; Inkforge no debe hardcodearlos.
+- Los Markdown reales son la fuente de verdad narrativa.
+- No mantener una base de datos paralela de canon ni una memoria narrativa alternativa.
+- OpenCode controla modelos y proveedores; Inkforge no los hardcodea ni introduce una abstracción propia de proveedores.
+- La persistencia del chat es estado de conversación, no canon narrativo.
 - `web/` es heredado y secundario.
-- Las decisiones deben ser generales para Inkforge y no quedar acopladas a *El Cambio*.
+- Las decisiones son generales para Inkforge, sin acoplamiento a *El Cambio*.
 
-Agentes heredados: `editor` (primary actual), `writer`, `structurer`, `lector`, `critico` y `query`. Inkforge detecta exactamente un agente con `mode="primary"`; no hay selector de agente en la UI.
+El primary actual es `editor`; los subagentes heredados son `writer`, `structurer`, `lector`, `critico` y `query`. Para el Director, Inkforge detecta exactamente un agente con `mode: "primary"`; no hay selector manual de agente.
+
+### Raíz técnica y workspace narrativo
+
+- **`infrastructureRoot`:** raíz técnica de Inkforge con `AGENTS.md`, configuración, skills y MCP.
+- **`workingDirectory`:** obra gestionada activa.
+- El MCP recibe la obra mediante `VAULT_PATH`.
+- Cambiar de obra cambia el workspace y reconecta OpenCode.
+- Cambiar de libro dentro de una saga mantiene el workspace de la saga y no reinicia OpenCode.
+- Cada turno recibe el contexto autoritativo del libro activo desde Inkforge. No se deduce mediante fechas de modificación ni otras heurísticas.
+- El contexto técnico se utiliza silenciosamente; no debe aparecer en la conversación normal.
+
+Sin obra activa, OpenCode puede proporcionar infraestructura y catálogo de modelos para Ajustes. No puede crear sesiones ni enviar mensajes narrativos contra `projectRoot`, `vault`, `vault/Proyectos` u otra obra. El catálogo sin obra usa un directorio técnico separado.
 
 ## 4. Estructura de Biblioteca cerrada
+
+Inkforge trabaja exclusivamente mediante la Biblioteca. La ubicación física sigue siendo `vault/Proyectos/`; el nombre Biblioteca del esquema es conceptual, no una migración de directorio.
 
 ```text
 Biblioteca/
@@ -107,93 +118,56 @@ Biblioteca/
         Recursos/
 ```
 
-Criterio cerrado:
 
-- Proyecto independiente: todo cuelga directamente del proyecto.
-- Saga: `Mundo`, `Estilo` y `Referencias` son compartidos; cada libro posee sus capítulos, planificación, canon, notas y recursos.
-- Las rutas reales de un libro de saga permanecen bajo `Libros/<id>/...`.
-- La Biblioteca debe soportar tanto novelas independientes como sagas y varios libros, sin asumir un único caso de uso.
-- `vault/Proyectos/` contiene datos y manuscritos locales generados por la Biblioteca. Está ignorado mediante `.gitignore` y no se versiona junto al código.
+Criterios cerrados:
 
-Pendiente futuro: perfiles de género/estilo, herencia Saga/Libro y eliminar supuestos de fantasía/Sanderson heredados de fiction-vault.
+- Novela independiente: capítulos, planificación, canon, notas y recursos cuelgan de la obra.
+- Saga: `Mundo`, `Estilo` y `Referencias` son compartidos; cada libro tiene sus áreas propias bajo `Libros/<id>/...`.
+- `vault/Proyectos/` contiene datos locales de Biblioteca, está ignorado mediante `.gitignore` y no se versiona junto al código.
+- El contenido heredado directamente bajo `vault/` no se borra, mueve ni migra automáticamente. Ya no es un workspace activo de Inkforge.
+- Se eliminó el proyecto ficticio de tipo `legacy`, incluido `LEGACY_PROJECT`, y el modo funcional «Vault actual».
+- La representación de obra activa es `ActiveProject = LibraryProjectSummary | null`. `null` significa que no hay obra seleccionada, no un proyecto alternativo.
 
 ## 5. Historial Git relevante
 
-Base:
+El registro documental anterior recoge, entre otros, estos hitos históricos:
 
 ```text
 3e2364d chore: initialize Inkforge from fiction-vault Windows base
-```
-
-Hitos cerrados anteriores:
-
-```text
 41ada3c feat: add initial Inkforge desktop shell
-3ba263b merge shell
-
 686c601 feat: add read-only vault browser
-7a0490d merge vault browser
-
 75fb395 feat: add markdown editing and safe save flow
-8b4cb3a merge editor
-
 18a9cd0 feat: integrate OpenCode chat
-2de990f merge: integrate OpenCode chat
-
 358fd51 feat: prevent external file overwrite conflicts
-ce356bf merge: add file reconciliation
-
 cb8f8a6 feat: sync vault tree and protect window close
-1a847ef merge: sync vault tree and protect window close
-
 57e2c4c feat: localize interface and managed vault labels
-f25db41 Merge branch 'feature/interface-localization'
 ```
 
-Tras el push de `f25db41` se confirmó `## main...origin/main`; `main` quedó limpia y sincronizada con `origin/main`. La rama local `feature/interface-localization` fue eliminada.
+Son referencias históricas, no una comprobación del checkout actual. No se afirma que los cambios recientes estén commiteados, mergeados, enviados ni que la rama esté limpia.
 
 ## 6. Rama y estado de trabajo actual
 
-Rama de trabajo actual conocida:
+Rama de desarrollo conocida, comunicada para este hito:
 
 ```text
-feature/help-import-guide
+feature/chat-model-persistence
 ```
 
-El hito de internacionalización y localización de la interfaz y de las etiquetas estructurales gestionadas está integrado en `main` mediante:
+El estado funcional actual incluye Biblioteca exclusiva, chat persistente por obra, contexto del libro activo, filtrado de salida interna, preferencias globales de modelo/variante, restauración de Biblioteca, Ajustes, temas y estados sin obra.
 
-```text
-57e2c4c feat: localize interface and managed vault labels
-f25db41 Merge branch 'feature/interface-localization'
-```
-
-El merge fue enviado a `origin/main`. Tras el push se comprobó `## main...origin/main`, por lo que `main` quedó limpia y sincronizada con `origin/main`. La rama local `feature/interface-localization` ya fue eliminada.
-
-El hito actual de Ayuda integrada y guía informativa de preparación para importación compatible está **implementado y validado** en `feature/help-import-guide`.
-
-La Biblioteca funcional y su último ajuste visual están implementados, revisados y validados mediante diff, lint, build y comprobación manual (véase sección 14).
-
-`README.md` ya fue reescrito para reflejar la arquitectura actual, la Biblioteca, la seguridad del vault, OpenCode, los comandos reales y los pendientes vigentes.
-
-La marca definitiva es **Inkforge**. Se comprobó que no hay referencias a «Studio de Escritura» ni «Taller de Escritura» en los archivos de código y documentación buscados.
+La validación comunicada incluye lint y build limpios, arranque de Electron y los escenarios manuales de la sección 14. Los pendientes de la sección 16 no se consideran resueltos por esa validación.
 
 ## 7. OpenCode — estado conocido
 
-Versión probada:
+La integración se probó inicialmente con OpenCode 1.18.31; no es una versión mínima rígida ni una afirmación sobre la versión instalada actualmente.
 
-```text
-OpenCode 1.18.31
-```
-
-Arranque:
+Arranque gestionado por Electron main:
 
 ```text
 opencode serve --hostname 127.0.0.1 --port 0
 ```
 
-Inkforge lanza OpenCode desde Electron main.
-
-Seguridad Electron:
+El proceso principal concentra archivos, procesos, HTTP y SSE. El renderer accede mediante IPC estrecho y tipado, con:
 
 ```text
 contextIsolation: true
@@ -202,48 +176,64 @@ sandbox: true
 webSecurity: true
 ```
 
-Se han trabajado y validado: servidor local, detección de salud, modelos/proveedores dinámicos, agente primary, sesiones, envío, SSE, retry de modelo incompatible y cierre del proceso OpenCode al cerrar Inkforge.
+Están trabajados y validados el servidor local, salud, descubrimiento dinámico, primary, envío, streaming, retry de modelo incompatible y cierre del proceso gestionado. La configuración de proveedores y credenciales se realiza mediante OpenCode, fuera de Inkforge.
 
-No depender de `/api/session/{id}/wait`, porque devuelve 503 en OpenCode 1.18.31.
+No depender de `/api/session/{id}/wait`: en la versión inicialmente probada devolvía 503.
 
-## 8. Modelos, primary y streaming
+Las operaciones narrativas exigen una obra válida y rechazan solicitudes cuyo workspace haya cambiado. No hay chat asociado a `projectId = null`.
 
-Reglas implementadas:
+## 8. Director, modelos y streaming
 
-- No hardcodear proveedor ni elegir simplemente el primer modelo.
-- Si hay varios proveedores, mostrar `Selecciona un modelo`.
-- Si hay uno, usar su default declarado si existe en catálogo.
-- Variante vacía = predeterminada.
-- La configuración efectiva del agente se obtiene de OpenCode y debe haber exactamente un `config.agent[*].mode === "primary"`.
+### Conversación visible por obra
 
-Ejemplos observados:
+El historial visible del Director persiste en `.inkforge/director-chat.json` dentro de cada obra gestionada.
 
-```text
-default.openai = gpt-5.6-terra-fast
-default.opencode = big-pickle
-default.opencode-go = gpt-5.6-luna
-```
+- Se recupera tras reiniciar.
+- Está aislado entre obras.
+- Todos los libros de una saga comparten una conversación visible.
+- Cambiar de libro no crea otro chat ni reinicia OpenCode.
+- Las fronteras técnicas de las sesiones OpenCode no dividen la conversación visible.
+- El remontaje de `EditorPanel` por proyecto se conserva.
+- Continuidad del chat, memoria narrativa y canon son conceptos distintos. El historial no convierte una respuesta en canon.
 
-Se corrigió la selección accidental de `gpt-5.3-codex-spark`, incompatible con la autenticación ChatGPT usada. Persistir el último modelo sigue pendiente.
+### Modelo y variante globales
 
-SSE trabajado con `message.updated`, `message.part.updated`, `message.part.delta`, `session.status` y `session.idle`. Se corrigieron mensajes duplicados usando `messageID → role`; la etiqueta visible del asistente es `Inkforge`. El retry de modelo incompatible está validado en la misma sesión y sin duplicados.
+Modelo y variante se guardan como preferencias globales de Inkforge, fuera del contenido narrativo. Se conservan entre cambios de obra y reinicios.
 
-Las variantes están implementadas pero no completamente validadas en vivo. Permisos y preguntas OpenCode están implementados (`OpenCodePermissionCard.tsx` y `OpenCodeQuestionCard.tsx`), pendientes de prueba manual real.
+Reglas:
 
-La integración con otros modelos se realiza mediante la configuración de proveedores y modelos en OpenCode. No se debe crear un backend paralelo de IA dentro de Inkforge.
+- Catálogo dinámico de OpenCode, sin listas manuales de proveedores o modelos.
+- No elegir simplemente el primer modelo.
+- Se conserva la preferencia si sigue disponible y la variante si el modelo la admite.
+- El fallback existente puede usar el default declarado cuando hay un único proveedor representado.
+- Sin resolución válida, el usuario debe seleccionar un modelo.
+- Variante vacía significa predeterminada.
+- **Gratis / Otros modelos:** gratuidad identificada explícitamente por ID o nombre oficial; un coste reportado de cero no basta.
+
+La persistencia y los selectores de variante están validados. El comportamiento completo de variants en interacciones reales sigue pendiente.
+
+### Salida visible
+
+El flujo de presentación filtra partes `reasoning`, `synthetic` e `ignored`. Solo se muestra texto visible de respuesta. La prueba manual confirmó que no aparecen trazas temporales de razonamiento durante el streaming.
+
+Se conserva la reconciliación SSE por mensaje, rol y parte para evitar duplicados. El asistente se presenta como `Inkforge`. El retry de modelo incompatible está validado.
+
+Permisos y questions tienen componentes implementados, pero su validación real completa sigue pendiente.
 
 ## 9. Vault y seguridad
 
-Solo Markdown.
+El acceso documental se limita a Markdown de una obra gestionada activa:
 
-Protecciones cerradas:
+- Rechazo de rutas absolutas, `..`, elementos ocultos y symlinks.
+- Resolución con `realpath` y contención dentro del ámbito activo.
+- Validación de títulos, manifiestos, rutas y colisiones.
+- Lecturas y escrituras vinculadas al ID de la obra, para evitar guardar un documento en otra selección.
 
-- No rutas absolutas, `..`, elementos hidden ni symlinks.
-- `realpath` y prohibición de salir de `vaultRoot`.
-- Solo `.md`.
+Contrato documental básico, además de metadatos opcionales de presentación:
 
 ```ts
 interface VaultDocument {
+  projectId: string
   name: string
   path: string
   content: string
@@ -251,17 +241,18 @@ interface VaultDocument {
 }
 ```
 
-`revision` es SHA-256 hexadecimal del contenido UTF-8 exacto.
+`revision` es el SHA-256 hexadecimal del contenido UTF-8 exacto.
 
 ## 10. Guardado, conflicto y documento desaparecido
 
-Contrato implementado y validado:
+La edición empieza con `Editar`; el guardado es explícito, mediante botón o `Ctrl+S` / `Cmd+S`.
 
 ```ts
 vault.write(
   relativePath: string,
   content: string,
   expectedRevision: string,
+  projectId: string,
 )
 ```
 
@@ -276,258 +267,182 @@ type VaultWriteResult =
 
 `SaveState` incluye `idle`, `saving`, `error`, `conflict` y `missing`.
 
-El guardado usa un único `FileHandle`: relee, calcula SHA-256, compara la revisión y solo entonces escribe desde byte 0, trunca y sincroniza. Reduce TOCTOU, aunque no constituye un CAS atómico del sistema operativo.
+Se abre el archivo existente sin crearlo. Un único `FileHandle` permite releer, comparar la revisión y, solo después, escribir desde byte 0, truncar y sincronizar. Reduce TOCTOU; no constituye un CAS atómico del sistema operativo.
 
-Comportamiento validado:
+Comportamiento:
 
-- **Conflicto:** si el archivo existe pero cambió fuera de Inkforge, no se sobrescribe; se conserva el borrador, Guardar/Ctrl+S quedan bloqueados y al descartar se relee el disco de nuevo.
-- **Missing:** si la ruta abierta se renombra o elimina externamente, se conserva documento, modo edición y borrador; guardar pasa a estado `missing`, sin reintentar escribir ni degradarlo a error genérico. Solo puede recuperarse descartando el borrador o seleccionando otro documento.
-- **Error técnico:** se comunica sin perder el borrador.
+- **Conflicto:** no sobrescribe, conserva el borrador y bloquea el guardado. Al descartar se relee el disco.
+- **Ruta desaparecida:** conserva el borrador; no infiere renombres, no adopta otra ruta ni recrea el archivo.
+- **Error técnico o pérdida de ámbito:** informa del problema sin perder el borrador ni redirigir el guardado a otra obra.
 
-Reglas cerradas para `missing`:
+## 11. Watchers y protección de borradores
 
-- No inferir rename.
-- No buscar un archivo equivalente por contenido ni adoptar otra ruta.
-- No recrear silenciosamente la ruta antigua.
-- No cerrar el editor, limpiar dirty ni perder el borrador.
+El watcher del árbol utiliza `fs.watch` recursivo, debounce de 200 ms y `vault:changed`. Los refrescos ordinarios actualizan la estructura sin recargar documentos ni borrar borradores; ante un fallo de refresco conservan el árbol anterior.
 
-## 11. Watcher del árbol y cierre protegido
+La Biblioteca tiene su propio refresco y reconciliación de la selección activa. Si desaparece la obra:
 
-Sincronización automática implementada con `fs.watch(..., { recursive: true })`:
+- deja de considerarla activa y establece obra/libro en `null`;
+- limpia la preferencia persistida;
+- no selecciona otra obra ni interpreta otra carpeta como un renombrado;
+- actualiza la UI y desvincula el workspace narrativo;
+- no recrea la obra.
 
-- watcher único;
-- debounce de 200 ms;
-- evento `vault:changed`;
-- refresh en background sin flicker de loading;
-- si falla, conserva el árbol anterior;
-- no toca documento abierto, borrador, dirty, conflicto, selección ni modo edición.
+Si existe un borrador sin guardar, permanece en memoria con un aviso. Se bloquea su guardado para no sobrescribir contenido, escribirlo en otra obra ni recrear la ruta eliminada. El usuario puede copiarlo; antes de cambiar de obra debe cancelar la acción o confirmar el descarte.
 
-Validado con creación, renombrado y borrado externo; creación externa mientras hay borrador; y renombrado del documento abierto.
+Se ha probado manualmente la eliminación de la obra activa con un borrador sin guardar.
 
-El antiguo `beforeunload` se eliminó. Electron intercepta el cierre mediante `appWindow.onCloseRequested` y `appWindow.confirmClose`:
+El cierre protegido se resuelve en Electron mediante `appWindow.onCloseRequested` y `appWindow.confirmClose`: Cancelar conserva el borrador y `Salir sin guardar` confirma el cierre. OpenCode también se detiene al cerrar Inkforge.
 
-- sin dirty, cierra;
-- con dirty, abre el diálogo interno;
-- Cancelar conserva el borrador;
-- `Salir sin guardar` cierra.
+## 12. Biblioteca — selección y persistencia
 
-También se confirmó el cierre de OpenCode al cerrar Inkforge.
+La Biblioteca permite crear novelas y sagas, añadir libros, seleccionarlos explícitamente y renombrar obras/libros. El borrado desde Inkforge sigue pendiente.
 
-## 12. Biblioteca multiproyecto — implementación validada
+### Sin obra activa
 
-La primera implementación funcional de Biblioteca está realizada en `feature/library-project-bootstrap`.
+`activeProject = null` y `activeBook = null` son un estado válido. Si `vault/Proyectos` falta o no contiene obras válidas, Inkforge arranca sin crear contenido narrativo ni seleccionar carpetas arbitrariamente.
 
-Capacidades validadas manualmente:
+Biblioteca, Ajustes y Ayuda siguen disponibles. Se puede crear o seleccionar una obra. El Director muestra que necesita una obra activa.
 
-- Crear una **novela independiente** solicitando su título.
-- Crear una **saga** solicitando título de saga y título del primer libro.
-- Añadir un libro a una saga; el nuevo libro queda activo automáticamente.
-- Cambiar de libro solo mediante el selector `Libro activo`.
-- Renombrar saga, novela independiente y libro de saga.
-- Persistir obra y libro activos al trabajar con la Biblioteca.
-- Mostrar un libro no disponible en el selector sin permitir renombrarlo.
-- En una saga, ocultar del explorador los libros que no están activos.
-- En una novela independiente, no mostrar selector de libro.
-- Mantener el explorador como apertura de documentos, sin cambios indirectos de libro.
+### Restauración al arrancar
 
-Protecciones de borrador validadas:
+`library-selection.json` es una preferencia local versionada de Electron fuera del vault, con validación defensiva y escritura segura. Conserva última obra y último libro:
 
-- Al cambiar de libro con cambios sin guardar, Cancelar conserva libro y borrador.
-- Al elegir `Descartar cambios`, cambia de libro y no escribe el borrador en disco.
-- Al pulsar `Nueva obra` con un borrador, confirmar descarte limpia realmente el estado antes de abrir el diálogo. Si se cancela ese diálogo, el borrador no reaparece ni llega al disco.
-
-Comprobaciones realizadas tras el último ajuste visual:
-
-```text
-git diff --check   → sin errores (aviso LF/CRLF solo informativo)
-npm --prefix .\\app run lint   → correcto
-npm --prefix .\\app run build  → correcto
-validación manual visual y de cambio de libro   → correcta
+```json
+{
+  "version": 1,
+  "activeProjectId": null,
+  "activeBookId": null
+}
 ```
+
+- La selección se restaura antes de iniciar OpenCode.
+- Si la obra existe, se restaura su ámbito.
+- Si ya no existe, se limpia la selección y se arranca sin obra; las demás siguen visibles.
+- No se selecciona otra novela o saga automáticamente ni se vuelve al contenido heredado.
+- Si falta el último libro de una saga, se conserva la saga y se elige el primero válido disponible.
+- Si la saga no tiene libros, sigue activa con `activeBook = null` y permite añadirlos.
+
+Abrir un documento no cambia el libro activo. Cambiar de libro con un borrador requiere cancelar o descartar; ese descarte no escribe el borrador en disco.
 
 ## 13. Biblioteca — decisiones de interfaz cerradas
 
-La interfaz de Biblioteca debe respetar este comportamiento:
-
 - `Nueva obra` aparece antes de `Obra activa`.
-- Para una saga, el orden de controles es: `Nueva obra` → `Obra activa` → `Renombrar saga` → `Añadir libro` → `Libro activo` → `Renombrar libro`.
-- Para una novela independiente solo se muestran los controles pertinentes: `Nueva obra`, `Obra activa` y `Renombrar libro`.
-- El explorador no puede cambiar de libro.
-- En una saga, la presentación debe mostrar primero `Proyecto.md` si existe y las secciones compartidas. Después debe aparecer un rótulo no desplegable del libro activo y, debajo, sus archivos y carpetas directamente.
-- Ese rótulo no es un botón, no tiene chevrón y no representa una carpeta artificial. Solo cambia la presentación: las rutas reales siguen bajo `Libros/<id>/...`.
-- En una novela se mantiene el árbol directo, sin contenedor artificial.
+- Sin selección, el selector muestra `Selecciona una obra`; es un placeholder, no un proyecto.
+- Se ocultan o deshabilitan las acciones que requieren obra o libro activos.
+- En una saga: `Nueva obra` → `Obra activa` → `Renombrar saga` → `Añadir libro` → `Libro activo` → `Renombrar libro`.
+- El explorador muestra `Proyecto.md`, las áreas compartidas y solo el libro activo.
+- El rótulo del libro activo no es desplegable ni representa una carpeta artificial; las rutas siguen bajo `Libros/<id>/...`.
+- En una novela se mantiene el árbol directo y no aparece selector de libro.
 
-Estas reglas afectan solo a presentación y navegación; deben conservar ámbitos IPC, guardado, conflictos, `missing` y watchers.
+## 14. Validación confirmada
 
-El ajuste quedó revisado y validado: al cambiar el libro activo se sustituye correctamente su bloque visual y no aparecen otros libros.
+Resultados comunicados de la validación del código funcional actual:
 
-## 14. Último cambio de Biblioteca — revisado y validado
+| Área | Resultado confirmado |
+|---|---|
+| Comprobaciones de desarrollo | Lint limpio; build TypeScript/Vite limpio; Electron abre |
+| Chat | Persistencia tras reinicio; aislamiento entre obras; misma conversación entre libros de una saga |
+| Preferencias IA | Modelo y variante persistentes; grupos Gratis / Otros modelos |
+| Restauración | Última obra y último libro recuperados cuando existen |
+| Contexto y salida | Libro activo correcto; razonamiento interno no visible durante streaming |
+| Apariencia | Claro, Oscuro y Sistema; Sistema reacciona en caliente |
+| Conexión | Indicador de conexión y errores funcionales |
+| Biblioteca vacía | Arranque sin obra y acceso a las funciones globales |
+| Eliminación entre reinicios | Última obra ausente deja la selección vacía |
+| Eliminación durante ejecución | Obra desvinculada; borrador sin guardar protegido |
 
-Codex ha informado de una modificación limitada a:
+El registro previo también recoge navegación y edición Markdown, guardado seguro, conflictos, `missing`, cierre protegido, navegación entre libros, localización en cuatro idiomas y Ayuda integrada.
 
-```text
-app/electron/main.cjs
-app/src/types/inkforge.ts
-app/src/components/Sidebar.tsx
-app/src/App.css
-```
+Estos resultados proceden de comprobaciones ejecutadas manualmente; no acreditan una suite automática. Actualmente no hay suite automática propia confirmada. No equivalen a validación completa de permisos, questions o ejecución real de variants.
 
-Resultado comprobado:
+## 15. Ajustes, localización y Ayuda
 
-- `Nueva obra` aparece antes de `Obra activa`;
-- en una saga, el orden restante es `Renombrar saga` → `Añadir libro` → `Libro activo` → `Renombrar libro`;
-- el árbol muestra primero `Proyecto.md`, `Mundo`, `Estilo` y `Referencias`;
-- después muestra un rótulo no desplegable con el título del libro activo y sus hijos visibles directamente;
-- al cambiar el libro activo, el bloque anterior se sustituye y no aparecen otros libros;
-- las rutas reales y los comportamientos existentes se conservan.
+El engranaje del encabezado abre Ajustes globales:
 
-La revisión de implementación abarcó `main.cjs`, `preload.cjs`, `project-library.cjs`, tipos, `Sidebar` y CSS. El módulo de Biblioteca valida títulos, manifiestos y rutas, rechaza symlinks y protege las operaciones de renombrado.
+- **General:** idioma.
+- **Apariencia:** Sistema / Oscuro / Claro.
+- **IA / Director:** modelo / variante.
 
-Estado: **revisado y validado** mediante `git diff --check`, lint, build y comprobación manual visual y de cambio de libro.
+Las preferencias pertenecen a Inkforge, no a una obra, vault o Markdown. Idioma, tema y selección de modelo usan almacenamiento local de la aplicación.
 
-## 15. Internacionalización y pendientes posteriores
+### Apariencia y primera configuración
 
-La base de internacionalización del renderer está implementada con `i18next` y `react-i18next`:
+La preferencia estable es `system | dark | light`. Se persiste bajo `inkforge:theme`; Sistema resuelve `prefers-color-scheme` y reacciona al cambio del SO sin reiniciar. Los temas usan variables CSS semánticas y `data-theme`.
 
-- recursos separados y estructuralmente equivalentes para español (`es`), inglés (`en`), catalán (`ca`) y coreano (`ko`);
-- español como idioma por defecto y fallback;
-- detección inicial limitada a esos cuatro idiomas mediante `navigator.language`;
-- selector accesible en `AppHeader`, independiente del botón de Ajustes;
-- persistencia local bajo la clave estable `inkforge:locale`;
-- cambio inmediato desde el selector del encabezado;
-- actualización de `document.documentElement.lang` al cambiar de idioma;
-- traducción del texto propio de la interfaz, incluidos estados, diálogos, ayudas, placeholders y errores locales del renderer;
-- exclusión deliberada de Markdown, rutas, nombres y títulos del usuario, contenido documental, proveedores y modelos, mensajes literales de OpenCode y mensajes procedentes del proceso principal Electron.
+Si no existe selección de modelo persistida, Ajustes puede abrirse automáticamente para solicitarla. No se confunde con catálogo pendiente, reconexión o remontaje del Director. El diálogo puede cerrarse y la aplicación sigue siendo utilizable manualmente sin IA.
 
-`getLibraryError` conserva el comportamiento previo: presenta literalmente los errores remotos y solo localiza sus fallbacks generados en el renderer. La implementación mantiene recursos extensibles para idiomas futuros.
+Si un catálogo cargado correctamente confirma que falta el modelo guardado, se conserva el fallback válido; si no hay resolución válida, se solicita otra selección con un aviso y sin reapertura continua.
 
-Estado de validación: **implementado y validado**.
+### Estado de OpenCode
 
-Comprobaciones realizadas:
+El indicador del encabezado sustituye el encabezado técnico y los textos permanentes de conexión del Director:
 
-```text
-git diff --check                    → correcto (solo avisos LF/CRLF)
-npm --prefix .\app run lint   → correcto
-npm --prefix .\app run build  → correcto
-cambio manual entre los cuatro idiomas   → correcto
-persistencia del idioma tras reiniciar usando catalán   → correcta
-diálogo «Nueva obra» en coreano           → correcto, sin desbordamientos
-```
+- Verde: conectado.
+- Naranja: iniciando o reconectando.
+- Rojo: error o desconectado.
 
-### Etiquetas estructurales localizadas — implementadas y validadas
+Tiene descripción accesible y localizada. Los errores funcionales y reintentos existentes siguen visibles cuando corresponden. Modelo y variante están en Ajustes.
 
-El proceso principal añade una clave de presentación opcional únicamente a carpetas estructurales, ficheros de sistema y presentaciones propias que reconoce dentro de proyectos gestionados por Biblioteca. El renderer resuelve esa clave en los recursos `es`, `en`, `ca` y `ko` y conserva el nombre físico como fallback.
+### Localización
 
-Comportamiento implementado:
+La interfaz usa `i18next` y `react-i18next` con español, inglés, catalán y coreano. El idioma se cambia desde Ajustes, se persiste como `inkforge:locale` y actualiza `document.documentElement.lang`. La detección inicial se limita a idiomas compatibles; español es el respaldo.
 
-- solo se localizarán elementos explícitamente identificados como gestionados por Inkforge mediante claves estables;
-- los nombres físicos y las rutas permanecerán invariantes;
-- los nombres y títulos creados por el usuario permanecerán literales;
-- los vaults heredados y los elementos externos no reconocidos permanecerán literales;
-- no se inferirá que un elemento es estructural mediante coincidencias de texto.
+Solo se traduce texto propio de la interfaz. Markdown, rutas, títulos del usuario y mensajes literales externos no se traducen.
 
-La cobertura actual se limita a la estructura que Inkforge crea y reconoce hoy: manifiestos de proyecto y libro, áreas compartidas, carpetas de manuscrito, documentos de planificación, canon de libro y rótulo del libro activo. Este último localiza solo su parte fija e interpola literalmente el título del usuario.
+Las etiquetas estructurales gestionadas usan claves de presentación explícitas del proceso principal. `name` y `path` permanecen literales; los nodos no reconocidos usan su nombre físico. No se renombra contenido ni se infiere estructura por coincidencias de texto.
 
-Los metadatos de presentación acompañan el árbol y los documentos leídos o devueltos por el guardado; `name` y `path` reales continúan siendo la fuente operativa. No se han añadido migraciones, plantillas ni cambios al formato del proyecto.
+### Ayuda e importación futura
 
-Estado: **implementadas y validadas**.
+El botón `?` abre Ayuda localizada, con cierre mediante Cerrar, Escape u overlay y scroll para ventanas pequeñas. Abrirla no modifica documento, borrador, obra ni libro.
 
-Validaciones manuales realizadas:
+Incluye una guía de preparación con las estructuras físicas de novela y saga. **No existe todavía un importador funcional.**
 
-- estructura localizada correctamente en una saga gestionada;
-- estructura localizada correctamente en una novela independiente gestionada;
-- el cambio de libro activo mantiene correctamente la presentación localizada;
-- los títulos y nombres introducidos por el usuario permanecen literales;
-- el vault heredado o no gestionado conserva los nombres físicos sin traducir;
-- las rutas y los nombres físicos no se modifican.
+La primera importación sigue definida como:
 
-### Ayuda integrada y guía de preparación — implementadas y validadas
+- Solo estructuras compatibles.
+- Validar antes de copiar.
+- Copiar de forma no destructiva a la Biblioteca, sin modificar el original.
+- Sin importador genérico, renombrado automático ni inferencia arbitraria.
+- *El Cambio* como referencia de desarrollo, no como requisito ni acoplamiento.
 
-La primera versión de Ayuda integrada está disponible desde el botón `?` de `AppHeader`, situado entre el selector de idioma y el botón Ajustes, que continúa deshabilitado. `App.tsx` controla el nuevo `HelpDialog` mediante el estado local `isHelpOpen`.
+## 16. Problemas conocidos y pendientes
 
-La Ayuda:
+### Problema conocido sin corregir
 
-- se cierra mediante el botón `Cerrar`, Escape o un clic en el overlay exterior;
-- dispone de scroll y se adapta a ventanas pequeñas;
-- está localizada en español, inglés, catalán y coreano;
-- documenta Biblioteca, novelas y sagas, obra y libro activos, exploración y edición Markdown, guardado explícito sin autosave, protección ante cambios externos, comportamiento básico validado de OpenCode/modelos e idiomas;
-- no forma parte de `PendingAction` y abrirla o cerrarla no cambia documento, borrador, obra ni libro;
-- incluye una guía informativa para preparar proyectos compatibles con una futura importación.
+En una saga renombrada se detectó que el frontmatter de `Proyecto.md` contiene el título nuevo mientras el H1 conserva el anterior. La discrepancia todavía no está corregida; validar el renombrado básico no implica que ambos títulos estén sincronizados.
 
-La guía muestra literalmente las estructuras físicas de referencia de novela independiente y saga. Sus nombres no se traducen y la localización visual no modifica las rutas reales. Indica de forma explícita que la importación todavía no está disponible y no incorpora botón, selector de carpeta ni acción de importación.
+### Validación o desarrollo todavía incompletos
 
-Validaciones realizadas:
+- Permisos reales de OpenCode.
+- Questions en interacciones reales.
+- Flujo real de variants, más allá del selector y su persistencia.
+- Estrategia de motores IA e integración prevista, incluida la propuesta de Codex con cuenta ChatGPT y OpenCode multiproveedor.
+- Portabilidad Windows/Linux.
+- Packaging Windows y validación de `projectRoot` y rutas en el ejecutable.
+- Importación compatible.
+- Perfiles de género/estilo, herencia Saga → Libro y eliminación de supuestos editoriales heredados que no sean generales.
+- Conflictos, diff, elección de versión y merge avanzados.
+- Borrado de obras y libros.
+- Evolución posterior de Biblioteca y del flujo IA.
 
-```text
-git diff --check                  → correcto (solo avisos LF/CRLF informativos)
-npm --prefix .\app run lint       → correcto
-npm --prefix .\app run build      → correcto
-```
+## 17. Documentación y continuidad
 
-Validación manual en Electron:
+- **README:** entrada al proyecto, arquitectura, requisitos, desarrollo, funciones actuales y límites importantes.
+- **Ayuda integrada:** guía de uso de las funciones existentes.
+- **Este documento:** estado técnico, decisiones, validaciones, problemas, pendientes y siguiente paso.
 
-- Inkforge arranca correctamente y el botón `?` aparece entre idioma y Ajustes;
-- la Ayuda abre y cierra correctamente mediante Escape, overlay y `Cerrar`;
-- abrirla y cerrarla con un borrador sin guardar no modifica ni pierde el borrador;
-- el contenido es correcto en español, inglés, catalán y coreano;
-- coreano no presenta desbordamientos apreciables;
-- en una ventana pequeña, todo el contenido sigue accesible mediante scroll;
-- los bloques de estructura física permanecen literalmente en castellano en todos los idiomas;
-- la guía deja claro que la importación no está disponible y no ofrece botones, selección de carpetas ni acciones de importación;
-- Ajustes continúa deshabilitado.
+Para continuar en otra conversación: leer las instrucciones del proyecto y este documento, no pedir repetir información ya registrada y comprobar información dinámica solo cuando esté autorizado. Al cerrar nuevos hitos, actualizar el estado distinguiendo implementación de validación.
 
-El idioma se selecciona antes de abrir la Ayuda; no se establece como requisito cambiarlo mientras el modal está abierto, ya que el overlay bloquea correctamente la interfaz posterior.
+## 18. Roadmap y siguiente paso exacto
 
-### Decisión cerrada: primera importación de proyectos
+El siguiente paso es **validar permisos reales de OpenCode**. El bloque de trabajo queda ordenado así:
 
-La primera versión de importación aceptará únicamente proyectos que ya sean compatibles con la estructura de Inkforge.
+1. Validación real de permisos de OpenCode.
+2. Validación real de questions.
+3. Validación del flujo de variants.
+4. Motores IA e integración prevista.
+5. Portabilidad Windows/Linux.
+6. Packaging Windows y validación de rutas.
+7. Después, importación compatible.
 
-Reglas cerradas:
-
-- no habrá importador genérico;
-- no se renombrarán automáticamente carpetas ni ficheros;
-- no se inferirán ni adivinarán ámbitos o estructuras;
-- la entrada deberá ser compatible con la estructura de Inkforge;
-- la entrada se validará antes de importar;
-- la operación será no destructiva, copiará el proyecto compatible dentro de la Biblioteca portable y no modificará el proyecto fuente;
-- `El Cambio` será el caso de referencia de desarrollo, no un requisito del usuario;
-- la solución será general para cualquier proyecto compatible;
-- la guía informativa de preparación ya está implementada en la Ayuda integrada.
-
-Estado de la importación real: **decidida, todavía no implementada**. Siguen pendientes la selección de un proyecto externo, su validación real, la copia, la migración, el drag-and-drop y cualquier IPC de importación.
-
-Pendientes posteriores conocidos:
-
-- Implementar la importación validada y no destructiva de proyectos ya compatibles, sin importador genérico, renombrado automático ni inferencia de estructura.
-- Persistencia de sesiones/chat entre reinicios.
-- Persistencia del último modelo.
-- Validación real de permisos y preguntas OpenCode.
-- Validación completa de variantes.
-- Packaging Windows y revisión de `projectRoot` para app empaquetada.
-- Perfiles de género/estilo, herencia Saga/Libro y eliminación de supuestos de fantasía heredados.
-- Mejoras futuras de conflictos: diff, elección de versión y merge.
-- Modo portable Windows/Linux.
-- Motores de IA mediante Codex con cuenta ChatGPT y OpenCode multiproveedor.
-
-## 16. Documentación
-
-README y ayuda en la app son piezas distintas:
-
-- **README:** documentación técnica y de desarrollo ya actualizada con funcionalidades verificadas, arquitectura, comandos y pendientes actuales.
-- **Ayuda integrada:** guía de uso de producto, limitada a comportamientos existentes y comprobados.
-
-`docs/DEVELOPMENT_STATUS.md` es el estado operativo del desarrollo; debe conservar decisiones cerradas, separar implementación de validación y reflejar el siguiente paso real.
-
-## 17. Instrucción para una conversación nueva
-
-1. Leer las instrucciones del proyecto y este archivo.
-2. No pedir repetir información ya documentada.
-3. Comprobar solo información dinámica que pueda haber cambiado.
-4. Actualizar este archivo al cerrar avances adicionales.
-5. Continuar desde el siguiente paso exacto.
-
-## 18. Siguiente paso exacto
-
-Diseñar e implementar la primera importación validada y no destructiva de proyectos que ya sean compatibles con la estructura Inkforge.
-
-El hito deberá validar antes de copiar, no modificar el proyecto fuente y copiar el proyecto compatible hacia la Biblioteca portable. Se mantienen las decisiones cerradas: sin importador genérico, sin renombrado automático y sin inferencia o adivinación de estructura. `El Cambio` servirá como caso de referencia para probar el flujo, sin acoplar la arquitectura a ese proyecto.
+La importación no es el siguiente hito inmediato. Cuando corresponda, debe validar antes de copiar, preservar el proyecto fuente y aceptar únicamente estructuras compatibles, sin importador genérico, renombrado automático ni inferencia de estructura.

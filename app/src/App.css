@@ -38,8 +38,8 @@
   width: 30px;
   height: 30px;
   place-items: center;
-  border: 1px solid #bd8a5d;
-  color: #f0c391;
+  border: 1px solid var(--accent-strong);
+  color: var(--accent-text);
   font-family: Georgia, 'Times New Roman', serif;
   font-size: 17px;
   line-height: 1;
@@ -88,8 +88,8 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #65a982;
-  box-shadow: 0 0 0 3px rgb(101 169 130 / 12%);
+  background: var(--success);
+  box-shadow: 0 0 0 3px var(--success-halo);
 }
 
 .project-state {
@@ -147,7 +147,7 @@
 }
 
 .icon-button:focus-visible {
-  outline: 2px solid rgb(189 138 93 / 55%);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -274,7 +274,7 @@
 .project-switcher-error,
 .confirm-dialog .project-dialog-error {
   margin: 0;
-  color: #e29a8d;
+  color: var(--error-text);
   font-size: 11px;
   line-height: 1.45;
 }
@@ -342,7 +342,7 @@
 
 .tree-row:hover {
   color: var(--text-secondary);
-  background: rgb(255 255 255 / 3%);
+  background: var(--hover-tint);
 }
 
 .folder-row {
@@ -523,50 +523,50 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #65a982;
+  background: var(--success);
   content: '';
 }
 
 .save-state-dirty {
-  color: #d8b47d;
+  color: var(--warning-text);
 }
 
 .save-state-dirty::before {
-  background: #d29b58;
+  background: var(--warning);
 }
 
 .save-state-error {
-  color: #e4bbb2;
+  color: var(--error-text);
 }
 
 .save-state-error::before {
-  background: #c87969;
+  background: var(--error);
 }
 
 .save-button {
   min-height: 30px;
   padding: 0 13px;
-  border: 1px solid #8f6847;
+  border: 1px solid var(--primary-border);
   border-radius: 4px;
-  color: #f0d2af;
-  background: #5d402a;
+  color: var(--primary-text);
+  background: var(--primary-bg);
   cursor: pointer;
   font-size: 11px;
   font-weight: 600;
 }
 
 .save-button:hover:not(:disabled) {
-  border-color: #bd8a5d;
-  background: #69492f;
+  border-color: var(--accent-strong);
+  background: var(--primary-hover);
 }
 
 .workspace-button {
   min-height: 30px;
   padding: 0 13px;
-  border: 1px solid #8f6847;
+  border: 1px solid var(--primary-border);
   border-radius: 4px;
-  color: #f0d2af;
-  background: #5d402a;
+  color: var(--primary-text);
+  background: var(--primary-bg);
   cursor: pointer;
   font-size: 11px;
   font-weight: 600;
@@ -579,13 +579,13 @@
 }
 
 .workspace-button:hover:not(:disabled) {
-  border-color: #bd8a5d;
-  background: #69492f;
+  border-color: var(--accent-strong);
+  background: var(--primary-hover);
 }
 
 .workspace-button-secondary:hover:not(:disabled) {
   border-color: var(--text-muted);
-  background: #30343a;
+  background: var(--surface-hover);
 }
 
 .workspace-button:disabled {
@@ -596,7 +596,7 @@
 .save-button:focus-visible,
 .workspace-button:focus-visible,
 .markdown-editor:focus-visible {
-  outline: 2px solid rgb(189 138 93 / 55%);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -631,7 +631,7 @@
   gap: 7px;
   border: 1px solid var(--border-emphasis);
   background: var(--surface-panel);
-  box-shadow: 0 14px 30px rgb(0 0 0 / 18%);
+  box-shadow: 0 14px 30px var(--shadow-small);
 }
 
 .document-glyph span {
@@ -691,7 +691,7 @@
 }
 
 .document-error h1 {
-  color: #e4bbb2;
+  color: var(--error-text);
 }
 
 .document-editor {
@@ -739,7 +739,7 @@
 
 .markdown-source {
   margin: 0;
-  color: #d2d3d6;
+  color: var(--text-body);
   font-family: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', monospace;
   font-size: 13px;
   line-height: 1.75;
@@ -752,10 +752,10 @@
   flex: 0 0 auto;
   margin: 0 0 12px;
   padding: 9px 11px;
-  border: 1px solid rgb(200 121 105 / 30%);
+  border: 1px solid var(--error-border);
   border-radius: 4px;
-  color: #e4bbb2;
-  background: rgb(200 121 105 / 8%);
+  color: var(--error-text);
+  background: var(--error-bg);
   font-size: 11px;
   line-height: 1.45;
 }
@@ -772,9 +772,9 @@
   overflow: auto;
   border: 1px solid var(--border);
   border-radius: 4px;
-  color: #d2d3d6;
-  background: #1b1d21;
-  caret-color: #f0c391;
+  color: var(--text-body);
+  background: var(--surface-input);
+  caret-color: var(--accent-text);
   font-family: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', monospace;
   font-size: 13px;
   line-height: 1.7;
@@ -786,7 +786,7 @@
 
 .opencode-panel {
   display: grid;
-  grid-template-rows: 56px auto minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr) auto;
 }
 
 .connection-state {
@@ -804,28 +804,28 @@
 }
 
 .connection-connected {
-  color: #8fc3a5;
+  color: var(--success-text);
 }
 
 .connection-connected::before {
-  background: #65a982;
+  background: var(--success);
 }
 
 .connection-starting::before {
-  background: #d29b58;
+  background: var(--warning);
   animation: connection-pulse 1s ease-in-out infinite alternate;
 }
 
 .connection-error,
 .connection-incompatible,
 .connection-not_found {
-  color: #e4bbb2;
+  color: var(--error-text);
 }
 
 .connection-error::before,
 .connection-incompatible::before,
 .connection-not_found::before {
-  background: #c87969;
+  background: var(--error);
 }
 
 @keyframes connection-pulse {
@@ -839,7 +839,7 @@
   padding: 12px 14px;
   gap: 9px;
   border-bottom: 1px solid var(--border);
-  background: #1a1d21;
+  background: var(--surface-chat);
 }
 
 .opencode-controls label {
@@ -869,8 +869,68 @@
 }
 
 .opencode-controls select:disabled {
-  color: var(--text-faint);
+  color: var(--text-secondary);
   opacity: 0.75;
+}
+
+.status-dot-connecting {
+  background: var(--warning);
+  box-shadow: 0 0 0 3px var(--warning-halo);
+}
+
+.status-dot-error {
+  background: var(--error);
+  box-shadow: 0 0 0 3px var(--error-halo);
+}
+
+dialog.settings-dialog {
+  position: fixed;
+  width: min(480px, calc(100vw - 40px));
+  max-height: calc(100vh - 40px);
+  margin: auto;
+  padding: 24px;
+  box-sizing: border-box;
+  overflow-y: auto;
+  border: 1px solid var(--border-emphasis);
+  border-radius: 8px;
+  color: var(--text-strong);
+  background: var(--surface-panel);
+}
+
+.settings-dialog::backdrop {
+  background: var(--modal-backdrop);
+}
+
+.settings-dialog .opencode-controls {
+  padding: 16px 0;
+  background: transparent;
+}
+
+.settings-dialog .opencode-controls select {
+  height: 36px;
+  font-size: 12px;
+}
+
+.settings-section {
+  margin-top: 20px;
+}
+
+.settings-section h3 {
+  margin: 0;
+  color: var(--text-strong);
+  font-size: 14px;
+}
+
+.settings-notice,
+.confirm-dialog .settings-notice {
+  margin: 10px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--request-border);
+  border-radius: 4px;
+  color: var(--warning-text);
+  background: var(--request-bg);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .opencode-messages {
@@ -922,13 +982,13 @@
   padding: 10px 11px;
   border: 1px solid var(--border);
   border-radius: 5px;
-  background: #1a1d21;
+  background: var(--surface-chat);
 }
 
 .chat-message-user {
   margin-left: 18px;
-  border-color: rgb(193 138 88 / 32%);
-  background: rgb(93 64 42 / 24%);
+  border-color: var(--request-border);
+  background: var(--user-message-bg);
 }
 
 .chat-message-assistant {
@@ -946,7 +1006,7 @@
 
 .chat-message p {
   margin: 0;
-  color: #d2d3d6;
+  color: var(--text-body);
   font-size: 11px;
   line-height: 1.6;
   overflow-wrap: anywhere;
@@ -956,17 +1016,17 @@
 .chat-message small {
   display: block;
   margin-top: 7px;
-  color: #d89a8e;
+  color: var(--error-text);
   font-size: 9px;
 }
 
 .chat-message-error {
-  border-color: rgb(200 121 105 / 45%);
+  border-color: var(--error-border);
 }
 
 .opencode-activity {
   margin: 4px 0 12px;
-  color: #d8b47d;
+  color: var(--warning-text);
   font-size: 10px;
 }
 
@@ -976,7 +1036,7 @@
   height: 6px;
   margin-right: 7px;
   border-radius: 50%;
-  background: #d29b58;
+  background: var(--warning);
   content: '';
   animation: connection-pulse 1s ease-in-out infinite alternate;
 }
@@ -985,14 +1045,14 @@
 .opencode-request {
   margin: 12px 0;
   padding: 12px;
-  border: 1px solid rgb(200 121 105 / 38%);
+  border: 1px solid var(--error-border);
   border-radius: 5px;
-  background: rgb(91 51 45 / 20%);
+  background: var(--error-bg);
 }
 
 .opencode-error strong,
 .opencode-request h3 {
-  color: #edc7be;
+  color: var(--error-text);
   font-size: 11px;
 }
 
@@ -1005,13 +1065,13 @@
 }
 
 .opencode-request {
-  border-color: rgb(193 138 88 / 38%);
-  background: rgb(93 64 42 / 18%);
+  border-color: var(--request-border);
+  background: var(--request-bg);
 }
 
 .opencode-request h3 {
   margin: 7px 0 0;
-  color: #e7c49e;
+  color: var(--request-text);
 }
 
 .opencode-resource-list {
@@ -1044,9 +1104,9 @@
 }
 
 .opencode-request-actions .request-primary {
-  border-color: #8f6847;
-  color: #f0d2af;
-  background: #5d402a;
+  border-color: var(--primary-border);
+  color: var(--primary-text);
+  background: var(--primary-bg);
 }
 
 .opencode-request-actions button:disabled {
@@ -1114,7 +1174,7 @@
 .opencode-composer {
   padding: 12px;
   border-top: 1px solid var(--border);
-  background: #1a1d21;
+  background: var(--surface-chat);
 }
 
 .opencode-composer textarea {
@@ -1151,10 +1211,10 @@
 .opencode-composer-footer button {
   min-height: 30px;
   padding: 0 12px;
-  border: 1px solid #8f6847;
+  border: 1px solid var(--primary-border);
   border-radius: 4px;
-  color: #f0d2af;
-  background: #5d402a;
+  color: var(--primary-text);
+  background: var(--primary-bg);
   cursor: pointer;
   font-size: 10px;
   font-weight: 600;
@@ -1175,7 +1235,7 @@
   padding: 24px;
   place-items: center;
   overflow: auto;
-  background: rgb(8 9 11 / 74%);
+  background: var(--overlay);
   backdrop-filter: blur(3px);
 }
 
@@ -1187,7 +1247,7 @@
   border: 1px solid var(--border-emphasis);
   border-radius: 6px;
   background: var(--surface-panel);
-  box-shadow: 0 24px 70px rgb(0 0 0 / 48%);
+  box-shadow: 0 24px 70px var(--shadow-dialog);
 }
 
 .confirm-dialog h2 {
@@ -1326,14 +1386,14 @@
 }
 
 .dialog-button-danger {
-  border-color: #8e554a;
-  color: #f0c7bd;
-  background: #5b332d;
+  border-color: var(--danger-border);
+  color: var(--danger-text);
+  background: var(--danger-bg);
 }
 
 .dialog-button-danger:hover {
-  border-color: #c87969;
-  background: #683a33;
+  border-color: var(--error);
+  background: var(--danger-hover);
 }
 
 .editor-empty {

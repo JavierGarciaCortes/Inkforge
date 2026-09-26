@@ -147,7 +147,7 @@ export function Sidebar({
 }: SidebarProps) {
   const { t } = useTranslation()
   const documentCount = countDocuments(tree)
-  const activeProjectIsDiscovered = activeProject.id === null || projects.some(
+  const activeProjectIsDiscovered = activeProject === null || projects.some(
     (project) => project.id === activeProject.id,
   )
   const activeBookIsDiscovered = activeBook === null || books.some(
@@ -170,12 +170,14 @@ export function Sidebar({
         <label>
           <span>{t('sidebar.activeWork')}</span>
           <select
-            value={activeProject.id ?? ''}
+            value={activeProject?.id ?? ''}
             disabled={isProjectBusy}
-            onChange={(event) => onProjectChange(event.target.value || null)}
+            onChange={(event) => {
+              if (event.target.value) onProjectChange(event.target.value)
+            }}
           >
-            <option value="">{t('common.currentVault')}</option>
-            {!activeProjectIsDiscovered && activeProject.id !== null && (
+            <option value="" disabled>{t('library.selectWork')}</option>
+            {!activeProjectIsDiscovered && activeProject && (
               <option value={activeProject.id}>
                 {t('common.unavailable', { title: activeProject.title })}
               </option>
@@ -187,12 +189,12 @@ export function Sidebar({
             ))}
           </select>
         </label>
-        {activeProject.type !== 'legacy' && (
+        {activeProject && (
           <button type="button" disabled={isProjectBusy} onClick={onRenameProject}>
             {activeProject.type === 'saga' ? t('sidebar.renameSaga') : t('sidebar.renameBook')}
           </button>
         )}
-        {activeProject.type === 'saga' && (
+        {activeProject?.type === 'saga' && (
           <>
             <button type="button" disabled={isProjectBusy} onClick={onAddBook}>
               {t('sidebar.addBook')}
@@ -255,7 +257,10 @@ export function Sidebar({
         )}
 
         {state === 'ready' && tree.length === 0 && (
-          <div className="sidebar-state">{t('sidebar.empty')}</div>
+          <div className="sidebar-state">
+            {activeProject ? t('sidebar.empty') : projects.length === 0
+              ? t('library.empty') : t('library.selectWork')}
+          </div>
         )}
 
         {state === 'ready' && tree.length > 0 && (
@@ -269,11 +274,11 @@ export function Sidebar({
 
       <div className="sidebar-footer">
         <span className="sidebar-footer-label">
-          {activeProject.type === 'legacy' ? t('common.currentVault') : activeProject.title}
+          {activeProject?.title ?? t('library.noActiveWork')}
         </span>
         <span>
-          {activeProject.type === 'legacy'
-            ? t('sidebar.inheritedVault')
+          {activeProject === null
+            ? t('common.library')
             : activeProject.type === 'saga'
               ? t('sidebar.saga')
               : t('sidebar.novel')}

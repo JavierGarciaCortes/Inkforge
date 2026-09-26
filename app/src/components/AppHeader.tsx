@@ -1,19 +1,19 @@
 import { useTranslation } from 'react-i18next'
-import {
-  changeLocale,
-  isSupportedLocale,
-  LOCALE_LABELS,
-  SUPPORTED_LOCALES,
-} from '../i18n'
-import type { InkforgeAppInfo } from '../types/inkforge'
+import type { InkforgeAppInfo, OpenCodeConnectionState } from '../types/inkforge'
 
 interface AppHeaderProps {
   appInfo: InkforgeAppInfo | null
   onHelp: () => void
+  onSettings: () => void
+  connectionState: OpenCodeConnectionState
 }
 
-export function AppHeader({ appInfo, onHelp }: AppHeaderProps) {
-  const { t, i18n } = useTranslation()
+export function AppHeader({ appInfo, onHelp, onSettings, connectionState }: AppHeaderProps) {
+  const { t } = useTranslation()
+  const indicator = connectionState === 'connected'
+    ? 'connected'
+    : connectionState === 'starting' ? 'connecting' : 'error'
+  const connectionLabel = t(`header.connection.${indicator}`)
 
   return (
     <header className="app-header">
@@ -28,32 +28,21 @@ export function AppHeader({ appInfo, onHelp }: AppHeaderProps) {
       <div className="header-actions">
         {appInfo && (
           <span className="desktop-status">
-            <span className="status-dot" aria-hidden="true" />
+            <span
+              className={`status-dot status-dot-${indicator}`}
+              role="img"
+              aria-label={connectionLabel}
+              title={connectionLabel}
+            />
             {t('header.desktopVersion', { name: appInfo.name, version: appInfo.version })}
           </span>
         )}
-        <span className="project-state">{t('common.currentVault')}</span>
-        <label className="locale-selector">
-          <span className="sr-only">{t('header.language')}</span>
-          <select
-            aria-label={t('header.language')}
-            value={i18n.language}
-            onChange={(event) => {
-              if (isSupportedLocale(event.target.value)) {
-                void changeLocale(event.target.value)
-              }
-            }}
-          >
-            {SUPPORTED_LOCALES.map((locale) => (
-              <option key={locale} value={locale}>{LOCALE_LABELS[locale]}</option>
-            ))}
-          </select>
-        </label>
+        <span className="project-state">{t('common.library')}</span>
         <button className="icon-button" type="button" title={t('header.openHelp')} onClick={onHelp}>
           <span aria-hidden="true">?</span>
           <span className="sr-only">{t('header.help')}</span>
         </button>
-        <button className="icon-button" type="button" title={t('header.settingsUnavailable')} disabled>
+        <button className="icon-button" type="button" title={t('header.settings')} onClick={onSettings} aria-haspopup="dialog">
           <span aria-hidden="true">&#9881;</span>
           <span className="sr-only">{t('header.settings')}</span>
         </button>
