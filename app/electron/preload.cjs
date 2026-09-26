@@ -17,6 +17,8 @@ contextBridge.exposeInMainWorld('inkforge', {
     getActiveProject: () => ipcRenderer.invoke('library:get-active-project'),
     listBooks: (projectId) => ipcRenderer.invoke('library:list-books', projectId),
     getActiveBook: () => ipcRenderer.invoke('library:get-active-book'),
+    getScope: () => ipcRenderer.invoke('library:get-scope'),
+    onScopeChanged: (callback) => subscribe('library:scope-changed', callback),
     activateProject: (projectId) => ipcRenderer.invoke('library:activate-project', projectId),
     activateBook: (bookId) => ipcRenderer.invoke('library:activate-book', bookId),
     createProject: (input) => ipcRenderer.invoke('library:create-project', input),
@@ -29,11 +31,17 @@ contextBridge.exposeInMainWorld('inkforge', {
   },
   vault: {
     list: () => ipcRenderer.invoke('vault:list'),
-    read: (relativePath) => ipcRenderer.invoke('vault:read', relativePath),
-    write: (relativePath, content, expectedRevision) => (
-      ipcRenderer.invoke('vault:write', relativePath, content, expectedRevision)
+    read: (relativePath, projectId) => ipcRenderer.invoke('vault:read', relativePath, projectId),
+    write: (relativePath, content, expectedRevision, projectId) => (
+      ipcRenderer.invoke('vault:write', relativePath, content, expectedRevision, projectId)
     ),
     onChanged: (callback) => subscribe('vault:changed', callback),
+  },
+  directorState: {
+    load: (projectId) => ipcRenderer.invoke('director-state:load', { projectId }),
+    save: (projectId, state) => (
+      ipcRenderer.invoke('director-state:save', { projectId, state })
+    ),
   },
   opencode: {
     status: () => ipcRenderer.invoke('opencode:status'),
@@ -41,7 +49,7 @@ contextBridge.exposeInMainWorld('inkforge', {
     listModels: () => ipcRenderer.invoke('opencode:list-models'),
     listAgents: () => ipcRenderer.invoke('opencode:list-agents'),
     createSession: (input) => ipcRenderer.invoke('opencode:create-session', input),
-    getMessages: (sessionID) => ipcRenderer.invoke('opencode:get-messages', { sessionID }),
+    getMessages: (sessionID, projectId) => ipcRenderer.invoke('opencode:get-messages', { sessionID, projectId }),
     sendMessage: (input) => ipcRenderer.invoke('opencode:send-message', input),
     switchModel: (input) => ipcRenderer.invoke('opencode:switch-model', input),
     switchAgent: (input) => ipcRenderer.invoke('opencode:switch-agent', input),

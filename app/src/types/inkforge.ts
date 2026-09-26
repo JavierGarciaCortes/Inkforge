@@ -13,11 +13,7 @@ export interface LibraryProjectSummary {
   type: InkforgeProjectType
 }
 
-export interface ActiveProject {
-  id: string | null
-  title: string
-  type: 'legacy' | InkforgeProjectType
-}
+export type ActiveProject = LibraryProjectSummary | null
 
 export interface LibraryBookSummary {
   id: string
@@ -101,6 +97,7 @@ export interface VaultDocumentNode extends VaultPresentation {
 export type VaultTreeNode = VaultDirectoryNode | VaultDocumentNode
 
 export interface VaultDocument extends VaultPresentation {
+  projectId: string
   name: string
   path: string
   content: string
@@ -165,6 +162,7 @@ export interface OpenCodeModel {
   name: string
   variants: string[]
   isProviderDefault: boolean
+  isFree: boolean
 }
 
 export interface OpenCodeAgent {
@@ -184,6 +182,17 @@ export interface OpenCodeChatMessage {
   role: 'user' | 'assistant'
   text: string
   status?: 'sending' | 'sent' | 'error'
+}
+
+export interface DirectorChatSession {
+  id: string
+  startIndex: number
+}
+
+export interface DirectorChatState {
+  version: 1
+  messages: OpenCodeChatMessage[]
+  currentSession: DirectorChatSession | null
 }
 
 export interface OpenCodePermissionRequest {
@@ -231,6 +240,7 @@ export interface OpenCodeModelSelection {
   providerID: string
   modelID: string
   variant?: string
+  displayName?: string
 }
 
 export interface OpenCodeSwitchResult {
@@ -249,6 +259,8 @@ export interface InkforgeBridge {
     getActiveProject: () => Promise<ActiveProject>
     listBooks: (projectId?: string) => Promise<LibraryBookSummary[]>
     getActiveBook: () => Promise<ActiveBook>
+    getScope: () => Promise<LibraryActivationResult>
+    onScopeChanged: (callback: (scope: LibraryActivationResult) => void) => () => void
     activateProject: (projectId: string | null) => Promise<LibraryActivationResult>
     activateBook: (bookId: string) => Promise<LibraryBookSummary>
     createProject: (input: CreateProjectInput) => Promise<CreateProjectResult>
@@ -259,46 +271,57 @@ export interface InkforgeBridge {
   }
   vault: {
     list: () => Promise<VaultTreeNode[]>
-    read: (relativePath: string) => Promise<VaultDocument>
+    read: (relativePath: string, projectId: string) => Promise<VaultDocument>
     write: (
       relativePath: string,
       content: string,
       expectedRevision: string,
+      projectId: string,
     ) => Promise<VaultWriteResult>
     onChanged: (callback: () => void) => () => void
+  }
+  directorState: {
+    load: (projectId: string) => Promise<DirectorChatState>
+    save: (projectId: string, state: DirectorChatState) => Promise<DirectorChatState>
   }
   opencode: {
     status: () => Promise<OpenCodeResult<OpenCodeStatus>>
     start: () => Promise<OpenCodeResult<OpenCodeStatus>>
     listModels: () => Promise<OpenCodeResult<OpenCodeModel[]>>
     listAgents: () => Promise<OpenCodeResult<OpenCodeAgent[]>>
-    createSession: (input: { title?: string; agent?: string }) => Promise<OpenCodeResult<OpenCodeSession>>
-    getMessages: (sessionID: string) => Promise<OpenCodeResult<OpenCodeChatMessage[]>>
+    createSession: (input: { projectId: string | null; title?: string; agent?: string }) => Promise<OpenCodeResult<OpenCodeSession>>
+    getMessages: (sessionID: string, projectId: string) => Promise<OpenCodeResult<OpenCodeChatMessage[]>>
     sendMessage: (input: {
+      projectId: string | null
       sessionID: string
       agent: string
       model: OpenCodeModelSelection
       text: string
     }) => Promise<OpenCodeResult<{ accepted: boolean }>>
     switchModel: (input: {
+      projectId: string | null
       sessionID: string
       model: OpenCodeModelSelection
     }) => Promise<OpenCodeResult<OpenCodeSwitchResult>>
     switchAgent: (input: {
+      projectId: string | null
       sessionID: string
       agent: string
     }) => Promise<OpenCodeResult<OpenCodeSwitchResult>>
     replyPermission: (input: {
+      projectId: string | null
       sessionID: string
       requestID: string
       reply: 'once' | 'always' | 'reject'
     }) => Promise<OpenCodeResult<{ accepted: boolean }>>
     replyQuestion: (input: {
+      projectId: string | null
       sessionID: string
       requestID: string
       answers: string[][]
     }) => Promise<OpenCodeResult<{ accepted: boolean }>>
     rejectQuestion: (input: {
+      projectId: string | null
       sessionID: string
       requestID: string
     }) => Promise<OpenCodeResult<{ accepted: boolean }>>

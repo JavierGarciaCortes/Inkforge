@@ -1,4 +1,5 @@
 const path = require('node:path')
+const fs = require('node:fs/promises')
 const { spawn } = require('node:child_process')
 
 const START_TIMEOUT_MS = 15000
@@ -215,6 +216,10 @@ function resolveProjectPrimaryAgent(configPayload, availableAgents) {
   return primaryAgent
 }
 
+function hasStandaloneFreeToken(value) {
+  return /(^|[^a-z0-9])free(?=$|[^a-z0-9])/i.test(value)
+}
+
 function normalizeModels(payload) {
   if (!isRecord(payload) || !Array.isArray(payload.connected)) {
     throw new OpenCodeError(
@@ -281,6 +286,10 @@ function normalizeModels(payload) {
         name: String(model.name ?? modelID),
         variants,
         isProviderDefault: providerDefaults[providerID] === modelID,
+        isFree: (
+          hasStandaloneFreeToken(String(model.name ?? '')) ||
+          hasStandaloneFreeToken(modelID)
+        ),
       })
     }
   }
@@ -308,7 +317,13 @@ function normalizeMessages(payload) {
     }
 
     const text = entry.parts
-      .filter((part) => isRecord(part) && part.type === 'text' && typeof part.text === 'string')
+      .filter((part) => (
+        isRecord(part) &&
+        part.type === 'text' &&
+        part.synthetic !== true &&
+        part.ignored !== true &&
+        typeof part.text === 'string'
+      ))
       .map((part) => part.text)
       .join('')
 
@@ -324,7 +339,7 @@ function normalizeMessages(payload) {
   })
 }
 
-function normalizeServerEvent(payload, messageRoles) {
+function normalizeServerEvent(payload, messageRoles, visibleParts) {
   if (!isRecord(payload) || typeof payload.type !== 'string') {
     return null
   }
@@ -337,22 +352,38 @@ function normalizeServerEvent(payload, messageRoles) {
   }
 
   if (payload.type === 'session.next.text.delta') {
+    const messageID = typeof properties.assistantMessageID === 'string'
+      ? properties.assistantMessageID
+      : undefined
+    const partID = typeof properties.partID === 'string' ? properties.partID : undefined
+
+    if (
+      !event.sessionID || !messageID || !partID ||
+      messageRoles.get(event.sessionID)?.get(messageID) !== 'assistant' ||
+      visibleParts.get(event.sessionID)?.get(messageID)?.get(partID) !== true
+    ) {
+      return null
+    }
+
     return {
       ...event,
-      assistantMessageID: typeof properties.assistantMessageID === 'string'
-        ? properties.assistantMessageID
-        : undefined,
+      assistantMessageID: messageID,
+      partID,
       delta: typeof properties.delta === 'string' ? properties.delta : '',
     }
   }
 
   if (payload.type === 'message.part.delta') {
     const messageID = typeof properties.messageID === 'string' ? properties.messageID : undefined
+    const partID = typeof properties.partID === 'string' ? properties.partID : undefined
     const messageRole = event.sessionID && messageID
       ? messageRoles.get(event.sessionID)?.get(messageID)
       : undefined
 
-    if (properties.field !== 'text' || messageRole !== 'assistant') {
+    if (
+      properties.field !== 'text' || messageRole !== 'assistant' || !partID ||
+      visibleParts.get(event.sessionID)?.get(messageID)?.get(partID) !== true
+    ) {
       return null
     }
 
@@ -360,7 +391,7 @@ function normalizeServerEvent(payload, messageRoles) {
       ...event,
       type: 'session.next.text.delta',
       assistantMessageID: messageID,
-      partID: typeof properties.partID === 'string' ? properties.partID : undefined,
+      partID,
       delta: typeof properties.delta === 'string' ? properties.delta : '',
     }
   }
@@ -368,7 +399,7 @@ function normalizeServerEvent(payload, messageRoles) {
   if (payload.type === 'message.part.updated') {
     const part = isRecord(properties.part) ? properties.part : null
 
-    if (!part || part.type !== 'text' || typeof part.text !== 'string') {
+    if (!part) {
       return null
     }
 
@@ -376,11 +407,27 @@ function normalizeServerEvent(payload, messageRoles) {
       typeof part.sessionID === 'string' ? part.sessionID : undefined
     )
     const messageID = typeof part.messageID === 'string' ? part.messageID : undefined
+    const partID = typeof part.id === 'string' ? part.id : undefined
+    const visible = (
+      part.type === 'text' &&
+      part.synthetic !== true &&
+      part.ignored !== true &&
+      typeof part.text === 'string'
+    )
+
+    if (sessionID && messageID && partID) {
+      const sessionParts = visibleParts.get(sessionID) ?? new Map()
+      const messageParts = sessionParts.get(messageID) ?? new Map()
+      messageParts.set(partID, visible)
+      sessionParts.set(messageID, messageParts)
+      visibleParts.set(sessionID, sessionParts)
+    }
+
     const messageRole = sessionID && messageID
       ? messageRoles.get(sessionID)?.get(messageID)
       : undefined
 
-    if (messageRole !== 'assistant') {
+    if (!visible || !partID || messageRole !== 'assistant') {
       return null
     }
 
@@ -389,7 +436,7 @@ function normalizeServerEvent(payload, messageRoles) {
       type: 'session.next.text.updated',
       sessionID,
       assistantMessageID: messageID,
-      partID: typeof part.id === 'string' ? part.id : undefined,
+      partID,
       text: part.text,
     }
   }
@@ -423,6 +470,7 @@ function normalizeServerEvent(payload, messageRoles) {
 
   if (payload.type === 'session.idle' && event.sessionID) {
     messageRoles.delete(event.sessionID)
+    visibleParts.delete(event.sessionID)
   }
 
   if (payload.type === 'permission.v2.asked') {
@@ -476,8 +524,13 @@ function normalizeServerEvent(payload, messageRoles) {
 }
 
 class OpenCodeClient {
-  constructor({ projectRoot, onStatus, onEvent }) {
-    this.projectRoot = path.resolve(projectRoot)
+  constructor({ projectRoot, catalogDirectory, workingDirectory = null, validateWorkspace, onStatus, onEvent }) {
+    this.infrastructureRoot = path.resolve(projectRoot)
+    this.catalogDirectory = path.resolve(catalogDirectory)
+    this.workingDirectory = workingDirectory === null ? null : path.resolve(workingDirectory)
+    this.validateWorkspace = validateWorkspace
+    this.workspaceGeneration = 0
+    this.requestedWorkingDirectory = this.workingDirectory
     this.onStatus = onStatus
     this.onEvent = onEvent
     this.child = null
@@ -490,7 +543,10 @@ class OpenCodeClient {
     this.seenEventIDs = new Set()
     this.seenEventQueue = []
     this.messageRoles = new Map()
+    this.visibleParts = new Map()
     this.hasConnectedEventStream = false
+    this.workspaceChangePromise = Promise.resolve()
+    this.workspaceStatusBeforeChange = null
     this.status = {
       state: 'idle',
       message: 'OpenCode todavía no se ha iniciado.',
@@ -507,6 +563,11 @@ class OpenCodeClient {
   }
 
   async start() {
+    await this.ensureConnected()
+    return this.getStatus()
+  }
+
+  async startCurrentWorkspace() {
     if (this.status.state === 'connected' && this.baseUrl) {
       return this.getStatus()
     }
@@ -524,8 +585,73 @@ class OpenCodeClient {
     return this.startPromise
   }
 
+  setWorkingDirectory(workingDirectory) {
+    const nextWorkingDirectory = workingDirectory === null ? null : path.resolve(workingDirectory)
+    const previousRequestedDirectory = this.requestedWorkingDirectory
+    if (nextWorkingDirectory !== previousRequestedDirectory) this.workspaceGeneration += 1
+    this.requestedWorkingDirectory = nextWorkingDirectory
+    const previousChange = this.workspaceChangePromise
+
+    if (nextWorkingDirectory !== this.workingDirectory) {
+      if (
+        previousRequestedDirectory === this.workingDirectory &&
+        this.workspaceStatusBeforeChange === null
+      ) {
+        this.workspaceStatusBeforeChange = this.getStatus()
+      }
+
+      this.eventAbortController?.abort()
+      this.eventAbortController = null
+      this.setStatus({ state: 'starting', message: 'Iniciando OpenCode…' })
+    }
+
+    const nextChange = previousChange.catch(() => undefined).then(async () => {
+      if (nextWorkingDirectory !== this.requestedWorkingDirectory) {
+        return this.getStatus()
+      }
+
+      if (nextWorkingDirectory === this.workingDirectory) {
+        const previousStatus = this.workspaceStatusBeforeChange
+        this.workspaceStatusBeforeChange = null
+
+        if (previousStatus) {
+          this.setStatus(previousStatus)
+
+          if (previousStatus.state === 'connected' && this.baseUrl) {
+            void this.runEventStream()
+          }
+        }
+
+        return this.getStatus()
+      }
+
+      this.workspaceStatusBeforeChange = null
+      this.stopping = true
+      await this.terminateManagedProcess()
+      await this.startPromise?.catch(() => undefined)
+      this.baseUrl = null
+      this.models = []
+      this.agents = []
+      this.messageRoles.clear()
+      this.visibleParts.clear()
+      this.seenEventIDs.clear()
+      this.seenEventQueue = []
+      this.hasConnectedEventStream = false
+      this.workingDirectory = nextWorkingDirectory
+      this.stopping = false
+      this.setStatus({ state: 'idle', message: 'OpenCode detenido.' })
+      return this.startCurrentWorkspace()
+    })
+
+    this.workspaceChangePromise = nextChange
+    return nextChange
+  }
+
   async startInternal() {
     try {
+      if (this.workingDirectory === null) {
+        await fs.mkdir(this.catalogDirectory, { recursive: true })
+      }
       this.baseUrl = await this.launchProcess()
       const health = await this.waitForHealth()
       await this.loadCapabilities()
@@ -534,7 +660,7 @@ class OpenCodeClient {
         message: 'OpenCode conectado.',
         version: typeof health.version === 'string' ? health.version : undefined,
       })
-      void this.runEventStream()
+      if (this.workingDirectory !== null) void this.runEventStream()
       return this.getStatus()
     } catch (error) {
       const normalized = normalizeError(error)
@@ -555,13 +681,16 @@ class OpenCodeClient {
   }
 
   launchProcess() {
+    const environment = { ...process.env }
+    delete environment.VAULT_PATH
+    if (this.workingDirectory !== null) environment.VAULT_PATH = this.workingDirectory
     return new Promise((resolve, reject) => {
       const child = spawn(
         'opencode',
         ['serve', '--hostname', '127.0.0.1', '--port', '0'],
         {
-          cwd: this.projectRoot,
-          env: process.env,
+          cwd: this.workingDirectory === null ? this.catalogDirectory : this.infrastructureRoot,
+          env: environment,
           shell: process.platform === 'win32',
           windowsHide: true,
           stdio: ['ignore', 'pipe', 'pipe'],
@@ -621,7 +750,9 @@ class OpenCodeClient {
         ))
       })
       child.once('exit', (code) => {
-        this.child = null
+        if (this.child === child) {
+          this.child = null
+        }
 
         if (!launchSettled) {
           const missingCommand = /not recognized|no se reconoce|not found/i.test(output)
@@ -671,13 +802,23 @@ class OpenCodeClient {
       : new OpenCodeError('disconnected', 'OpenCode no respondió al control de salud.', { retryable: true })
   }
 
-  withDirectory(endpoint) {
+  withDirectory(endpoint, catalog = false) {
+    const directory = catalog ? this.workingDirectory ?? this.catalogDirectory : this.workingDirectory
+    if (!directory || (!catalog && this.requestedWorkingDirectory !== directory)) {
+      throw new OpenCodeError('invalid_request', 'No hay una obra activa para esta operación.')
+    }
     const url = new URL(endpoint, this.baseUrl)
-    url.searchParams.set('directory', this.projectRoot)
+    url.searchParams.set('directory', directory)
     return `${url.pathname}${url.search}`
   }
 
   async loadCapabilities() {
+    if (this.workingDirectory === null) {
+      const providers = await this.fetchJson(this.withDirectory('/provider', true))
+      this.models = normalizeModels(providers)
+      this.agents = []
+      return
+    }
     let agentPayload
     let providerPayload
     let configPayload
@@ -762,8 +903,45 @@ class OpenCodeClient {
   }
 
   async ensureConnected() {
-    if (this.status.state !== 'connected' || !this.baseUrl) {
-      await this.start()
+    while (true) {
+      const pendingWorkspaceChange = this.workspaceChangePromise
+      await pendingWorkspaceChange.catch(() => undefined)
+
+      if (pendingWorkspaceChange !== this.workspaceChangePromise) {
+        continue
+      }
+
+      if (this.requestedWorkingDirectory !== this.workingDirectory) {
+        continue
+      }
+
+      if (this.status.state !== 'connected' || !this.baseUrl) {
+        await this.startCurrentWorkspace()
+        continue
+      }
+
+      return
+    }
+  }
+
+  async ensureNarrativeConnected(directory) {
+    const generation = this.workspaceGeneration
+    const assertScope = () => {
+      if (
+        !directory ||
+        directory !== this.requestedWorkingDirectory ||
+        generation !== this.workspaceGeneration
+      ) {
+        throw new OpenCodeError('invalid_request', 'Crea o selecciona una obra para utilizar el Director.')
+      }
+    }
+    assertScope()
+    await this.ensureConnected()
+    assertScope()
+    await this.validateWorkspace(directory)
+    assertScope()
+    if (this.workingDirectory !== directory) {
+      throw new OpenCodeError('invalid_request', 'La obra activa ha cambiado.')
     }
   }
 
@@ -778,7 +956,7 @@ class OpenCodeClient {
   }
 
   async createSession(input = {}) {
-    await this.ensureConnected()
+    await this.ensureNarrativeConnected(input.workingDirectory)
     const agent = typeof input.agent === 'string' ? input.agent : undefined
 
     if (agent && !this.agents.some((candidate) => candidate.name === agent)) {
@@ -804,11 +982,26 @@ class OpenCodeClient {
     }
   }
 
-  async getMessages(sessionID) {
-    await this.ensureConnected()
+  async getMessages(sessionID, workingDirectory) {
+    await this.ensureNarrativeConnected(workingDirectory)
     const safeSessionID = encodeURIComponent(assertIdentifier(sessionID, 'La sesión'))
-    const payload = await this.fetchJson(this.withDirectory(`/session/${safeSessionID}/message`))
-    return normalizeMessages(payload)
+
+    try {
+      const payload = await this.fetchJson(this.withDirectory(`/session/${safeSessionID}/message`))
+      return normalizeMessages(payload)
+    } catch (error) {
+      const normalized = normalizeError(error)
+
+      if (normalized.httpStatus === 404) {
+        throw new OpenCodeError(
+          'session_missing',
+          'La sesión de OpenCode ya no está disponible.',
+          { httpStatus: 404, retryable: true },
+        )
+      }
+
+      throw normalized
+    }
   }
 
   validateAgent(agent) {
@@ -843,7 +1036,7 @@ class OpenCodeClient {
   }
 
   async sendMessage(input) {
-    await this.ensureConnected()
+    await this.ensureNarrativeConnected(input?.workingDirectory)
     const sessionID = encodeURIComponent(assertIdentifier(input?.sessionID, 'La sesión'))
     const text = typeof input?.text === 'string' ? input.text : ''
 
@@ -862,6 +1055,7 @@ class OpenCodeClient {
           modelID: input.model.modelID,
           ...(input.model.variant ? { variant: input.model.variant } : {}),
         },
+        ...(typeof input.system === 'string' ? { system: input.system } : {}),
         parts: [{ type: 'text', text }],
       },
       timeout: 10 * 60 * 1000,
@@ -879,7 +1073,7 @@ class OpenCodeClient {
   }
 
   async switchModel(input) {
-    await this.ensureConnected()
+    await this.ensureNarrativeConnected(input?.workingDirectory)
     const sessionID = encodeURIComponent(assertIdentifier(input?.sessionID, 'La sesión'))
     this.validateModel(input.model)
 
@@ -907,7 +1101,7 @@ class OpenCodeClient {
   }
 
   async switchAgent(input) {
-    await this.ensureConnected()
+    await this.ensureNarrativeConnected(input?.workingDirectory)
     const sessionID = encodeURIComponent(assertIdentifier(input?.sessionID, 'La sesión'))
     const agent = assertIdentifier(input?.agent, 'El agente')
 
@@ -933,7 +1127,7 @@ class OpenCodeClient {
   }
 
   async replyPermission(input) {
-    await this.ensureConnected()
+    await this.ensureNarrativeConnected(input?.workingDirectory)
     const sessionID = encodeURIComponent(assertIdentifier(input?.sessionID, 'La sesión'))
     const requestID = encodeURIComponent(assertIdentifier(input?.requestID, 'El permiso'))
 
@@ -949,7 +1143,7 @@ class OpenCodeClient {
   }
 
   async replyQuestion(input) {
-    await this.ensureConnected()
+    await this.ensureNarrativeConnected(input?.workingDirectory)
     const sessionID = encodeURIComponent(assertIdentifier(input?.sessionID, 'La sesión'))
     const requestID = encodeURIComponent(assertIdentifier(input?.requestID, 'La pregunta'))
 
@@ -968,7 +1162,7 @@ class OpenCodeClient {
   }
 
   async rejectQuestion(input) {
-    await this.ensureConnected()
+    await this.ensureNarrativeConnected(input?.workingDirectory)
     const sessionID = encodeURIComponent(assertIdentifier(input?.sessionID, 'La sesión'))
     const requestID = encodeURIComponent(assertIdentifier(input?.requestID, 'La pregunta'))
     await this.fetchJson(this.withDirectory(`/api/session/${sessionID}/question/${requestID}/reject`), {
@@ -1001,7 +1195,7 @@ class OpenCodeClient {
     const controller = new AbortController()
     this.eventAbortController = controller
     const url = new URL('/event', this.baseUrl)
-    url.searchParams.set('directory', this.projectRoot)
+    url.searchParams.set('directory', this.workingDirectory)
     const response = await fetch(url, {
       headers: { Accept: 'text/event-stream' },
       redirect: 'error',
@@ -1052,7 +1246,7 @@ class OpenCodeClient {
 
         if (data) {
           try {
-            const event = normalizeServerEvent(JSON.parse(data), this.messageRoles)
+            const event = normalizeServerEvent(JSON.parse(data), this.messageRoles, this.visibleParts)
 
             if (event && this.rememberEvent(event)) {
               this.onEvent(event)
@@ -1068,7 +1262,7 @@ class OpenCodeClient {
   }
 
   async runEventStream() {
-    while (!this.stopping && this.status.state === 'connected' && this.baseUrl) {
+    while (!this.stopping && this.workingDirectory !== null && this.status.state === 'connected' && this.baseUrl) {
       try {
         await this.consumeEventStream()
       } catch (error) {
@@ -1144,12 +1338,14 @@ class OpenCodeClient {
   }
 
   async stop() {
+    await this.workspaceChangePromise.catch(() => undefined)
     this.stopping = true
     await this.terminateManagedProcess()
     this.baseUrl = null
     this.models = []
     this.agents = []
     this.messageRoles.clear()
+    this.visibleParts.clear()
     this.setStatus({ state: 'idle', message: 'OpenCode detenido.' })
   }
 }

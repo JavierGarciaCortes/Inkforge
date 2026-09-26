@@ -3,6 +3,9 @@ import { getVaultPresentationLabel } from '../i18n/vault-presentation'
 import type { LoadState, SaveState, VaultDocument } from '../types/inkforge'
 
 interface DocumentWorkspaceProps {
+  hasActiveProject: boolean
+  isBookMissing: boolean
+  isDetached: boolean
   document: VaultDocument | null
   selectedPath: string | null
   state: LoadState
@@ -20,6 +23,9 @@ interface DocumentWorkspaceProps {
 }
 
 export function DocumentWorkspace({
+  hasActiveProject,
+  isBookMissing,
+  isDetached,
   document,
   selectedPath,
   state,
@@ -84,6 +90,8 @@ export function DocumentWorkspace({
                   type="button"
                   disabled={
                     !isDirty ||
+                    isDetached ||
+                    !hasActiveProject ||
                     saveState === 'saving' ||
                     saveState === 'conflict' ||
                     saveState === 'missing'
@@ -119,8 +127,10 @@ export function DocumentWorkspace({
               <span />
               <span />
             </div>
-            <h1>{t('document.selectTitle')}</h1>
-            <p>{t('document.selectDescription')}</p>
+            <h1>{!hasActiveProject ? t('library.noActiveWork') : isBookMissing
+              ? t('library.noActiveBook') : t('document.selectTitle')}</h1>
+            <p>{!hasActiveProject ? t('library.chooseOrCreate') : isBookMissing
+              ? t('library.addBookHint') : t('document.selectDescription')}</p>
           </div>
         )}
 
@@ -141,6 +151,9 @@ export function DocumentWorkspace({
 
         {state === 'ready' && document && (
           <section className={isEditing ? 'document-editor' : 'document-reader'}>
+            {isDetached && (
+              <p className="save-error" role="alert">{t('library.draftPreserved')}</p>
+            )}
             <header className="document-content-header">
               <h1>{documentName}</h1>
               <p title={document.path}>{document.path}</p>

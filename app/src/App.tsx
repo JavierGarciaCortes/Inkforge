@@ -10,6 +10,7 @@ import { NarrativeNameDialog } from './components/NarrativeNameDialog'
 import { ProjectDialog } from './components/ProjectDialog'
 import { Sidebar } from './components/Sidebar'
 import { i18n } from './i18n'
+import { loadOpenCodeModelSelection } from './storage/model-selection-storage'
 import type {
   ActiveBook,
   ActiveProject,
@@ -19,6 +20,7 @@ import type {
   LibraryBookSummary,
   LibraryProjectSummary,
   LoadState,
+  OpenCodeConnectionState,
   SaveState,
   VaultDocument,
   VaultTreeNode,
@@ -30,12 +32,6 @@ async function readVaultTree(): Promise<VaultTreeNode[]> {
   }
 
   return window.inkforge.vault.list()
-}
-
-const LEGACY_PROJECT: ActiveProject = {
-  id: null,
-  title: '',
-  type: 'legacy',
 }
 
 function sortProjects(projects: LibraryProjectSummary[]): LibraryProjectSummary[] {
@@ -70,13 +66,22 @@ function App() {
   const { t } = useTranslation()
   const [appInfo, setAppInfo] = useState<InkforgeAppInfo | null>(null)
   const [projects, setProjects] = useState<LibraryProjectSummary[]>([])
-  const [activeProject, setActiveProject] = useState<ActiveProject>(LEGACY_PROJECT)
+  const [activeProject, setActiveProject] = useState<ActiveProject>(null)
   const [books, setBooks] = useState<LibraryBookSummary[]>([])
   const [activeBook, setActiveBook] = useState<ActiveBook>(null)
   const [isProjectBusy, setIsProjectBusy] = useState(false)
   const [projectError, setProjectError] = useState<string | null>(null)
   const [isProjectDialogOpen, setIsProjectDialogOpen] = useState(false)
   const [isHelpOpen, setIsHelpOpen] = useState(false)
+  const [isSettingsOpen, setIsSettingsOpen] = useState(() => loadOpenCodeModelSelection() === null)
+  const unavailableModelPrompts = useRef(new Set<string>())
+  const promptForUnavailableModel = useCallback((key: string) => {
+    if (!unavailableModelPrompts.current.has(key)) {
+      unavailableModelPrompts.current.add(key)
+      setIsSettingsOpen(true)
+    }
+  }, [])
+  const [connectionState, setConnectionState] = useState<OpenCodeConnectionState>('starting')
   const [narrativeDialog, setNarrativeDialog] = useState<NarrativeDialogKind | null>(null)
   const [vaultTree, setVaultTree] = useState<VaultTreeNode[]>([])
   const [vaultState, setVaultState] = useState<LoadState>('loading')
@@ -91,6 +96,7 @@ function App() {
   const [saveState, setSaveState] = useState<SaveState>('idle')
   const [saveError, setSaveError] = useState<string | null>(null)
   const [conflictDocument, setConflictDocument] = useState<VaultDocument | null>(null)
+  const [isDocumentDetached, setIsDocumentDetached] = useState(false)
   const isMounted = useRef(false)
   const selectedPathRef = useRef<string | null>(null)
   const draftContentRef = useRef('')
@@ -217,13 +223,11 @@ function App() {
       const requestId = libraryRequestId.current + 1
       libraryRequestId.current = requestId
 
-      void Promise.all([
-        bridge.library.getActiveProject(),
-        bridge.library.getActiveBook(),
-      ]).then(([nextActiveProject, nextActiveBook]) => {
+      void bridge.library.getScope().then((scope) => {
         if (isEffectActive && libraryRequestId.current === requestId) {
-          setActiveProject(nextActiveProject)
-          setActiveBook(nextActiveBook)
+          setActiveProject(scope.activeProject)
+          setActiveBook(scope.activeBook)
+          setBooks(scope.books)
         }
       }).catch((error: unknown) => {
         if (isEffectActive && libraryRequestId.current === requestId) {
@@ -259,6 +263,7 @@ function App() {
   }, [loadLibraryBooks, loadLibraryProjects, loadVault])
 
   const resetDocumentForProjectChange = useCallback(() => {
+    setIsDocumentDetached(false)
     selectedPathRef.current = null
     draftContentRef.current = ''
     readRequestId.current += 1
@@ -273,6 +278,28 @@ function App() {
     setSaveError(null)
     setConflictDocument(null)
   }, [])
+
+  useEffect(() => {
+    return window.inkforge?.library.onScopeChanged((scope) => {
+      booksRequestId.current += 1
+      readRequestId.current += 1
+      saveRequestId.current += 1
+      setActiveProject(scope.activeProject)
+      setActiveBook(scope.activeBook)
+      setBooks(scope.books)
+      setNarrativeDialog(null)
+      setVaultTree([])
+      setVaultError(null)
+      if (document && isDirty) {
+        setIsDocumentDetached(true)
+        setSaveState('missing')
+        setConflictDocument(null)
+      } else {
+        resetDocumentForProjectChange()
+      }
+      void loadVault()
+    })
+  }, [document, isDirty, loadVault, resetDocumentForProjectChange])
 
   const finishProjectActivation = useCallback((nextScope: LibraryActivationResult) => {
     booksRequestId.current += 1
@@ -519,7 +546,7 @@ function App() {
   }, [])
 
   const openDocument = async (relativePath: string) => {
-    if (relativePath === selectedPath) {
+    if (!activeProject || relativePath === selectedPath) {
       return
     }
 
@@ -545,7 +572,7 @@ function App() {
     }
 
     try {
-      const nextDocument = await window.inkforge.vault.read(relativePath)
+      const nextDocument = await window.inkforge.vault.read(relativePath, activeProject.id)
 
       if (readRequestId.current === requestId) {
         setDocument(nextDocument)
@@ -590,7 +617,7 @@ function App() {
 
   const requestProjectChange = (projectId: string | null) => {
     if (
-      projectId === activeProject.id ||
+      projectId === activeProject?.id ||
       isProjectBusy ||
       libraryOperationActiveRef.current ||
       saveState === 'saving'
@@ -733,7 +760,7 @@ function App() {
       readRequestId.current = requestId
 
       try {
-        const nextDocument = await window.inkforge.vault.read(relativePath)
+        const nextDocument = await window.inkforge.vault.read(relativePath, document.projectId)
 
         if (
           !isMounted.current ||
@@ -789,6 +816,8 @@ function App() {
 
     if (
       !currentDocument ||
+      isDocumentDetached ||
+      activeProject?.id !== currentDocument.projectId ||
       libraryOperationActiveRef.current ||
       contentToSave === currentDocument.content ||
       saveState === 'saving' ||
@@ -814,6 +843,7 @@ function App() {
         currentDocument.path,
         contentToSave,
         currentDocument.revision,
+        currentDocument.projectId,
       )
 
       if (
@@ -853,7 +883,7 @@ function App() {
       setSaveState('error')
       setSaveError(i18n.t('errors.saveFailed'))
     }
-  }, [document, saveState])
+  }, [activeProject, document, isDocumentDetached, saveState])
 
   useEffect(() => {
     const handleSaveShortcut = (event: KeyboardEvent) => {
@@ -922,16 +952,16 @@ function App() {
   const narrativeDialogTitle = narrativeDialog === 'add-book'
     ? t('dialogs.addBook')
     : narrativeDialog === 'rename-project'
-      ? activeProject.type === 'saga'
+      ? activeProject?.type === 'saga'
         ? t('dialogs.renameSaga')
         : t('dialogs.renameBook')
       : t('dialogs.renameBook')
   const narrativeDialogLabel = narrativeDialog === 'rename-project' &&
-    activeProject.type === 'saga'
+    activeProject?.type === 'saga'
     ? t('dialogs.sagaTitle')
     : t('dialogs.bookTitle')
   const narrativeDialogInitialValue = narrativeDialog === 'rename-project'
-    ? activeProject.title
+    ? activeProject?.title ?? ''
     : narrativeDialog === 'rename-book'
       ? activeBook?.title ?? ''
       : ''
@@ -962,7 +992,12 @@ function App() {
 
   return (
     <div className="app-shell">
-      <AppHeader appInfo={appInfo} onHelp={() => setIsHelpOpen(true)} />
+      <AppHeader
+        appInfo={appInfo}
+        onHelp={() => setIsHelpOpen(true)}
+        onSettings={() => setIsSettingsOpen(true)}
+        connectionState={connectionState}
+      />
       <div className="workspace-grid">
         <Sidebar
           tree={vaultTree}
@@ -985,6 +1020,9 @@ function App() {
           onReload={retryVault}
         />
         <DocumentWorkspace
+          hasActiveProject={activeProject !== null}
+          isBookMissing={activeProject?.type === 'saga' && activeBook === null}
+          isDetached={isDocumentDetached}
           document={document}
           selectedPath={selectedPath}
           state={documentState}
@@ -1000,7 +1038,14 @@ function App() {
           onContentChange={changeDocumentContent}
           onSave={() => void saveDocument()}
         />
-        <EditorPanel />
+        <EditorPanel
+          key={activeProject ? 'scope:project:' + activeProject.id : 'scope:none'}
+          projectId={activeProject?.id ?? null}
+          isSettingsOpen={isSettingsOpen}
+          onUnavailableModel={promptForUnavailableModel}
+          onCloseSettings={() => setIsSettingsOpen(false)}
+          onConnectionStateChange={setConnectionState}
+        />
       </div>
       {isProjectDialogOpen && (
         <ProjectDialog
