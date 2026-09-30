@@ -227,6 +227,7 @@ const ca = {
     primaryUnavailable: 'OpenCode no ha retornat cap agent principal utilitzable.',
     chatStateLoadFailed: 'No s’ha pogut carregar l’historial del Director. No se sobreescriurà.',
     chatStateSaveFailed: 'No s’ha pogut desar l’historial del Director.',
+    interruptedInteraction: 'La interacció anterior ha quedat interrompuda i ja no es pot respondre. Això pot passar en reiniciar OpenCode. Revisa l’últim torn i continua des del Director.',
     activity: {
       writing: 'S’està escrivint…',
       waitingPermission: 'S’està esperant permís',

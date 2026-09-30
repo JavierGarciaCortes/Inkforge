@@ -227,6 +227,7 @@ const en = {
     primaryUnavailable: 'OpenCode did not return a usable primary agent.',
     chatStateLoadFailed: 'The Director history could not be loaded. It will not be overwritten.',
     chatStateSaveFailed: 'The Director history could not be saved.',
+    interruptedInteraction: 'The previous interaction was interrupted and can no longer be answered. This can happen when OpenCode restarts. Review the last turn and continue from the Director.',
     activity: {
       writing: 'Writing…',
       waitingPermission: 'Waiting for permission',

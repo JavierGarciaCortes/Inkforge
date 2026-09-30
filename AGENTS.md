@@ -5,6 +5,19 @@
 
 ---
 
+## Contrato de rutas de Inkforge (prioritario)
+
+- `workingDirectory` es la raíz física de la obra activa gestionada por Inkforge; `VAULT_PATH` apunta a esa misma raíz. Los Markdown reales son la fuente de verdad.
+- Toda lectura o escritura directa de contenido usa rutas relativas a esa raíz. «Vault Markdown» es un concepto, no un prefijo: **no anteponer `vault/` ni crear automáticamente `<workingDirectory>/vault/`**.
+- **Novela independiente:** `Canon/`, `Capítulos/`, `Notas/`, `Planificación/`, `Recursos/`, `Mundo/`, `Estilo/` y `Referencias/` cuelgan directamente de la raíz.
+- **Saga:** `Mundo/`, `Estilo/` y `Referencias/` son compartidos en la raíz. `Canon/`, `Capítulos/`, `Notas/`, `Planificación/` y `Recursos/` pertenecen al libro activo y se resuelven bajo `Libros/<carpeta física exacta del libro activo>/`.
+- La selección de obra y libro proporcionada por Inkforge es autoritativa. Nunca elegir otro libro porque contenga una carpeta adecuada. Resolver la carpeta exacta con esa información; si falta la ruta, inspeccionar `Libros/` y los metadatos reales (`Libro.md` u otros existentes). No derivarla del título ni inventar prefijos como `01 -`. Si persiste una ambigüedad genuina, preguntar antes de escribir.
+- En este documento, **ámbito del libro activo** significa la raíz en una novela independiente y la carpeta exacta del libro activo dentro de `Libros/` en una saga. Las referencias a capítulos y su manifiesto siempre se resuelven en ese ámbito.
+- Las tools/MCP que resuelven rutas mediante `VAULT_PATH` conservan su uso y sus APIs; no añadirles manualmente el prefijo prohibido.
+- `infrastructureRoot` / project root es el repositorio Inkforge, distinto de la raíz de la obra. Las referencias a `.tools/`, `.opencode/`, `AGENTS.md`, `opencode.json` y al Makefile identifican infraestructura del repositorio, no carpetas que deban crearse en la obra. Resolver recursos técnicos existentes en su ubicación real.
+
+---
+
 ## 0. Onboarding: primera sesión
 
 Cuando ejecutes `session_check.py` y detecte que es la primera sesión
@@ -21,13 +34,13 @@ al workflow de revisión estándar**. En su lugar:
 
 2. **Con las respuestas**, ofrece sugerencias de cómo usar las herramientas:
    - Para empezar a escribir desde cero: crear primer capítulo con `new_chapter.py`
-   - Para planificar antes de escribir: rellenar `vault/Referencias/Trama.md`, `vault/Referencias/Cronología.md` y fichas de personajes en `vault/Mundo/Personajes/`
-   - Para explorar el lore: `vault/Referencias/Fundamentos.md` para las reglas canónicas, `vault/Mundo/Historia/` para el desarrollo detallado
-   - Para seguir sin presión: simplemente escribir en `vault/Capítulos/` y dejar que las tools ayuden después
+   - Para planificar antes de escribir: rellenar `Referencias/Trama.md`, `Referencias/Cronología.md` y fichas de personajes en `Mundo/Personajes/`
+   - Para explorar el lore: `Referencias/Fundamentos.md` para las reglas canónicas, `Mundo/Historia/` para el desarrollo detallado
+   - Para seguir sin presión: simplemente escribir en `Capítulos/` del ámbito del libro activo y dejar que las tools ayuden después
 
 3. **Pregunta si quiere configurar algo**:
    - `.fiction/config.json` — acts, POV por defecto, midpoint
-   - `vault/Estilo/Guía de estilo.md` — reglas narrativas del proyecto
+   - `Estilo/Guía de estilo.md` — reglas narrativas del proyecto
 
 4. **Ejemplo de invitación:**
    > "Veo que esta bóveda está recién creada. No hay capítulos, personajes ni
@@ -42,51 +55,48 @@ hacer con la herramienta y elija por dónde empezar.
 
 ## 1. Estructura del repositorio
 
-El repositorio tiene tres contextos separados:
+El contenido y la infraestructura tienen raíces distintas:
 
-| Contexto | Directorio | Propósito |
-|----------|-----------|-----------|
-| **Contenido creativo** | `vault/` | Bóveda Obsidian: capítulos, personajes, lore, referencias, plantillas |
-| **Dashboard web** | `web/` | Web Astro SSR con métricas, buscador y navegación del proyecto |
-| **Herramientas** | `.tools/`, `.fiction/` | Scripts Python, configs, estados, MCP server |
+| Contexto | Raíz | Propósito |
+|----------|------|-----------|
+| **Contenido creativo** | `workingDirectory` = `VAULT_PATH` | Markdown de la obra activa y, en saga, del libro seleccionado |
+| **Dashboard web** | `web/` en el repositorio Inkforge | Web Astro SSR |
+| **Herramientas** | Recursos existentes en el repositorio Inkforge | Scripts Python, configuración y MCP |
+
+Estructura de contenido (rutas relativas a la obra activa; los nombres de libros son marcadores, no rutas literales):
+
+```text
+Novela independiente: workingDirectory/
+├── .inkforge/
+├── Canon/
+├── Capítulos/                 # manifiesto.json, si existe
+├── Estilo/
+├── Mundo/
+├── Notas/
+├── Planificación/
+├── Recursos/
+├── Referencias/
+└── Proyecto.md
+
+Saga: workingDirectory/
+├── .inkforge/
+├── Estilo/                    # compartido
+├── Mundo/                     # compartido
+├── Referencias/               # compartido
+├── Libros/
+│   └── <carpeta física exacta del libro activo>/
+│       ├── Canon/
+│       ├── Capítulos/         # manifiesto.json, si existe
+│       ├── Notas/
+│       ├── Planificación/
+│       ├── Recursos/
+│       └── Libro.md
+└── Proyecto.md
+```
+
+Recursos de infraestructura referenciados por los flujos siguientes (desde la raíz del repositorio Inkforge):
 
 ```
-├── vault/                     # 📚 BÓVEDA OBSIDIAN (todo el contenido creativo)
-│   ├── Capítulos/             # Capítulos + manifiesto.json (orden narrativo)
-│   ├── Mundo/
-│   │   ├── Personajes/        # Fichas de personaje
-│   │   ├── Lugares/           # Geografía y localizaciones
-│   │   └── Historia/          # Lore, magia, cronología
-│   ├── Referencias/
-│   │   ├── Fundamentos.md          # Reglas, cosmología, sistema de sangre (worldbuilding puro)
-│   │   ├── Trama.md      # Decisiones narrativas (fuente única del argumento)
-│   │   ├── Outliner.md             # Plan capítulo a capítulo, decisiones cerradas
-│   │   ├── Índice.md               # Mapa de navegación rápida de la bóveda
-│   │   ├── Léxico.md               # Glosario de términos del mundo
-│   │   ├── Pendientes.md           # Tareas y prioridades (fuente única de seguimiento)
-│   │   ├── Cronología.md           # Línea temporal detallada con acotaciones
-│   │   ├── Foreshadowing.md        # Registro de siembras y pagos narrativos
-│   │   └── Estado.md               # Tracking: métricas, fichas creadas, decisiones pasadas
-│   ├── Estilo/
-│   │   ├── Guía general.md       # Reglas universales de ficción en español
-│   │   ├── Guía de estilo.md     # Reglas específicas del proyecto
-│   │   ├── patrones.json         # Patrones de prosa para el scanner
-│   │   ├── Consejos Sanderson.md # Teoría de trama, personajes, worldbuilding
-│   │   └── Consejos Stephen King.md # On Writing: disciplina, voz, oficio
-│   └── Plantillas/           # Plantillas para crear contenido
-│       ├── capitulo.md
-│       ├── personaje.md
-│       ├── lugar.md
-│       ├── lore.md
-│       ├── lexico.md
-│       ├── patrones.json
-│       ├── config.json
-│       └── ejemplos/             # Ejemplos rellenos (misma estructura que la bóveda)
-│           ├── Capítulos/
-│           ├── Mundo/
-│           │   ├── Personajes/
-│           │   ├── Lugares/
-│           │   └── Historia/
 ├── web/                      # 🌐 DASHBOARD ASTRO SSR
 │   ├── src/                  # Componentes Astro, layouts, páginas
 │   ├── public/               # Estáticos (theme.css, etc.)
@@ -125,9 +135,7 @@ El repositorio tiene tres contextos separados:
 └── AGENTS.md
 ```
 
-> **⚠️ Importante**: todo el contenido creativo (capítulos, personajes, lore, referencias, plantillas)
-> está bajo `vault/`. Las tools del MCP lo resuelven automáticamente vía `vault.py`.
-> Para lecturas directas de archivos, usar la ruta completa con prefijo `vault/`.
+> **⚠️ Importante**: las lecturas y escrituras de contenido parten de `workingDirectory` y respetan el ámbito de raíz o libro activo descrito arriba. Las tools MCP mantienen su resolución mediante `VAULT_PATH` y `vault.py`; no fabricar otra raíz de contenido.
 
 ---
 
@@ -188,7 +196,7 @@ python .tools/prose_scanner.py --ritmo       # estadísticas de longitud de fras
 python .tools/prose_scanner.py --validate    # detectar overlaps entre patrones
 ```
 
-Patrones en `vault/Estilo/patrones.json`. Categorías:
+Patrones en `Estilo/patrones.json`. Categorías:
 - `ai_fingerprint` — alta prioridad, filtrar siempre
 - `fragile` — evaluar caso a caso
 - `voice` — solo si es muletilla
@@ -197,7 +205,7 @@ Patrones en `vault/Estilo/patrones.json`. Categorías:
 
 ## 4. Workflow de revisión <!-- PROYECTO — adapta los capítulos a tu libro -->
 
-> **⚠️ Archivos de ejemplo:** Los archivos en `vault/Plantillas/ejemplos/` son demostraciones de la plantilla, no contenido real. Ignorarlos. Los templates vacíos en `vault/Mundo/` y `vault/Capítulos/` son los que debes rellenar con tu proyecto.
+> **⚠️ Archivos de ejemplo:** las demostraciones y plantillas heredadas no son contenido real. Si se necesitan, localizar los recursos existentes sin suponer que hay una carpeta de plantillas en la obra. Las fichas reales están en `Mundo/`; los capítulos, en `Capítulos/` del ámbito del libro activo.
 
 ### ⚠️ Regla fundamental: quién escribe
 
@@ -207,21 +215,21 @@ Patrones en `vault/Estilo/patrones.json`. Categorías:
 2. **Recopilar contexto** para el writer: pasaje completo, perfil del personaje, voz, reglas de estilo, lo que se necesita mejorar
 3. **Pedir al writer** que genere la prosa nueva/modificada con instrucciones precisas
 4. **Revisar** la propuesta del writer
-5. **Formatear** con la metodología estándar (bloque ACTUAL/PROPUESTA) y **presentar al usuario** para su aprobación
+5. **Aplicar la intención del usuario**: ante una orden explícita de edición, ejecutar el cambio revisado sin doble confirmación; en tareas de propuesta, presentar ACTUAL/PROPUESTA sin modificar archivos. Aclarar ambigüedades sustanciales antes de escribir (sección 17).
 
 ### Preliminar (cada sesión)
 1. **Ejecutar `python .tools/session_check.py`** — resumen de qué cambió (no opcional)
 2. **`editorial_letter(beta=true)`** — carta editorial sintética con todas las analíticas
 3. **`get_foreshadowing()`** — ledger completo de siembras y pagos
-4. **Leer `vault/Referencias/Estado.md`** — scores pre-cambio, puntos débiles conocidos
+4. **Leer `Referencias/Estado.md`** — scores pre-cambio, puntos débiles conocidos
 5. **Para el capítulo concreto**: `get_chapter_context(num)` + `get_character(POV, num)` + `get_location(relevante)`
 6. **Para voz de personaje**: `check_voice_consistency(num, nombre)` para diagnóstico
-7. **Para hilos narrativos**: `get_foreshadowing(thread?)` o consultar `vault/Referencias/Foreshadowing.md`
+7. **Para hilos narrativos**: `get_foreshadowing(thread?)` o consultar `Referencias/Foreshadowing.md`
 
 ### ⚠️ Regla de oro: NO improvisar de memoria
 
 El editor NUNCA asume que recuerda un dato del worldbuilding. Ante cualquier consulta:
-1. **Consultar `vault/Referencias/Fundamentos.md` primero**: es la base canónica. Si hay conflicto entre archivos, gana Fundamentos.
+1. **Consultar `Referencias/Fundamentos.md` primero**: es la base canónica. Si hay conflicto entre archivos, gana Fundamentos.
 2. **Consultar la tool del MCP correspondiente** (`get_character`, `get_location`, `search_bible`, etc.)
 3. **Solo después de leer la respuesta**, emitir un juicio o proponer una edición
 
@@ -242,8 +250,8 @@ El editor NUNCA asume que recuerda un dato del worldbuilding. Ante cualquier con
 1. **Re-scan** tras cambios (`scan_prose()`)
 2. `check_consistency(num)` + `check_transitions()` si se tocó tiempo/clima
 3. `check_voice_consistency(num, personaje)` si se tocó diálogo
-4. **Actualizar story bible**: personajes, lugares, historia, cronología, trama, y `vault/Referencias/Fundamentos.md` si se tocaron reglas o conceptos canónicos
-5. Actualizar `vault/Referencias/Estado.md` con nuevos scores
+4. **Actualizar story bible**: personajes, lugares, historia, cronología, trama, y `Referencias/Fundamentos.md` si se tocaron reglas o conceptos canónicos
+5. Actualizar `Referencias/Estado.md` con nuevos scores
 
 ---
 
@@ -268,13 +276,13 @@ El editor NUNCA asume que recuerda un dato del worldbuilding. Ante cualquier con
 
 ## 6. Voces de personaje  <!-- PROYECTO — rellena con tus personajes -->
 
-La fuente de verdad para la voz de cada personaje es su ficha en `vault/Mundo/Personajes/*.md` (sección `## Voz`).
+La fuente de verdad para la voz de cada personaje es su ficha en `Mundo/Personajes/*.md` (sección `## Voz`).
 
 - Al escribir/editar diálogo: `get_character(nombre)` devuelve el perfil completo, incluyendo voz.
 - Tras editar: `check_voice_consistency(cap, nombre)` analiza el diálogo contra la voz definida en la ficha.
 - Las reglas «NUNCA diría» también se definen en la ficha del personaje.
 
-Fichas completas en `vault/Mundo/Personajes/*.md`.
+Fichas completas en `Mundo/Personajes/*.md`.
 
 ---
 
@@ -317,15 +325,15 @@ El archivo `.opencode/skills/editorial_skill.md` contiene instrucciones detallad
 Después de CUALQUIER modificación (editar prosa, crear/renumerar capítulos, añadir tools, modificar patrones, cambiar lore, etc.), actualizar:
 
 1. **`AGENTS.md`** — secciones de estructura, tabla de capítulos, reglas POV, puntos débiles si aplica
-2. **`vault/Referencias/Estado.md`** — tabla de scores, herramientas, pendientes, última actualización
-3. **`vault/Referencias/Fundamentos.md`** — si se tocaron reglas, conceptos canónicos o el mapa de conexiones
-4. **Story bible** — personajes, lugares, historia, cronología, trama si se tocó lore o eventos (todo bajo `vault/`)
+2. **`Referencias/Estado.md`** — tabla de scores, herramientas, pendientes, última actualización
+3. **`Referencias/Fundamentos.md`** — si se tocaron reglas, conceptos canónicos o el mapa de conexiones
+4. **Story bible** — personajes, lugares, historia, cronología, trama si se tocó lore o eventos (rutas de raíz o de libro activo según el contrato de rutas)
 5. **`.fiction/`** — session_log.json tras cualquier decisión
 6. **`.opencode/skills/editorial_skill.md`** — si se añadieron nuevas tools, flags o flujos
-7. **`vault/Capítulos/manifiesto.json`** — si se insertó/eliminó/reordenó un capítulo
+7. **`Capítulos/manifiesto.json` del ámbito del libro activo** — si se insertó/eliminó/reordenó un capítulo
 8. **Ejecutar `sync_manifiesto.py`** tras modificar manifiesto
 9. **Ejecutar `prose_scanner.py --validate`** después de modificar `patrones.json`
-10. **`vault/Referencias/Léxico.md`** — añadir términos nuevos que aparecieron; ejecutar `make sort-lexico`
+10. **`Referencias/Léxico.md`** — añadir términos nuevos que aparecieron; ejecutar `make sort-lexico`
 10. **`.fiction/session_log.json`** — registrar decisiones tomadas, archivos tocados, preguntas abiertas y próximas acciones
 
 ---
@@ -385,15 +393,15 @@ python .tools/sort_lexico.py                           # ordenar alfabéticament
 | `opencode.json` | Registra MCP server, apunta a AGENTS.md |
 | `.fiction/config.json` | Config del proyecto (rutas, acts, POV, etc.) |
 | `.fiction/session_log.json` | Memoria entre sesiones: decisiones, archivos tocados, preguntas abiertas |
-| `vault/Mundo/Personajes/*.md` | Fichas con voz, tics, NUNCA diría |
-| `vault/Mundo/Lugares/*.md` | Fichas con atmósfera, sonidos, capítulos |
+| `Mundo/Personajes/*.md` | Fichas con voz, tics, NUNCA diría |
+| `Mundo/Lugares/*.md` | Fichas con atmósfera, sonidos, capítulos |
 | `.opencode/skills/editorial_skill.md` | Skill de edición: flujos paso a paso por tipo de tarea |
 
 ---
 
 ## 13. Tabla de capítulos (resumen rápido)  <!-- PROYECTO -->
 
-> La tabla de capítulos y el orden narrativo viven en `vault/Capítulos/manifiesto.json`. El arco de la novela está en `vault/Referencias/Outliner.md`.
+> La tabla de capítulos y el orden narrativo viven en `Capítulos/manifiesto.json` del ámbito del libro activo. El arco de la novela está en `Referencias/Outliner.md`.
 > Para contexto de un capítulo concreto: `get_chapter_context(num)`. Para el arco completo: `get_story_arc()`.
 
 ---
@@ -401,22 +409,22 @@ python .tools/sort_lexico.py                           # ordenar alfabéticament
 ## 14. Reglas POV  <!-- PROYECTO — una sección por personaje-POV -->
 
 > Las reglas de POV (tiempo verbal, filtro sensorial, lo que sabe/no sabe cada personaje)
-> se definen en `vault/Estilo/Guía de estilo.md`. Para saber qué sabe un personaje en un
+> se definen en `Estilo/Guía de estilo.md`. Para saber qué sabe un personaje en un
 > capítulo concreto, usar `get_character(POV, num)`.
 
 ---
 
 ## 15. Puntos débiles conocidos  <!-- PROYECTO -->
 
-> Los puntos débiles y prioridades del proyecto se consultan en `vault/Referencias/Estado.md`
-> y `vault/Referencias/Pendientes.md`. No memorizar — leer en cada sesión.
+> Los puntos débiles y prioridades del proyecto se consultan en `Referencias/Estado.md`
+> y `Referencias/Pendientes.md`. No memorizar — leer en cada sesión.
 > Para el checklist completo de revisión: `editorial_letter(beta=true)`.
 
 ---
 
 ## 16. Ritual de inicio de sesión (OBLIGATORIO)
 
-> **⚠️ Archivos de ejemplo:** Los archivos en `vault/Plantillas/ejemplos/` son demostraciones de la plantilla, no contenido real. Ignorarlos. Los templates vacíos en `vault/Mundo/` y `vault/Capítulos/` son los que debes rellenar con tu proyecto.
+> **⚠️ Archivos de ejemplo:** las demostraciones y plantillas heredadas no son contenido real. Si se necesitan, localizar los recursos existentes sin suponer que hay una carpeta de plantillas en la obra. Las fichas reales están en `Mundo/`; los capítulos, en `Capítulos/` del ámbito del libro activo.
 
 > **⚠️ Guarda de primera sesión:** Si el paso 1 muestra `⚡ PRIMERA SESIÓN`, salta el resto del ritual y ve directamente a la **sección 0 (Onboarding)**. Vuelve aquí cuando el proyecto tenga capítulos reales y seguimiento.
 
@@ -424,25 +432,24 @@ Al empezar CUALQUIER sesión de edición/escritura, ejecutar estos pasos en orde
 
 1. **`python .tools/session_check.py`** — resumen de qué cambió desde la última sesión
 2. **`.fiction/session_log.json`** — leer decisiones, archivos tocados y preguntas abiertas de la sesión anterior
-3. **Recordar la regla de permiso (sección 17)**: el editor dice: *«Recuerda: voy a pedirte permiso antes de cada cambio. Si quieres volar sin preguntas, dímelo.»*
+3. **Aplicar la política de intención (sección 17)**: una orden explícita autoriza el cambio dentro de su alcance; una consulta o propuesta no autoriza escrituras.
 4. **`editorial_letter(beta=true)`** — carta editorial sintética con todas las analíticas
 5. **`get_foreshadowing()`** — ledger completo de siembras y pagos
-6. **Leer `vault/Referencias/Estado.md`** — scores pre-cambio, puntos débiles conocidos
+6. **Leer `Referencias/Estado.md`** — scores pre-cambio, puntos débiles conocidos
 7. **Para el capítulo a editar**: `get_chapter_context(num)` + `get_character(POV, num)` + `get_location(relevante)`
 
 ---
 
-## 17. Regla de permiso por cambio
+## 17. Autorización según la intención del usuario
 
-> ⚠️ **Regla fija**: el editor (asistente principal) **NUNCA edita ningún archivo sin preguntar primero al usuario**. Cada modificación, por pequeña que sea, debe ser aprobada explícitamente.
+Una orden explícita de modificación (cambia, modifica, reescribe, añade, corrige) ya autoriza ejecutar ese cambio. El Director lo ejecuta directamente dentro del alcance solicitado, sin preguntar «¿Aplico?», «¿Confirmas?» o «¿Quieres que lo modifique?».
 
-### Excepciones
-- **Actualizaciones de Estado.md, Pendientes.md y AGENTS.md al final del ritual**: están incluidas en la aprobación inicial del ritual. El usuario ya dio su consentimiento al arrancar la sesión.
-- **Correcciones de erratas obvias** (tildes, puntuación): se pueden hacer sin preguntar, pero se listan al usuario al terminar.
+- **Análisis, propuestas, sugerencias, opciones o «no cambies todavía»**: presentar resultados sin modificar archivos, tampoco para corregir erratas.
+- **Información necesaria ausente o ambigüedad sustancial**: usar `question` o pedir aclaración antes de escribir.
+- **Ampliación del alcance solicitado**: preguntar antes de aplicar cambios adicionales.
+- **Sin doble confirmación**: `question` resuelve decisiones reales; no vuelve a pedir autorización para una edición ya ordenada.
 
-### Recordatorio al inicio del ritual (sección 16)
-Al empezar el ritual de inicio de sesión, justo tras el session check, el editor debe decir:
-> *«Recuerda: voy a pedirte permiso antes de cada cambio. Si quieres volar sin preguntas, dímelo.»*
+Las permissions de OpenCode son barreras técnicas distintas de las preguntas narrativas. Mantener las protecciones técnicas y sensibles correspondientes sin configurar la edición narrativa normal como `edit: ask`. No anunciar al inicio que se pedirá permiso por cada cambio.
 
 ---
 

@@ -8,6 +8,7 @@
     },
     "editor": {
       "mode": "primary",
+      "permission": { "question": "allow" },
       "description": "Editor disciplinado. Coordina subagentes (structurer, critico, lector, writer), analiza consistencia y lore, aplica cambios. NUNCA improvisa de memoria: consulta MCP tools y .fiction/session_log.json antes de emitir juicios. Skills en .opencode/skills/editorial_skill.md"
     },
     "structurer": {

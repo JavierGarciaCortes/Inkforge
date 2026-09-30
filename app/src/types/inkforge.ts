@@ -221,6 +221,22 @@ export interface OpenCodeQuestionRequest {
   questions: OpenCodeQuestion[]
 }
 
+export type OpenCodeInterruptedInteraction = {
+  kind: 'question' | 'operation'
+  messageID?: string
+} | null
+
+export interface OpenCodeHistory {
+  messages: OpenCodeChatMessage[]
+  // Evidence only; an interruption requires a successful live-pending lookup.
+  unfinishedInteraction: OpenCodeInterruptedInteraction
+}
+
+export interface OpenCodePendingInteractions {
+  permissions: OpenCodePermissionRequest[]
+  questions: OpenCodeQuestionRequest[]
+}
+
 export interface OpenCodeEvent {
   id?: string
   type: string
@@ -234,6 +250,10 @@ export interface OpenCodeEvent {
   error?: OpenCodeError
   permission?: OpenCodePermissionRequest
   question?: OpenCodeQuestionRequest
+  // permission.v2.replied, question.v2.replied and question.v2.rejected.
+  requestID?: string
+  reply?: 'once' | 'always' | 'reject'
+  answers?: string[][]
 }
 
 export interface OpenCodeModelSelection {
@@ -290,7 +310,8 @@ export interface InkforgeBridge {
     listModels: () => Promise<OpenCodeResult<OpenCodeModel[]>>
     listAgents: () => Promise<OpenCodeResult<OpenCodeAgent[]>>
     createSession: (input: { projectId: string | null; title?: string; agent?: string }) => Promise<OpenCodeResult<OpenCodeSession>>
-    getMessages: (sessionID: string, projectId: string) => Promise<OpenCodeResult<OpenCodeChatMessage[]>>
+    getMessages: (sessionID: string, projectId: string) => Promise<OpenCodeResult<OpenCodeHistory>>
+    getPendingInteractions: (sessionID: string, projectId: string) => Promise<OpenCodeResult<OpenCodePendingInteractions>>
     sendMessage: (input: {
       projectId: string | null
       sessionID: string

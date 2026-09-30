@@ -2,6 +2,8 @@
 
 > Uso: cargar con `skill("critico")` antes de delegar revisión crítica.
 
+> **Rutas Inkforge:** `workingDirectory` = `VAULT_PATH` = raíz de la obra activa. No anteponer `vault/` ni crear esa subcarpeta. `Mundo/`, `Estilo/` y `Referencias/` están en la raíz (compartidos en saga). `Canon/`, `Capítulos/`, `Notas/`, `Planificación/` y `Recursos/` están en la raíz de una novela independiente o en `Libros/<carpeta física exacta del libro activo>/` en saga. Respetar la selección autoritativa de Inkforge: resolver la carpeta con `Libros/` y metadatos reales como `Libro.md`, nunca adivinarla por título o prefijo ni sustituirla por otro libro. Si persiste ambigüedad, preguntar antes de escribir. Mantener las APIs MCP y su resolución por `VAULT_PATH`; los Markdown reales son la fuente de verdad. Aplicar el contrato de rutas prioritario de AGENTS.md también al delegar.
+
 ---
 
 ## Tools MCP a consultar (en orden)
@@ -21,9 +23,9 @@
 - `Referencias/Foreshadowing.md` — promesas narrativas
 - `Referencias/Pendientes.md` — qué falta resolver
 - `Referencias/Léxico.md` — glosario, detectar términos ausentes
-- `vault/Mundo/Personajes/*.md` — fichas completas (incluye voz en `## Voz` y arco en `## Arco narrativo`)
-- `vault/Referencias/Foreshadowing.md` — siembras y pagos narrativos
-- `vault/Referencias/Fundamentos.md` — base canónica (manda sobre todo lo demás)
+- `Mundo/Personajes/*.md` — fichas completas (incluye voz en `## Voz` y arco en `## Arco narrativo`)
+- `Referencias/Foreshadowing.md` — siembras y pagos narrativos
+- `Referencias/Fundamentos.md` — base canónica (manda sobre todo lo demás)
 - `Mundo/Historia/*.md` — lore, magia, cronología
 
 ## Formato de respuesta
