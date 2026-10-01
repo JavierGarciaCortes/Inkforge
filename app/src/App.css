@@ -155,8 +155,41 @@
   height: 100%;
   min-height: 0;
   display: grid;
-  grid-template-columns: 276px minmax(360px, 1fr) 320px;
+  grid-template-columns: 276px minmax(360px, 1fr) 8px minmax(280px, min(var(--director-width), calc(100% - 644px)));
   overflow: hidden;
+}
+
+.director-resize-handle {
+  position: relative;
+  z-index: 1;
+  min-height: 0;
+  cursor: col-resize;
+  touch-action: none;
+  background: var(--surface-panel);
+}
+
+.director-resize-handle::before {
+  content: '';
+  position: absolute;
+  inset: 0 3px;
+  background: var(--border-strong);
+}
+
+.director-resize-handle:hover::before,
+.director-resize-handle:focus-visible::before,
+.workspace-grid.is-resizing .director-resize-handle::before {
+  background: var(--focus-ring);
+}
+
+.director-resize-handle:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.workspace-grid.is-resizing,
+.workspace-grid.is-resizing * {
+  cursor: col-resize;
+  user-select: none;
 }
 
 .sidebar,
@@ -1455,7 +1488,7 @@ dialog.settings-dialog {
 
 @media (max-width: 1080px) {
   .workspace-grid {
-    grid-template-columns: 228px minmax(340px, 1fr) 280px;
+    grid-template-columns: 228px minmax(300px, 1fr) 8px minmax(260px, min(var(--director-width), calc(100% - 536px)));
   }
 
   .desktop-status {
@@ -1471,6 +1504,10 @@ dialog.settings-dialog {
   .workspace-grid {
     grid-template-columns: 210px minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr) minmax(220px, 42%);
+  }
+
+  .director-resize-handle {
+    display: none;
   }
 
   .editor-panel {
