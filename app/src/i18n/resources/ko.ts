@@ -227,6 +227,7 @@ const ko = {
     primaryUnavailable: 'OpenCode가 사용할 수 있는 기본 에이전트를 반환하지 않았습니다.',
     chatStateLoadFailed: 'Director 기록을 불러오지 못했습니다. 기존 파일은 덮어쓰지 않습니다.',
     chatStateSaveFailed: 'Director 기록을 저장하지 못했습니다.',
+    interruptedInteraction: '이전 상호작용이 중단되어 더 이상 응답할 수 없습니다. OpenCode를 다시 시작하면 이런 일이 발생할 수 있습니다. 마지막 대화를 확인하고 Director에서 계속하세요.',
     activity: {
       writing: '작성 중…',
       waitingPermission: '권한을 기다리는 중',

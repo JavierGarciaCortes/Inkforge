@@ -300,6 +300,33 @@ function normalizeModels(payload) {
   })
 }
 
+function findUnfinishedInteraction(payload, sessionID, usedByCurrentProcess) {
+  // The message endpoint returns chronological { info, parts } entries.
+  // Only inspect the final message: later turns supersede old running tools.
+  if (!Array.isArray(payload) || !payload.length) return null
+  const last = payload[payload.length - 1]
+  if (
+    !isRecord(last) || !isRecord(last.info) || last.info.role !== 'assistant' ||
+    (last.info.sessionID !== undefined && last.info.sessionID !== sessionID) ||
+    last.info.time?.completed || !Array.isArray(last.parts)
+  ) return null
+  // Later text, reasoning or another tool makes this evidence ambiguous.
+  const tail = last.parts.filter((part) => isRecord(part) && (
+    part.type === 'tool' || part.type === 'text' || part.type === 'reasoning'
+  )).at(-1)
+  if (
+    !tail || tail.type !== 'tool' || typeof tail.tool !== 'string' || !tail.tool ||
+    !isRecord(tail.state) || tail.state.status !== 'running'
+  ) return null
+  // A live permission may not appear in GET /permission. Process ownership,
+  // not an empty pending list, distinguishes other tools from interrupted work.
+  if (tail.tool !== 'question' && usedByCurrentProcess) return null
+  return {
+    kind: tail.tool === 'question' ? 'question' : 'operation',
+    ...(typeof last.info.id === 'string' ? { messageID: last.info.id } : {}),
+  }
+}
+
 function normalizeMessages(payload) {
   if (!Array.isArray(payload)) {
     return []
@@ -339,10 +366,61 @@ function normalizeMessages(payload) {
   })
 }
 
+function isInteractionIdentifier(value) {
+  return typeof value === 'string' && value.trim().length > 0 && value.length <= 200
+}
+
+function normalizePermissionRequest(value) {
+  if (!isRecord(value) || !isInteractionIdentifier(value.id) || !isInteractionIdentifier(value.sessionID)) return null
+  value = {
+    ...value,
+    action: value.action ?? value.permission,
+    resources: value.resources ?? value.patterns,
+  }
+  return {
+    id: value.id,
+    sessionID: value.sessionID,
+    action: typeof value.action === 'string' ? value.action : 'Acción solicitada',
+    resources: Array.isArray(value.resources) ? value.resources.filter((item) => typeof item === 'string') : [],
+  }
+}
+
+function normalizeQuestionRequest(value) {
+  if (
+    !isRecord(value) || !isInteractionIdentifier(value.id) || !isInteractionIdentifier(value.sessionID) ||
+    !Array.isArray(value.questions) || !value.questions.length ||
+    value.questions.some((item) => !isRecord(item) || typeof item.question !== 'string' || !item.question.trim())
+  ) return null
+  // Keep question positions intact: answers use the original question order.
+  return {
+    id: value.id,
+    sessionID: value.sessionID,
+    questions: value.questions.map((item) => ({
+      question: item.question,
+      header: typeof item.header === 'string' ? item.header : 'Pregunta',
+      multiple: item.multiple === true,
+      custom: item.custom !== false,
+      options: Array.isArray(item.options)
+        ? item.options.filter((option) => isRecord(option) && typeof option.label === 'string' && option.label.trim())
+          .map((option) => ({ label: option.label, description: typeof option.description === 'string' ? option.description : '' }))
+        : [],
+    })),
+  }
+}
+
 function normalizeServerEvent(payload, messageRoles, visibleParts) {
   if (!isRecord(payload) || typeof payload.type !== 'string') {
     return null
   }
+
+  const interactionTypes = new Map([
+    ['permission.asked', 'permission.v2.asked'],
+    ['permission.replied', 'permission.v2.replied'],
+    ['question.asked', 'question.v2.asked'],
+    ['question.replied', 'question.v2.replied'],
+    ['question.rejected', 'question.v2.rejected'],
+  ])
+  payload = { ...payload, type: interactionTypes.get(payload.type) ?? payload.type }
 
   const properties = isRecord(payload.properties) ? payload.properties : {}
   const event = {
@@ -474,43 +552,27 @@ function normalizeServerEvent(payload, messageRoles, visibleParts) {
   }
 
   if (payload.type === 'permission.v2.asked') {
-    return {
-      ...event,
-      permission: {
-        id: String(properties.id ?? ''),
-        sessionID: String(properties.sessionID ?? ''),
-        action: typeof properties.action === 'string' ? properties.action : 'Acción solicitada',
-        resources: Array.isArray(properties.resources)
-          ? properties.resources.filter((resource) => typeof resource === 'string')
-          : [],
-      },
-    }
+    const permission = normalizePermissionRequest(properties)
+    return permission ? { ...event, permission } : null
   }
 
   if (payload.type === 'question.v2.asked') {
-    const questions = Array.isArray(properties.questions)
-      ? properties.questions.filter(isRecord).map((question) => ({
-        question: String(question.question ?? ''),
-        header: String(question.header ?? 'Pregunta'),
-        multiple: question.multiple === true,
-        custom: question.custom === true,
-        options: Array.isArray(question.options)
-          ? question.options.filter(isRecord).map((option) => ({
-            label: String(option.label ?? ''),
-            description: typeof option.description === 'string' ? option.description : '',
-          })).filter((option) => option.label.length > 0)
-          : [],
-      }))
-      : []
+    const question = normalizeQuestionRequest(properties)
+    return question ? { ...event, question } : null
+  }
 
-    return {
-      ...event,
-      question: {
-        id: String(properties.id ?? ''),
-        sessionID: String(properties.sessionID ?? ''),
-        questions,
-      },
+  if (['permission.v2.replied', 'question.v2.replied', 'question.v2.rejected'].includes(payload.type)) {
+    if (!isInteractionIdentifier(event.sessionID) || !isInteractionIdentifier(properties.requestID)) return null
+    const resolved = { ...event, requestID: properties.requestID }
+    if (payload.type === 'permission.v2.replied') {
+      return ['once', 'always', 'reject'].includes(properties.reply) ? { ...resolved, reply: properties.reply } : null
     }
+    if (payload.type === 'question.v2.replied') {
+      return Array.isArray(properties.answers) && properties.answers.every((answer) => (
+        Array.isArray(answer) && answer.every((item) => typeof item === 'string')
+      )) ? { ...resolved, answers: properties.answers } : null
+    }
+    return resolved
   }
 
   if (payload.type === 'session.error' || payload.type === 'session.next.step.failed') {
@@ -530,6 +592,8 @@ class OpenCodeClient {
     this.workingDirectory = workingDirectory === null ? null : path.resolve(workingDirectory)
     this.validateWorkspace = validateWorkspace
     this.workspaceGeneration = 0
+    this.processGeneration = 0
+    this.processSessions = new Set()
     this.requestedWorkingDirectory = this.workingDirectory
     this.onStatus = onStatus
     this.onEvent = onEvent
@@ -681,6 +745,15 @@ class OpenCodeClient {
   }
 
   launchProcess() {
+    // Only a real launch resets ownership, never a renderer or SSE reconnect.
+    const processGeneration = ++this.processGeneration
+    this.processSessions = new Set()
+    this.eventAbortController?.abort()
+    this.messageRoles.clear()
+    this.visibleParts.clear()
+    this.seenEventIDs.clear()
+    this.seenEventQueue = []
+    this.hasConnectedEventStream = false
     const environment = { ...process.env }
     delete environment.VAULT_PATH
     if (this.workingDirectory !== null) environment.VAULT_PATH = this.workingDirectory
@@ -750,6 +823,7 @@ class OpenCodeClient {
         ))
       })
       child.once('exit', (code) => {
+        const isCurrentProcess = this.child === child && this.processGeneration === processGeneration
         if (this.child === child) {
           this.child = null
         }
@@ -766,7 +840,7 @@ class OpenCodeClient {
           return
         }
 
-        if (!this.stopping) {
+        if (isCurrentProcess && !this.stopping) {
           this.baseUrl = null
           this.eventAbortController?.abort()
           this.setStatus({
@@ -855,6 +929,13 @@ class OpenCodeClient {
   }
 
   async fetchJson(endpoint, options = {}) {
+    const processGeneration = this.processGeneration
+    const child = this.child
+    const assertCurrentProcess = () => {
+      if (this.processGeneration !== processGeneration || this.child !== child || this.stopping) {
+        throw new OpenCodeError('disconnected', 'La instancia de OpenCode ha cambiado.', { retryable: true })
+      }
+    }
     if (!this.baseUrl) {
       throw new OpenCodeError('disconnected', 'OpenCode no está conectado.', { retryable: true })
     }
@@ -880,6 +961,7 @@ class OpenCodeClient {
         signal: controller.signal,
       })
       const responseText = response.status === 204 ? '' : await response.text()
+      assertCurrentProcess()
       let payload = null
 
       if (responseText) {
@@ -896,6 +978,7 @@ class OpenCodeClient {
 
       return payload
     } catch (error) {
+      assertCurrentProcess()
       throw normalizeError(error)
     } finally {
       clearTimeout(timeout)
@@ -957,6 +1040,7 @@ class OpenCodeClient {
 
   async createSession(input = {}) {
     await this.ensureNarrativeConnected(input.workingDirectory)
+    const processSessions = this.processSessions
     const agent = typeof input.agent === 'string' ? input.agent : undefined
 
     if (agent && !this.agents.some((candidate) => candidate.name === agent)) {
@@ -975,6 +1059,11 @@ class OpenCodeClient {
       throw new OpenCodeError('incompatible', 'OpenCode no devolvió una sesión válida.')
     }
 
+    if (processSessions !== this.processSessions) {
+      throw new OpenCodeError('disconnected', 'La instancia de OpenCode ha cambiado.', { retryable: true })
+    }
+    processSessions.add(assertIdentifier(payload.id, 'La sesión'))
+
     return {
       id: payload.id,
       title: typeof payload.title === 'string' ? payload.title : 'Inkforge',
@@ -984,11 +1073,18 @@ class OpenCodeClient {
 
   async getMessages(sessionID, workingDirectory) {
     await this.ensureNarrativeConnected(workingDirectory)
+    const processSessions = this.processSessions
     const safeSessionID = encodeURIComponent(assertIdentifier(sessionID, 'La sesión'))
 
     try {
       const payload = await this.fetchJson(this.withDirectory(`/session/${safeSessionID}/message`))
-      return normalizeMessages(payload)
+      if (processSessions !== this.processSessions) {
+        throw new OpenCodeError('disconnected', 'La instancia de OpenCode ha cambiado.', { retryable: true })
+      }
+      return {
+        messages: normalizeMessages(payload),
+        unfinishedInteraction: findUnfinishedInteraction(payload, sessionID, processSessions.has(sessionID)),
+      }
     } catch (error) {
       const normalized = normalizeError(error)
 
@@ -1045,6 +1141,9 @@ class OpenCodeClient {
     }
 
     this.validateSelection(input.agent, input.model)
+
+    // Mark before issuing real work, even if the request later fails ambiguously.
+    this.processSessions.add(input.sessionID)
 
     const payload = await this.fetchJson(this.withDirectory(`/session/${sessionID}/message`), {
       method: 'POST',
@@ -1126,16 +1225,52 @@ class OpenCodeClient {
     }
   }
 
+  async getPendingInteractions(sessionID, workingDirectory) {
+    await this.ensureNarrativeConnected(workingDirectory)
+    assertIdentifier(sessionID, 'La sesión')
+    let permissions, questions
+    try {
+      [permissions, questions] = await Promise.all([
+        this.fetchJson(this.withDirectory('/permission')),
+        this.fetchJson(this.withDirectory('/question')),
+      ])
+    } catch (error) {
+      const normalized = normalizeError(error)
+      if (normalized.httpStatus === 404) {
+        // Distinguish a missing session from an unavailable interaction endpoint.
+        await this.getMessages(sessionID, workingDirectory)
+        throw new OpenCodeError('incompatible', 'OpenCode no ofrece la consulta de solicitudes pendientes.', { httpStatus: 404 })
+      }
+      throw normalized
+    }
+    const pendingList = (payload) => {
+      if (Array.isArray(payload)) return payload
+      if (isRecord(payload) && Array.isArray(payload.data)) return payload.data
+      if (isRecord(payload) && Array.isArray(payload.value)) return payload.value
+      return null
+    }
+    permissions = pendingList(permissions)
+    questions = pendingList(questions)
+    if (permissions === null || questions === null) {
+      throw new OpenCodeError('incompatible', 'OpenCode no devolvió listas válidas de solicitudes pendientes.')
+    }
+    const forSession = (request) => request !== null && request.sessionID === sessionID
+    return {
+      permissions: permissions.map(normalizePermissionRequest).filter(forSession),
+      questions: questions.map(normalizeQuestionRequest).filter(forSession),
+    }
+  }
+
   async replyPermission(input) {
     await this.ensureNarrativeConnected(input?.workingDirectory)
-    const sessionID = encodeURIComponent(assertIdentifier(input?.sessionID, 'La sesión'))
+    assertIdentifier(input?.sessionID, 'La sesión')
     const requestID = encodeURIComponent(assertIdentifier(input?.requestID, 'El permiso'))
 
     if (!['once', 'always', 'reject'].includes(input?.reply)) {
       throw new OpenCodeError('invalid_request', 'La respuesta al permiso no es válida.')
     }
 
-    await this.fetchJson(this.withDirectory(`/api/session/${sessionID}/permission/${requestID}/reply`), {
+    await this.fetchJson(this.withDirectory(`/permission/${requestID}/reply`), {
       method: 'POST',
       body: { reply: input.reply },
     })
@@ -1144,7 +1279,7 @@ class OpenCodeClient {
 
   async replyQuestion(input) {
     await this.ensureNarrativeConnected(input?.workingDirectory)
-    const sessionID = encodeURIComponent(assertIdentifier(input?.sessionID, 'La sesión'))
+    assertIdentifier(input?.sessionID, 'La sesión')
     const requestID = encodeURIComponent(assertIdentifier(input?.requestID, 'La pregunta'))
 
     if (
@@ -1154,7 +1289,7 @@ class OpenCodeClient {
       throw new OpenCodeError('invalid_request', 'Las respuestas no tienen un formato válido.')
     }
 
-    await this.fetchJson(this.withDirectory(`/api/session/${sessionID}/question/${requestID}/reply`), {
+    await this.fetchJson(this.withDirectory(`/question/${requestID}/reply`), {
       method: 'POST',
       body: { answers: input.answers },
     })
@@ -1163,9 +1298,9 @@ class OpenCodeClient {
 
   async rejectQuestion(input) {
     await this.ensureNarrativeConnected(input?.workingDirectory)
-    const sessionID = encodeURIComponent(assertIdentifier(input?.sessionID, 'La sesión'))
+    assertIdentifier(input?.sessionID, 'La sesión')
     const requestID = encodeURIComponent(assertIdentifier(input?.requestID, 'La pregunta'))
-    await this.fetchJson(this.withDirectory(`/api/session/${sessionID}/question/${requestID}/reject`), {
+    await this.fetchJson(this.withDirectory(`/question/${requestID}/reject`), {
       method: 'POST',
     })
     return { accepted: true }
@@ -1192,15 +1327,32 @@ class OpenCodeClient {
   }
 
   async consumeEventStream() {
+    const workingDirectory = this.workingDirectory
+    const workspaceGeneration = this.workspaceGeneration
+    const processGeneration = this.processGeneration
+    const child = this.child
+    if (!workingDirectory) return
     const controller = new AbortController()
     this.eventAbortController = controller
+    const isCurrentWorkspace = () => (
+      !controller.signal.aborted && !this.stopping &&
+      workspaceGeneration === this.workspaceGeneration &&
+      processGeneration === this.processGeneration && child === this.child &&
+      workingDirectory === this.workingDirectory &&
+      workingDirectory === this.requestedWorkingDirectory
+    )
     const url = new URL('/event', this.baseUrl)
-    url.searchParams.set('directory', this.workingDirectory)
+    url.searchParams.set('directory', workingDirectory)
     const response = await fetch(url, {
       headers: { Accept: 'text/event-stream' },
       redirect: 'error',
       signal: controller.signal,
     })
+
+    if (!isCurrentWorkspace()) {
+      controller.abort()
+      return
+    }
 
     if (!response.ok || !response.body) {
       throw classifyHttpError(response.status, { message: 'Event stream unavailable' })
@@ -1228,6 +1380,11 @@ class OpenCodeClient {
     while (!this.stopping) {
       const { done, value } = await reader.read()
 
+      if (!isCurrentWorkspace()) {
+        controller.abort()
+        return
+      }
+
       if (done) {
         break
       }
@@ -1246,7 +1403,17 @@ class OpenCodeClient {
 
         if (data) {
           try {
-            const event = normalizeServerEvent(JSON.parse(data), this.messageRoles, this.visibleParts)
+            const decoded = JSON.parse(data)
+            if (isRecord(decoded) && 'directory' in decoded) {
+              if (
+                typeof decoded.directory !== 'string' || !path.isAbsolute(decoded.directory) ||
+                path.relative(workingDirectory, decoded.directory) !== ''
+              ) {
+                throw new Error('Event belongs to a different workspace.')
+              }
+            }
+            const payload = isRecord(decoded) && 'payload' in decoded ? decoded.payload : decoded
+            const event = normalizeServerEvent(payload, this.messageRoles, this.visibleParts)
 
             if (event && this.rememberEvent(event)) {
               this.onEvent(event)
@@ -1262,11 +1429,14 @@ class OpenCodeClient {
   }
 
   async runEventStream() {
-    while (!this.stopping && this.workingDirectory !== null && this.status.state === 'connected' && this.baseUrl) {
+    const processGeneration = this.processGeneration
+    const child = this.child
+    const isCurrentProcess = () => processGeneration === this.processGeneration && child === this.child
+    while (isCurrentProcess() && !this.stopping && this.workingDirectory !== null && this.status.state === 'connected' && this.baseUrl) {
       try {
         await this.consumeEventStream()
       } catch (error) {
-        if (this.stopping || error?.name === 'AbortError') {
+        if (!isCurrentProcess() || this.stopping || error?.name === 'AbortError') {
           return
         }
 
@@ -1278,7 +1448,7 @@ class OpenCodeClient {
         }
       }
 
-      if (!this.stopping && this.status.state === 'connected') {
+      if (isCurrentProcess() && !this.stopping && this.status.state === 'connected') {
         this.setStatus({ ...this.status, message: 'OpenCode conectado. Reconectando eventos…' })
         await delay(EVENT_RECONNECT_DELAY_MS)
       }

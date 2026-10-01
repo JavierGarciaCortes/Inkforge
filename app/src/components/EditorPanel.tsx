@@ -35,7 +35,7 @@ export function EditorPanel({ projectId, isSettingsOpen, onCloseSettings, onConn
     if (list) {
       list.scrollTop = list.scrollHeight
     }
-  }, [chat.messages, chat.activity, chat.permission, chat.question])
+  }, [chat.messages, chat.activity, chat.permission, chat.question, chat.interruptedInteraction])
 
   const canSend = (
     projectId !== null &&
@@ -159,14 +159,18 @@ export function EditorPanel({ projectId, isSettingsOpen, onCloseSettings, onConn
 
         {chat.activity && <div className="opencode-activity">{chat.activity}</div>}
 
-        {chat.permission && (
+        {chat.interruptedInteraction && (
+          <p className="settings-notice" role="status">{t('openCode.interruptedInteraction')}</p>
+        )}
+
+        {!chat.interruptedInteraction && chat.permission && (
           <OpenCodePermissionCard
             request={chat.permission}
             onReply={(reply) => void chat.answerPermission(reply)}
           />
         )}
 
-        {chat.question && (
+        {!chat.interruptedInteraction && chat.question && (
           <OpenCodeQuestionCard
             key={chat.question.id}
             request={chat.question}

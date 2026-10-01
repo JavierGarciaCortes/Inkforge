@@ -225,6 +225,7 @@ const es = {
     primaryUnavailable: 'OpenCode no devolvió un agente principal utilizable.',
     chatStateLoadFailed: 'No se pudo cargar el historial del Director. No se sobrescribirá.',
     chatStateSaveFailed: 'No se pudo guardar el historial del Director.',
+    interruptedInteraction: 'La interacción anterior quedó interrumpida y ya no está disponible para responder. Esto puede ocurrir al reiniciar OpenCode. Revisa el último turno y continúa desde el Director.',
     activity: {
       writing: 'Escribiendo…',
       waitingPermission: 'Esperando permiso',

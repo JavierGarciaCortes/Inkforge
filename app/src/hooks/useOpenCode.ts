@@ -11,6 +11,7 @@ import type {
   OpenCodeChatMessage,
   OpenCodeError,
   OpenCodeEvent,
+  OpenCodeInterruptedInteraction,
   OpenCodeModel,
   OpenCodePermissionRequest,
   OpenCodeQuestionRequest,
@@ -97,6 +98,17 @@ export function useOpenCode(projectId: string | null) {
   const [error, setError] = useState<OpenCodeError | null>(bridgeAvailable ? null : unavailableError)
   const [permission, setPermission] = useState<OpenCodePermissionRequest | null>(null)
   const [question, setQuestion] = useState<OpenCodeQuestionRequest | null>(null)
+  const [interruptedInteraction, setInterruptedInteraction] = useState<
+    (NonNullable<OpenCodeInterruptedInteraction> & { projectId: string; sessionID: string }) | null
+  >(null)
+  const recoveryRevisionRef = useRef(0)
+  const sessionRefreshRef = useRef(0)
+  const permissionRef = useRef<OpenCodePermissionRequest | null>(null)
+  const questionRef = useRef<OpenCodeQuestionRequest | null>(null)
+  const permissionRevisionRef = useRef(0)
+  const questionRevisionRef = useRef(0)
+  const pendingRefreshRef = useRef(0)
+  const connectedRef = useRef(false)
   const mountedRef = useRef(false)
   const projectIdRef = useRef<string | null>(projectId)
   const projectGenerationRef = useRef(0)
@@ -118,6 +130,30 @@ export function useOpenCode(projectId: string | null) {
     () => models.find((model) => modelKey(model) === selectedModelKey) ?? null,
     [models, selectedModelKey],
   )
+
+  const updatePermission = useCallback((next: OpenCodePermissionRequest | null) => {
+    if (next) setInterruptedInteraction(null)
+    permissionRevisionRef.current += 1
+    permissionRef.current = next
+    setPermission(next)
+  }, [])
+
+  const updateQuestion = useCallback((next: OpenCodeQuestionRequest | null) => {
+    if (next) setInterruptedInteraction(null)
+    questionRevisionRef.current += 1
+    questionRef.current = next
+    setQuestion(next)
+  }, [])
+
+  const clearInteractions = useCallback(() => {
+    recoveryRevisionRef.current += 1
+    sessionRefreshRef.current += 1
+    setInterruptedInteraction(null)
+    pendingRefreshRef.current += 1
+    updatePermission(null)
+    updateQuestion(null)
+    setActivityKey('')
+  }, [updatePermission, updateQuestion])
 
   const reportDirectorSaveError = useCallback((savedProjectId: string) => {
     if (!mountedRef.current || projectIdRef.current !== savedProjectId) {
@@ -318,6 +354,7 @@ export function useOpenCode(projectId: string | null) {
     }
 
     setStatus(nextStatus)
+    connectedRef.current = nextStatus.state === 'connected'
 
     if (nextStatus.state === 'connected') {
       if (!capabilitiesLoadedRef.current) {
@@ -326,10 +363,24 @@ export function useOpenCode(projectId: string | null) {
       }
     } else {
       capabilitiesLoadedRef.current = false
+      pendingRefreshRef.current += 1
+      recoveryRevisionRef.current += 1
     }
   }, [loadCapabilities])
 
+  const forgetMissingSession = useCallback(() => {
+    sessionIDRef.current = null
+    sessionStartIndexRef.current = null
+    setSessionID(null)
+    clearInteractions()
+    setIsWorking(false)
+    assistantPartsRef.current.clear()
+    queueDirectorSave(true)
+  }, [clearInteractions, queueDirectorSave])
+
   const refreshHistory = useCallback(async () => {
+    const revision = recoveryRevisionRef.current
+    const refresh = sessionRefreshRef.current
     const api = window.inkforge?.opencode
     const currentSessionID = sessionIDRef.current
     const currentStartIndex = sessionStartIndexRef.current
@@ -345,18 +396,15 @@ export function useOpenCode(projectId: string | null) {
     if (
       !mountedRef.current ||
       projectGenerationRef.current !== generation ||
-      sessionIDRef.current !== currentSessionID
+      sessionIDRef.current !== currentSessionID ||
+      recoveryRevisionRef.current !== revision || sessionRefreshRef.current !== refresh
     ) {
       return
     }
 
     if (!result.ok) {
       if (result.error.code === 'session_missing') {
-        sessionIDRef.current = null
-        sessionStartIndexRef.current = null
-        setSessionID(null)
-        assistantPartsRef.current.clear()
-        queueDirectorSave(true)
+        forgetMissingSession()
         return
       }
 
@@ -366,13 +414,82 @@ export function useOpenCode(projectId: string | null) {
 
     assistantPartsRef.current.clear()
     const preservedMessages = messagesRef.current.slice(0, currentStartIndex)
-    commitMessages([...preservedMessages, ...result.value], true)
-  }, [commitMessages, queueDirectorSave])
+    commitMessages([...preservedMessages, ...result.value.messages], true)
+    return result.value.unfinishedInteraction
+  }, [commitMessages, forgetMissingSession])
+
+  const refreshPendingInteractions = useCallback(async (history: {
+    interaction: OpenCodeInterruptedInteraction | undefined
+    revision: number
+    permissionRevision: number
+    questionRevision: number
+    refresh: number
+  }) => {
+    const api = window.inkforge?.opencode
+    const expectedSession = sessionIDRef.current
+    const expectedProject = projectIdRef.current
+    const generation = projectGenerationRef.current
+    if (!api || !expectedProject || !expectedSession || !connectedRef.current) return
+    const refresh = ++pendingRefreshRef.current
+    const permissionRevision = permissionRevisionRef.current
+    const questionRevision = questionRevisionRef.current
+    const result = await api.getPendingInteractions(expectedSession, expectedProject)
+    if (
+      !mountedRef.current || !connectedRef.current ||
+      projectGenerationRef.current !== generation || projectIdRef.current !== expectedProject ||
+      sessionIDRef.current !== expectedSession || pendingRefreshRef.current !== refresh
+    ) return
+    if (!result.ok) {
+      if (result.error.code === 'session_missing') forgetMissingSession()
+      else setError(result.error)
+      return
+    }
+    // One card per kind: choose the lowest ID, independently of API array order.
+    const select = <T extends { id: string; sessionID: string }>(requests: T[]) => (
+      requests.filter((request) => request.sessionID === expectedSession)
+        .sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0)[0] ?? null
+    )
+    // SSE events and local replies after the GET started take precedence.
+    const historyIsCurrent = (
+      history.refresh === sessionRefreshRef.current &&
+      history.revision === recoveryRevisionRef.current &&
+      history.permissionRevision === permissionRevisionRef.current &&
+      history.questionRevision === questionRevisionRef.current
+    )
+    if (permissionRevisionRef.current === permissionRevision && history.permissionRevision === permissionRevision) {
+      updatePermission(select(result.value.permissions))
+    }
+    if (questionRevisionRef.current === questionRevision && history.questionRevision === questionRevision) {
+      updateQuestion(select(result.value.questions))
+    }
+    if (historyIsCurrent && history.interaction !== undefined) {
+      // Any live request wins. Never manufacture an actionable historical card.
+      const interrupted = permissionRef.current || questionRef.current ? null : history.interaction
+      setInterruptedInteraction(interrupted ? { ...interrupted, projectId: expectedProject, sessionID: expectedSession } : null)
+      if (interrupted) {
+        setIsWorking(false)
+        setActivityKey('')
+      }
+    }
+  }, [forgetMissingSession, updatePermission, updateQuestion])
+
+  const refreshSession = useCallback(async () => {
+    const generation = projectGenerationRef.current
+    const expectedSession = sessionIDRef.current
+    const refresh = ++sessionRefreshRef.current
+    const revision = recoveryRevisionRef.current
+    const permissionRevision = permissionRevisionRef.current
+    const questionRevision = questionRevisionRef.current
+    const interaction = await refreshHistory()
+    if (mountedRef.current && projectGenerationRef.current === generation && sessionIDRef.current === expectedSession && sessionRefreshRef.current === refresh) {
+      await refreshPendingInteractions({ interaction, revision, permissionRevision, questionRevision, refresh })
+    }
+  }, [refreshHistory, refreshPendingInteractions])
 
   const handleEvent = useCallback((event: OpenCodeEvent) => {
     if (projectIdRef.current === null) return
     if (event.type === 'inkforge.sse.reconnected') {
-      void refreshHistory()
+      void refreshSession()
       return
     }
 
@@ -380,6 +497,11 @@ export function useOpenCode(projectId: string | null) {
 
     if (!currentSessionID || event.sessionID !== currentSessionID) {
       return
+    }
+
+    recoveryRevisionRef.current += 1
+    if (event.type !== 'session.idle' && event.type !== 'session.status') {
+      setInterruptedInteraction(null)
     }
 
     const updateAssistantPart = (
@@ -432,14 +554,24 @@ export function useOpenCode(projectId: string | null) {
     }
 
     if (event.type === 'permission.v2.asked' && event.permission) {
-      setPermission(event.permission)
-      setActivityKey('openCode.activity.waitingPermission')
+      updatePermission(event.permission)
       return
     }
 
     if (event.type === 'question.v2.asked' && event.question) {
-      setQuestion(event.question)
-      setActivityKey('openCode.activity.waitingAnswer')
+      updateQuestion(event.question)
+      return
+    }
+
+    if (event.type === 'permission.v2.replied') {
+      permissionRevisionRef.current += 1
+      if (permissionRef.current?.id === event.requestID) updatePermission(null)
+      return
+    }
+
+    if (event.type === 'question.v2.replied' || event.type === 'question.v2.rejected') {
+      questionRevisionRef.current += 1
+      if (questionRef.current?.id === event.requestID) updateQuestion(null)
       return
     }
 
@@ -474,7 +606,7 @@ export function useOpenCode(projectId: string | null) {
         ? 'openCode.activity.retrying'
         : 'openCode.activity.working')
     }
-  }, [commitMessages, queueDirectorSave, refreshHistory])
+  }, [commitMessages, queueDirectorSave, refreshSession, updatePermission, updateQuestion])
 
   useEffect(() => {
     mountedRef.current = true
@@ -516,6 +648,8 @@ export function useOpenCode(projectId: string | null) {
     projectGenerationRef.current = generation
     projectIdRef.current = projectId
     stateReadyRef.current = false
+    recoveryRevisionRef.current += 1
+    sessionRefreshRef.current += 1
 
     if (projectId === null) {
       return
@@ -537,6 +671,7 @@ export function useOpenCode(projectId: string | null) {
       }
 
       messagesRef.current = loadedState.messages
+      setInterruptedInteraction(null)
       sessionIDRef.current = loadedState.currentSession?.id ?? null
       sessionStartIndexRef.current = loadedState.currentSession?.startIndex ?? null
       stateReadyRef.current = true
@@ -560,9 +695,9 @@ export function useOpenCode(projectId: string | null) {
 
   useEffect(() => {
     if (isChatReady && sessionID && status.state === 'connected') {
-      void refreshHistory()
+      void refreshSession()
     }
-  }, [isChatReady, refreshHistory, sessionID, status.state])
+  }, [isChatReady, refreshSession, sessionID, status.state])
 
   const connect = useCallback(async () => {
     const api = window.inkforge?.opencode
@@ -573,6 +708,7 @@ export function useOpenCode(projectId: string | null) {
     }
 
     setStatus(initialStatus)
+    connectedRef.current = false
     setError(null)
     const generation = projectGenerationRef.current
     const result = await api.start()
@@ -616,7 +752,7 @@ export function useOpenCode(projectId: string | null) {
     const generation = projectGenerationRef.current
     const result = await api.createSession({ projectId: projectIdRef.current, title: 'Inkforge', agent: primaryAgent.name })
 
-    if (projectGenerationRef.current !== generation) {
+    if (!mountedRef.current || projectGenerationRef.current !== generation) {
       return null
     }
 
@@ -625,12 +761,13 @@ export function useOpenCode(projectId: string | null) {
       return null
     }
 
+    clearInteractions()
     sessionIDRef.current = result.value.id
     sessionStartIndexRef.current = messagesRef.current.length
     setSessionID(result.value.id)
     queueDirectorSave(true)
     return result.value.id
-  }, [primaryAgent, queueDirectorSave])
+  }, [clearInteractions, primaryAgent, queueDirectorSave])
 
   const sendText = useCallback(async (sourceText: string) => {
     const api = window.inkforge?.opencode
@@ -658,6 +795,8 @@ export function useOpenCode(projectId: string | null) {
     }
 
     const localMessageID = 'local-' + crypto.randomUUID()
+    recoveryRevisionRef.current += 1
+    setInterruptedInteraction(null)
     lastSubmittedTextRef.current = text
     lastUserMessageIDRef.current = localMessageID
     failedMessageIDRef.current = null
@@ -815,7 +954,7 @@ export function useOpenCode(projectId: string | null) {
   const answerPermission = useCallback(async (reply: 'once' | 'always' | 'reject') => {
     const api = window.inkforge?.opencode
 
-    if (!api || !permission) {
+    if (!api || !permission || !projectIdRef.current || permission.sessionID !== sessionIDRef.current) {
       return
     }
 
@@ -827,22 +966,22 @@ export function useOpenCode(projectId: string | null) {
       reply,
     })
 
-    if (projectGenerationRef.current !== generation) {
+    if (!mountedRef.current || projectGenerationRef.current !== generation || sessionIDRef.current !== permission.sessionID) {
       return
     }
 
     if (result.ok) {
-      setPermission(null)
-      setActivityKey('openCode.activity.working')
+      permissionRevisionRef.current += 1
+      if (permissionRef.current?.id === permission.id) updatePermission(null)
     } else {
       setError(result.error)
     }
-  }, [permission])
+  }, [permission, updatePermission])
 
   const answerQuestion = useCallback(async (answers: string[][]) => {
     const api = window.inkforge?.opencode
 
-    if (!api || !question) {
+    if (!api || !question || !projectIdRef.current || question.sessionID !== sessionIDRef.current) {
       return
     }
 
@@ -854,22 +993,22 @@ export function useOpenCode(projectId: string | null) {
       answers,
     })
 
-    if (projectGenerationRef.current !== generation) {
+    if (!mountedRef.current || projectGenerationRef.current !== generation || sessionIDRef.current !== question.sessionID) {
       return
     }
 
     if (result.ok) {
-      setQuestion(null)
-      setActivityKey('openCode.activity.working')
+      questionRevisionRef.current += 1
+      if (questionRef.current?.id === question.id) updateQuestion(null)
     } else {
       setError(result.error)
     }
-  }, [question])
+  }, [question, updateQuestion])
 
   const rejectQuestion = useCallback(async () => {
     const api = window.inkforge?.opencode
 
-    if (!api || !question) {
+    if (!api || !question || !projectIdRef.current || question.sessionID !== sessionIDRef.current) {
       return
     }
 
@@ -880,17 +1019,17 @@ export function useOpenCode(projectId: string | null) {
       requestID: question.id,
     })
 
-    if (projectGenerationRef.current !== generation) {
+    if (!mountedRef.current || projectGenerationRef.current !== generation || sessionIDRef.current !== question.sessionID) {
       return
     }
 
     if (result.ok) {
-      setQuestion(null)
-      setActivityKey('openCode.activity.working')
+      questionRevisionRef.current += 1
+      if (questionRef.current?.id === question.id) updateQuestion(null)
     } else {
       setError(result.error)
     }
-  }, [question])
+  }, [question, updateQuestion])
 
   const displayedStatus = status.state === 'starting'
     ? initialStatus
@@ -902,6 +1041,12 @@ export function useOpenCode(projectId: string | null) {
     : !bridgeAvailable && error?.code === 'disconnected'
       ? unavailableError
       : error
+
+  const displayedActivityKey = question
+    ? 'openCode.activity.waitingAnswer'
+    : permission
+      ? 'openCode.activity.waitingPermission'
+      : isWorking ? activityKey : ''
 
   return {
     status: displayedStatus,
@@ -917,8 +1062,10 @@ export function useOpenCode(projectId: string | null) {
     composer,
     isWorking,
     isChatReady,
-    activity: activityKey ? appI18n.t(activityKey) : '',
+    activity: displayedActivityKey ? appI18n.t(displayedActivityKey) : '',
     error: displayedError,
+    interruptedInteraction: interruptedInteraction?.projectId === projectId && interruptedInteraction.sessionID === sessionID
+      ? interruptedInteraction : null,
     permission,
     question,
     setComposer,

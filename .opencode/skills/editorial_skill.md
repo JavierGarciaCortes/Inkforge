@@ -5,6 +5,8 @@
 >
 > **Memoria entre sesiones**: `.fiction/session_log.json`. Leerlo al inicio y actualizarlo al cierre.
 
+> **Rutas Inkforge:** `workingDirectory` = `VAULT_PATH` = raíz de la obra activa. No anteponer `vault/` ni crear esa subcarpeta. `Mundo/`, `Estilo/` y `Referencias/` están en la raíz (compartidos en saga). `Canon/`, `Capítulos/`, `Notas/`, `Planificación/` y `Recursos/` están en la raíz de una novela independiente o en `Libros/<carpeta física exacta del libro activo>/` en saga. Respetar la selección autoritativa de Inkforge: resolver la carpeta con `Libros/` y metadatos reales como `Libro.md`, nunca adivinarla por título o prefijo ni sustituirla por otro libro. Si persiste ambigüedad, preguntar antes de escribir. Mantener las APIs MCP y su resolución por `VAULT_PATH`; los Markdown reales son la fuente de verdad. Aplicar el contrato de rutas prioritario de AGENTS.md también al delegar.
+
 ---
 
 ## 🟢 Inicio de sesión (OBLIGATORIO)
@@ -15,13 +17,13 @@ Al empezar cualquier sesión de edición/escritura, en este orden exacto. No sal
 2. **`cat .fiction/session_log.json`** — leer decisiones, archivos tocados y preguntas abiertas de la sesión anterior. Recuperar contexto inmediato.
 3. **`editorial_letter(beta=true)`** — carta editorial sintética. Foto global: estructura, escenas, hooks, foreshadowing, show/tell. Imprescindible para no perder perspectiva a medida que crece el manuscrito.
 4. **`get_foreshadowing()`** — ledger completo de siembras/pagos. Identificar hilos abiertos antes de tocar prosa.
-5. **Leer `vault/Referencias/Estado.md`** — scores pre-cambio, puntos débiles, pendientes de rondas anteriores.
+5. **Leer `Referencias/Estado.md`** — scores pre-cambio, puntos débiles, pendientes de rondas anteriores.
 6. **Para cada capítulo a editar**: `get_chapter_context(num)` + `get_character(POV, num)` + `get_location(relevante)` antes de tocar el archivo.
 
 ### ⚠️ Regla de oro
 
 El editor NUNCA responde de memoria sobre datos del worldbuilding (personaje, lugar, regla mágica, evento, hilo). Secuencia obligatoria:
-1. **`vault/Referencias/Fundamentos.md`** — base canónica. Si hay conflicto, gana Fundamentos.
+1. **`Referencias/Fundamentos.md`** — base canónica. Si hay conflicto, gana Fundamentos.
 2. **Tools MCP** — `get_character`, `get_location`, `search_bible`, `get_foreshadowing`, etc.
 3. **Solo después** de leer la respuesta, emitir juicio.
 
@@ -77,7 +79,7 @@ Antes de la edición de prosa fina, ejecutar `check_king(chapter?)` o `prose_sca
 - Palabras temáticas del libro (ej: "silencio" en un libro sobre el Vacío)
 
 ### Formato de propuesta (estándar)
-Cada edición debe presentarse **línea a línea** con contexto completo en formato diff:
+En tareas de propuesta o revisión, presentar ACTUAL/PROPUESTA cuando sea útil, **línea a línea** con contexto completo en formato diff:
 
 ```diff
  línea anterior
@@ -90,7 +92,12 @@ Incluir siempre:
 - **Patrón**: [nombre] × N ocurrencias en el capítulo
 - **Motivo**: 1 línea
 
-Preguntar "¿Aplico?" antes de cada cambio. El usuario decide individualmente si acepta o rechaza.
+Aplicar la intención del usuario (AGENTS.md, sección 17):
+- **Propuesta, análisis, sugerencias u opciones**: presentar la propuesta sin modificar archivos.
+- **Orden explícita de edición**: ejecutar directamente el cambio solicitado, sin preguntar «¿Aplico?» ni pedir doble confirmación.
+- **Ambigüedad real, información necesaria ausente o ampliación del alcance**: usar `question` o pedir aclaración antes de escribir.
+
+`question` obtiene información y decisiones narrativas; las permissions son barreras técnicas de OpenCode. No convertir una edición ya autorizada en una nueva solicitud de permiso.
 
 ---
 
@@ -145,15 +152,15 @@ Preguntar "¿Aplico?" antes de cada cambio. El usuario decide individualmente si
 2. **Consistencia** si se tocó tiempo/clima: `check_consistency(chapter)` + `check_transitions()`
 3. **Voz** si se tocó diálogo: `check_voice_consistency(chapter, character)`
 4. **Actualizar story bible** si se añadieron/quitaron eventos, voces, relaciones o geografía:
-   - `vault/Referencias/Fundamentos.md` — reglas canónicas, si se tocaron
-   - `vault/Mundo/Historia/*.md` — lore, magia, objetos nuevos, cambios
-   - `vault/Mundo/Personajes/*.md` — nuevos tics, gestos, revelaciones, cambios de voz
-   - `vault/Mundo/Lugares/*.md` — atmósfera, sonidos, capítulos asociados
-   - `vault/Referencias/Foreshadowing.md` — nuevas siembras o pagos añadidos al texto
-   - `vault/Referencias/Cronología.md` — si se alteró la línea temporal
-   - `vault/Referencias/Trama.md` — si cambió algún arco
-   - `vault/Referencias/Outliner.md` — word counts, decisiones cerradas
-5. **Actualizar `vault/Referencias/Estado.md`** con nuevos scores
+   - `Referencias/Fundamentos.md` — reglas canónicas, si se tocaron
+   - `Mundo/Historia/*.md` — lore, magia, objetos nuevos, cambios
+   - `Mundo/Personajes/*.md` — nuevos tics, gestos, revelaciones, cambios de voz
+   - `Mundo/Lugares/*.md` — atmósfera, sonidos, capítulos asociados
+   - `Referencias/Foreshadowing.md` — nuevas siembras o pagos añadidos al texto
+   - `Referencias/Cronología.md` — si se alteró la línea temporal
+   - `Referencias/Trama.md` — si cambió algún arco
+   - `Referencias/Outliner.md` — word counts, decisiones cerradas
+5. **Actualizar `Referencias/Estado.md`** con nuevos scores
 6. **Actualizar `.fiction/session_log.json`** — registrar:
     - Decisiones tomadas (tema, decisión, alternativa descartada)
     - Archivos tocados
@@ -165,7 +172,7 @@ Preguntar "¿Aplico?" antes de cada cambio. El usuario decide individualmente si
 
 Cada vez que se añada un término nuevo al universo (concepto, lugar, personaje, objeto):
 
-1. **Comprobar** si ya está en `vault/Referencias/Léxico.md`
+1. **Comprobar** si ya está en `Referencias/Léxico.md`
 2. Si no está: **añadirlo** a la categoría correspondiente (Lugares, Lore, Personajes, Conceptos)
 3. **Ejecutar** `make sort-lexico` para reordenar alfabéticamente
 4. Si el término se usó en un capítulo: **verificar** que el wiki link `[[término]]` esté bien formado

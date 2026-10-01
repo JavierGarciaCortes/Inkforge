@@ -50,6 +50,7 @@ contextBridge.exposeInMainWorld('inkforge', {
     listAgents: () => ipcRenderer.invoke('opencode:list-agents'),
     createSession: (input) => ipcRenderer.invoke('opencode:create-session', input),
     getMessages: (sessionID, projectId) => ipcRenderer.invoke('opencode:get-messages', { sessionID, projectId }),
+    getPendingInteractions: (sessionID, projectId) => ipcRenderer.invoke('opencode:get-pending-interactions', { sessionID, projectId }),
     sendMessage: (input) => ipcRenderer.invoke('opencode:send-message', input),
     switchModel: (input) => ipcRenderer.invoke('opencode:switch-model', input),
     switchAgent: (input) => ipcRenderer.invoke('opencode:switch-agent', input),
