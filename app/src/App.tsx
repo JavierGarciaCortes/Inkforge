@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import './App.css'
 import { AppHeader } from './components/AppHeader'
@@ -11,6 +12,7 @@ import { ProjectDialog } from './components/ProjectDialog'
 import { Sidebar } from './components/Sidebar'
 import { i18n } from './i18n'
 import { loadOpenCodeModelSelection } from './storage/model-selection-storage'
+import { loadDirectorWidth, MAX_DIRECTOR_WIDTH, saveDirectorWidth } from './storage/director-width-storage'
 import type {
   ActiveBook,
   ActiveProject,
@@ -62,6 +64,18 @@ type PendingAction =
 
 type NarrativeDialogKind = 'add-book' | 'rename-project' | 'rename-book'
 
+function getDirectorBounds(workspaceWidth: number, compact: boolean) {
+  const minimum = compact ? 260 : 280
+  const sidebarWidth = compact ? 228 : 276
+  const documentMinimum = compact ? 300 : 360
+  const available = workspaceWidth - sidebarWidth - documentMinimum - 8
+  return { minimum, maximum: Math.max(minimum, Math.min(MAX_DIRECTOR_WIDTH, available)) }
+}
+
+function clampDirectorWidth(width: number, bounds: ReturnType<typeof getDirectorBounds>) {
+  return Math.min(bounds.maximum, Math.max(bounds.minimum, Math.round(width)))
+}
+
 function App() {
   const { t } = useTranslation()
   const [appInfo, setAppInfo] = useState<InkforgeAppInfo | null>(null)
@@ -82,6 +96,15 @@ function App() {
     }
   }, [])
   const [connectionState, setConnectionState] = useState<OpenCodeConnectionState>('starting')
+  const [directorWidth, setDirectorWidth] = useState(loadDirectorWidth)
+  const [isDirectorResizing, setIsDirectorResizing] = useState(false)
+  const [directorLayout, setDirectorLayout] = useState(() => ({
+    workspaceWidth: window.innerWidth,
+    compact: window.matchMedia('(max-width: 1080px)').matches,
+  }))
+  const workspaceGridRef = useRef<HTMLDivElement>(null)
+  const directorWidthRef = useRef(directorWidth)
+  const stopDirectorResizeRef = useRef<(() => void) | null>(null)
   const [narrativeDialog, setNarrativeDialog] = useState<NarrativeDialogKind | null>(null)
   const [vaultTree, setVaultTree] = useState<VaultTreeNode[]>([])
   const [vaultState, setVaultState] = useState<LoadState>('loading')
@@ -109,6 +132,96 @@ function App() {
   const saveRequestId = useRef(0)
 
   const isDirty = documentState === 'ready' && document !== null && draftContent !== document.content
+
+  const directorBounds = getDirectorBounds(directorLayout.workspaceWidth, directorLayout.compact)
+  const effectiveDirectorWidth = clampDirectorWidth(directorWidth, directorBounds)
+
+  const currentDirectorBounds = useCallback(() => getDirectorBounds(
+    workspaceGridRef.current?.clientWidth ?? window.innerWidth,
+    window.matchMedia('(max-width: 1080px)').matches,
+  ), [])
+
+  useEffect(() => {
+    const grid = workspaceGridRef.current
+    if (!grid) return
+    const updateLayout = () => {
+      const workspaceWidth = grid.clientWidth
+      const compact = window.matchMedia('(max-width: 1080px)').matches
+      setDirectorLayout((previous) => previous.workspaceWidth === workspaceWidth && previous.compact === compact
+        ? previous
+        : { workspaceWidth, compact })
+    }
+    const observer = new ResizeObserver(updateLayout)
+    observer.observe(grid)
+    window.addEventListener('resize', updateLayout)
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', updateLayout)
+    }
+  }, [])
+
+  const stopDirectorResize = useCallback((persist = false) => {
+    const cleanup = stopDirectorResizeRef.current
+    if (!cleanup) return
+    stopDirectorResizeRef.current = null
+    cleanup()
+    setIsDirectorResizing(false)
+    if (persist) saveDirectorWidth(directorWidthRef.current)
+  }, [])
+
+  useEffect(() => () => stopDirectorResize(), [activeProject?.id, stopDirectorResize])
+
+  const startDirectorResize = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0 || !event.isPrimary || window.matchMedia('(max-width: 820px)').matches) return
+    event.preventDefault()
+    stopDirectorResize()
+    const pointerId = event.pointerId
+    const move = (next: PointerEvent) => {
+      if (next.pointerId !== pointerId) return
+      const grid = workspaceGridRef.current
+      if (!grid) return
+      const width = clampDirectorWidth(grid.getBoundingClientRect().right - next.clientX - 4, currentDirectorBounds())
+      directorWidthRef.current = width
+      setDirectorWidth(width)
+    }
+    const end = (next: PointerEvent) => {
+      if (next.pointerId === pointerId) stopDirectorResize(true)
+    }
+    const cancel = (next: PointerEvent) => {
+      if (next.pointerId === pointerId) stopDirectorResize()
+    }
+    const stop = () => stopDirectorResize()
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', end)
+    window.addEventListener('pointercancel', cancel)
+    window.addEventListener('blur', stop)
+    window.addEventListener('resize', stop)
+    stopDirectorResizeRef.current = () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', end)
+      window.removeEventListener('pointercancel', cancel)
+      window.removeEventListener('blur', stop)
+      window.removeEventListener('resize', stop)
+    }
+    setIsDirectorResizing(true)
+  }, [currentDirectorBounds, stopDirectorResize])
+
+  const resizeDirectorWithKeyboard = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (window.matchMedia('(max-width: 820px)').matches) return
+    const bounds = currentDirectorBounds()
+    const currentWidth = clampDirectorWidth(directorWidthRef.current, bounds)
+    const step = event.shiftKey ? 64 : 16
+    const next = event.key === 'ArrowLeft' ? currentWidth + step
+      : event.key === 'ArrowRight' ? currentWidth - step
+        : event.key === 'Home' ? bounds.maximum
+          : event.key === 'End' ? bounds.minimum : null
+    if (next === null) return
+    event.preventDefault()
+    const width = clampDirectorWidth(next, bounds)
+    directorWidthRef.current = width
+    setDirectorWidth(width)
+    saveDirectorWidth(width)
+  }, [currentDirectorBounds])
 
   const loadVault = useCallback(async (
     { background = false }: { background?: boolean } = {},
@@ -998,7 +1111,11 @@ function App() {
         onSettings={() => setIsSettingsOpen(true)}
         connectionState={connectionState}
       />
-      <div className="workspace-grid">
+      <div
+        className={`workspace-grid${isDirectorResizing ? ' is-resizing' : ''}`}
+        ref={workspaceGridRef}
+        style={{ '--director-width': `${effectiveDirectorWidth}px` } as CSSProperties}
+      >
         <Sidebar
           tree={vaultTree}
           state={vaultState}
@@ -1037,6 +1154,18 @@ function App() {
           onReadMode={requestReadMode}
           onContentChange={changeDocumentContent}
           onSave={() => void saveDocument()}
+        />
+        <div
+          className="director-resize-handle"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label={t('editor.assistantTitle')}
+          aria-valuemin={directorBounds.minimum}
+          aria-valuemax={directorBounds.maximum}
+          aria-valuenow={effectiveDirectorWidth}
+          tabIndex={0}
+          onPointerDown={startDirectorResize}
+          onKeyDown={resizeDirectorWithKeyboard}
         />
         <EditorPanel
           key={activeProject ? 'scope:project:' + activeProject.id : 'scope:none'}
