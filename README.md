@@ -1,4 +1,4 @@
-T# Inkforge
+# Inkforge
 
 Inkforge es una aplicación de escritorio para escribir y gestionar novelas y sagas mediante una Biblioteca de proyectos Markdown. Utiliza Electron, React y TypeScript, y mantiene los archivos Markdown reales como fuente de verdad narrativa.
 
