@@ -16,6 +16,7 @@ sensibles, lo que hace al sistema completamente agnóstico del proyecto.
 """
 
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -36,7 +37,6 @@ def _find_vault() -> Path:
     2. tools/ es hijo directo de la raíz
     3. directorio actual
     """
-    import os
     env = os.environ.get("VAULT_PATH", "")
     if env:
         return Path(env).resolve()
@@ -47,6 +47,12 @@ def _find_vault() -> Path:
 
 
 REPO: Path = _find_vault()
+
+# Global reusable resources are separate from the active work root.
+# Outside Inkforge, no global library is inferred from VAULT_PATH.
+_library_environment = os.environ.get("INKFORGE_LIBRARY_ROOT", "")
+LIBRARY_ROOT: Path | None = Path(_library_environment).resolve() if _library_environment else None
+GENRES_DIR: Path | None = LIBRARY_ROOT / "Generos" if LIBRARY_ROOT else None
 
 # ---------------------------------------------------------------------------
 # Config desde .fiction/config.json
@@ -124,7 +130,7 @@ MANIFEST_FILE = _resolve_content("manifest_file")
 FORESHADOWING_FILE = _resolve_content("foreshadowing_file")
 ESTADO_FILE = _resolve_content("estado_file")
 PENDIENTES_FILE = _resolve_content("pendientes_file")
-TEMPLATES_DIR = _resolve_content("templates_dir")
+TEMPLATES_DIR = LIBRARY_ROOT / "Plantillas" if LIBRARY_ROOT else _resolve_content("templates_dir")
 OUTPUT_DIR = _resolve_repo("output_dir")
 
 # ---------------------------------------------------------------------------

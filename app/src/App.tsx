@@ -4,6 +4,8 @@ import { useTranslation } from 'react-i18next'
 import './App.css'
 import { AppHeader } from './components/AppHeader'
 import { ConfirmDialog } from './components/ConfirmDialog'
+import { BookDialog } from './components/BookDialog'
+import { GenreConfigurationDialog } from './components/GenreConfigurationDialog'
 import { DocumentWorkspace } from './components/DocumentWorkspace'
 import { EditorPanel } from './components/EditorPanel'
 import { HelpDialog } from './components/HelpDialog'
@@ -17,6 +19,7 @@ import type {
   ActiveBook,
   ActiveProject,
   CreateProjectInput,
+  CreateBookInput,
   InkforgeAppInfo,
   LibraryActivationResult,
   LibraryBookSummary,
@@ -60,9 +63,10 @@ type PendingAction =
   | { type: 'switch-project'; projectId: string | null }
   | { type: 'switch-book'; bookId: string }
   | { type: 'new-project' }
+  | { type: 'add-book' }
   | { type: NarrativeDialogKind }
 
-type NarrativeDialogKind = 'add-book' | 'rename-project' | 'rename-book'
+type NarrativeDialogKind = 'rename-project' | 'rename-book'
 
 function getDirectorBounds(workspaceWidth: number, compact: boolean) {
   const minimum = compact ? 260 : 280
@@ -106,6 +110,8 @@ function App() {
   const directorWidthRef = useRef(directorWidth)
   const stopDirectorResizeRef = useRef<(() => void) | null>(null)
   const [narrativeDialog, setNarrativeDialog] = useState<NarrativeDialogKind | null>(null)
+  const [isBookDialogOpen, setIsBookDialogOpen] = useState(false)
+  const [isGenreDialogOpen, setIsGenreDialogOpen] = useState(false)
   const [vaultTree, setVaultTree] = useState<VaultTreeNode[]>([])
   const [vaultState, setVaultState] = useState<LoadState>('loading')
   const [vaultError, setVaultError] = useState<string | null>(null)
@@ -401,6 +407,8 @@ function App() {
       setActiveBook(scope.activeBook)
       setBooks(scope.books)
       setNarrativeDialog(null)
+      setIsBookDialogOpen(false)
+      setIsGenreDialogOpen(false)
       setVaultTree([])
       setVaultError(null)
       if (document && isDirty) {
@@ -416,6 +424,8 @@ function App() {
 
   const finishProjectActivation = useCallback((nextScope: LibraryActivationResult) => {
     booksRequestId.current += 1
+    setIsBookDialogOpen(false)
+    setIsGenreDialogOpen(false)
     resetDocumentForProjectChange()
     setActiveProject(nextScope.activeProject)
     setActiveBook(nextScope.activeBook)
@@ -427,6 +437,7 @@ function App() {
   }, [loadVault, resetDocumentForProjectChange])
 
   const finishBookActivation = useCallback((nextActiveBook: LibraryBookSummary) => {
+    setIsGenreDialogOpen(false)
     resetDocumentForProjectChange()
     setActiveBook(nextActiveBook)
     setVaultTree([])
@@ -538,7 +549,7 @@ function App() {
     }
   }, [finishBookActivation])
 
-  const createLibraryBook = useCallback(async (bookTitle: string) => {
+  const createLibraryBook = useCallback(async (input: CreateBookInput) => {
     const bridge = window.inkforge
 
     if (!bridge) {
@@ -553,13 +564,13 @@ function App() {
     setProjectError(null)
 
     try {
-      const nextActiveBook = await bridge.library.createBook({ bookTitle })
+      const nextActiveBook = await bridge.library.createBook(input)
 
       if (!isMounted.current || libraryRequestId.current !== requestId) {
         return
       }
 
-      setNarrativeDialog(null)
+      setIsBookDialogOpen(false)
       finishBookActivation(nextActiveBook)
     } catch (error) {
       if (isMounted.current && libraryRequestId.current === requestId) {
@@ -783,7 +794,7 @@ function App() {
   }
 
   const requestNarrativeDialog = (
-    type: 'add-book' | 'rename-project' | 'rename-book',
+    type: 'add-book' | NarrativeDialogKind,
   ) => {
     if (
       isProjectBusy ||
@@ -799,7 +810,8 @@ function App() {
     }
 
     setProjectError(null)
-    setNarrativeDialog(type)
+    if (type === 'add-book') setIsBookDialogOpen(true)
+    else setNarrativeDialog(type)
   }
 
   const cancelPendingAction = useCallback(() => {
@@ -830,13 +842,19 @@ function App() {
     }
 
     if (
-      action.type === 'add-book' ||
       action.type === 'rename-project' ||
       action.type === 'rename-book'
     ) {
       resetDocumentForProjectChange()
       setProjectError(null)
       setNarrativeDialog(action.type)
+      return
+    }
+
+    if (action.type === 'add-book') {
+      resetDocumentForProjectChange()
+      setProjectError(null)
+      setIsBookDialogOpen(true)
       return
     }
 
@@ -1047,11 +1065,6 @@ function App() {
   }
 
   const submitNarrativeDialog = (nextTitle: string) => {
-    if (narrativeDialog === 'add-book') {
-      void createLibraryBook(nextTitle)
-      return
-    }
-
     if (narrativeDialog === 'rename-project') {
       void renameLibraryProject(nextTitle)
       return
@@ -1062,9 +1075,7 @@ function App() {
     }
   }
 
-  const narrativeDialogTitle = narrativeDialog === 'add-book'
-    ? t('dialogs.addBook')
-    : narrativeDialog === 'rename-project'
+  const narrativeDialogTitle = narrativeDialog === 'rename-project'
       ? activeProject?.type === 'saga'
         ? t('dialogs.renameSaga')
         : t('dialogs.renameBook')
@@ -1078,9 +1089,7 @@ function App() {
     : narrativeDialog === 'rename-book'
       ? activeBook?.title ?? ''
       : ''
-  const narrativeDialogSubmitLabel = narrativeDialog === 'add-book'
-    ? t('dialogs.addBook')
-    : t('dialogs.rename')
+  const narrativeDialogSubmitLabel = t('dialogs.rename')
   const isCloseWindowPending = pendingAction?.type === 'close-window'
   const isProjectChangePending = pendingAction?.type === 'switch-project'
     || pendingAction?.type === 'new-project'
@@ -1134,6 +1143,7 @@ function App() {
           onAddBook={() => requestNarrativeDialog('add-book')}
           onRenameProject={() => requestNarrativeDialog('rename-project')}
           onRenameBook={() => requestNarrativeDialog('rename-book')}
+          onConfigureGenres={() => setIsGenreDialogOpen(true)}
           onReload={retryVault}
         />
         <DocumentWorkspace
@@ -1182,6 +1192,23 @@ function App() {
           error={projectError}
           onCancel={cancelProjectDialog}
           onCreate={(input) => void createLibraryProject(input)}
+        />
+      )}
+      {isBookDialogOpen && (
+        <BookDialog
+          isCreating={isProjectBusy}
+          error={projectError}
+          onCancel={() => { setIsBookDialogOpen(false); setProjectError(null) }}
+          onCreate={(input) => void createLibraryBook(input)}
+        />
+      )}
+      {isGenreDialogOpen && activeProject && (
+        <GenreConfigurationDialog
+          key={`${activeProject.id}/${activeBook?.id ?? ''}`}
+          projectId={activeProject.id}
+          projectType={activeProject.type}
+          bookId={activeBook?.id ?? null}
+          onCancel={() => setIsGenreDialogOpen(false)}
         />
       )}
       {narrativeDialog && (

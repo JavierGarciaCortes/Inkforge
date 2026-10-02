@@ -23,19 +23,34 @@ export interface LibraryBookSummary {
 
 export type ActiveBook = LibraryBookSummary | null
 
+export interface GenreProfileSummary {
+  name: string
+}
+
+export interface GenreConfiguration {
+  projectGenres: string[]
+  bookGenres: string[] | null
+  inheritProjectGenres: boolean | null
+  effectiveGenres: string[]
+}
+
 export type CreateProjectInput =
   | {
       type: 'novela'
       bookTitle: string
+      genres: string[]
     }
   | {
       type: 'saga'
       sagaTitle: string
       firstBookTitle: string
+      genres: string[]
     }
 
 export interface CreateBookInput {
   bookTitle: string
+  inheritGenres: boolean
+  genres: string[]
 }
 
 export interface LibraryActivationResult {
@@ -280,6 +295,10 @@ export interface InkforgeBridge {
     listBooks: (projectId?: string) => Promise<LibraryBookSummary[]>
     getActiveBook: () => Promise<ActiveBook>
     getScope: () => Promise<LibraryActivationResult>
+    listGenreProfiles: () => Promise<GenreProfileSummary[]>
+    getGenreConfiguration: () => Promise<GenreConfiguration>
+    updateProjectGenres: (input: { projectId: string; genres: string[]; expectedGenres: string[] }) => Promise<string[]>
+    updateBookGenres: (input: { projectId: string; bookId: string; inheritGenres: boolean; genres: string[]; expectedInheritGenres: boolean; expectedGenres: string[] }) => Promise<{ inheritGenres: boolean; genres: string[] }>
     onScopeChanged: (callback: (scope: LibraryActivationResult) => void) => () => void
     activateProject: (projectId: string | null) => Promise<LibraryActivationResult>
     activateBook: (bookId: string) => Promise<LibraryBookSummary>

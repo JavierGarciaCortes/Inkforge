@@ -26,7 +26,7 @@
 - `Mundo/Personajes/*.md` — fichas completas (incluye voz en `## Voz` y arco en `## Arco narrativo`)
 - `Referencias/Foreshadowing.md` — siembras y pagos narrativos
 - `Referencias/Fundamentos.md` — base canónica (manda sobre todo lo demás)
-- `Mundo/Historia/*.md` — lore, magia, cronología
+- `Mundo/Historia/*.md` — historia, reglas del mundo y cronología
 
 ## Formato de respuesta
 

@@ -29,6 +29,7 @@ from vault import (
     STYLE_DIR, FORESHADOWING_FILE,
     strip_comments, get_chapter_number, get_chapter_title, get_manifiesto,
 )
+from genre_profiles import list_profiles, read_profile, create_profile, update_profile
 
 try:
     from tools import prose_scanner, editorial_letter
@@ -371,6 +372,52 @@ store = DataStore()
 # ---------------------------------------------------------------------------
 
 server = MCPServer()
+
+
+@server.tool(
+    name="list_genre_profiles",
+    description="Lista en cada llamada los perfiles editoriales Markdown globales disponibles.",
+    properties={},
+)
+def list_genre_profiles() -> str:
+    return json.dumps(list_profiles(), ensure_ascii=False)
+
+
+@server.tool(
+    name="read_genre_profile",
+    description="Lee un perfil editorial global por su nombre exacto. Es guía, no canon.",
+    properties={"name": {"type": "string", "description": "Nombre real del perfil, sin .md"}},
+    required=["name"],
+)
+def read_genre_profile(name: str) -> str:
+    return read_profile(name)
+
+
+@server.tool(
+    name="create_genre_profile",
+    description="Crea un perfil global nuevo solo si el usuario lo pide explícitamente; nunca como efecto secundario de una obra.",
+    properties={
+        "name": {"type": "string", "description": "Nombre real del perfil, sin .md"},
+        "content": {"type": "string", "description": "Markdown completo del perfil"},
+    },
+    required=["name", "content"],
+)
+def mcp_create_genre_profile(name: str, content: str) -> str:
+    return "Perfil creado: " + create_profile(name, content)
+
+
+@server.tool(
+    name="update_genre_profile",
+    description="Actualiza un perfil global existente solo por petición explícita. Requiere el contenido leído antes para detectar cambios externos.",
+    properties={
+        "name": {"type": "string", "description": "Nombre real del perfil, sin .md"},
+        "content": {"type": "string", "description": "Nuevo Markdown completo"},
+        "expected_content": {"type": "string", "description": "Contenido completo leído previamente"},
+    },
+    required=["name", "content", "expected_content"],
+)
+def mcp_update_genre_profile(name: str, content: str, expected_content: str) -> str:
+    return "Perfil actualizado: " + update_profile(name, content, expected_content)
 
 
 @server.tool(
@@ -1827,26 +1874,6 @@ def mcp_check_chapter(chapter: int) -> str:
         if cons and "no encontrado" not in cons.lower():
             out.append("## Consistencia")
             out.append(cons)
-            out.append("")
-    except Exception:
-        pass
-
-    # 8. King
-    try:
-        king_result = mcp_check_king(chapter)
-        if king_result and "Sin datos" not in king_result:
-            out.append("## Stephen King")
-            out.append(king_result)
-            out.append("")
-    except Exception:
-        pass
-
-    # 9. Sanderson
-    try:
-        sanderson_result = mcp_check_sanderson(chapter)
-        if sanderson_result and "Sin datos" not in sanderson_result:
-            out.append("## Brandon Sanderson")
-            out.append(sanderson_result)
             out.append("")
     except Exception:
         pass

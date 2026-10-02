@@ -1,5 +1,7 @@
 # Writer Skill — Escritura y edición de prosa creativa
 
+Los perfiles de género efectivos indicados por Inkforge orientan la escritura cuando son pertinentes. Leer su Markdown global mediante MCP; nunca tratarlos como canon ni modificarlos sin petición explícita. Priorizar instrucciones del usuario, canon real y estilo de la obra.
+
 > Uso: cargar con `skill("writer")` antes de delegar generación o edición de prosa.
 
 ---

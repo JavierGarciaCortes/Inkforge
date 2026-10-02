@@ -586,8 +586,9 @@ function normalizeServerEvent(payload, messageRoles, visibleParts) {
 }
 
 class OpenCodeClient {
-  constructor({ projectRoot, catalogDirectory, workingDirectory = null, validateWorkspace, onStatus, onEvent }) {
+  constructor({ projectRoot, libraryRoot, catalogDirectory, workingDirectory = null, validateWorkspace, onStatus, onEvent }) {
     this.infrastructureRoot = path.resolve(projectRoot)
+    this.libraryRoot = path.resolve(libraryRoot)
     this.catalogDirectory = path.resolve(catalogDirectory)
     this.workingDirectory = workingDirectory === null ? null : path.resolve(workingDirectory)
     this.validateWorkspace = validateWorkspace
@@ -756,7 +757,9 @@ class OpenCodeClient {
     this.hasConnectedEventStream = false
     const environment = { ...process.env }
     delete environment.VAULT_PATH
+    delete environment.INKFORGE_LIBRARY_ROOT
     if (this.workingDirectory !== null) environment.VAULT_PATH = this.workingDirectory
+    environment.INKFORGE_LIBRARY_ROOT = this.libraryRoot
     return new Promise((resolve, reject) => {
       const child = spawn(
         'opencode',

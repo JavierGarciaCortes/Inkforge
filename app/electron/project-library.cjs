@@ -18,6 +18,34 @@ const PLANNING_DOCUMENTS = [
 const WINDOWS_RESERVED_NAME = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i
 const WINDOWS_INVALID_CHARACTERS = /[<>:"/\\|?*\u0000-\u001f]/u
 const BOOK_DIRECTORY_PATTERN = /^(\d{2}) - (.+)$/u
+const GENRE_DIRECTORY_NAME = 'Generos'
+
+function validateGenreName(value) {
+  if (typeof value !== 'string') throw new Error('El nombre del género no es válido.')
+  const name = value.trim()
+  if (!name || name.startsWith('.') || /[. ]$/u.test(name) ||
+      WINDOWS_INVALID_CHARACTERS.test(name) || WINDOWS_RESERVED_NAME.test(name)) {
+    throw new Error('El nombre del género no es seguro para un archivo.')
+  }
+  return name
+}
+
+function normalizeGenres(value) {
+  if (!Array.isArray(value)) throw new Error('Los géneros deben ser una lista de nombres.')
+  const seen = new Set()
+  return value.map(validateGenreName).filter((name) => {
+    const key = name.normalize('NFC').toLocaleLowerCase('es')
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
+function manifestGenres(frontmatter) {
+  const value = frontmatter.get('generos')
+  if (value === undefined) return []
+  try { return normalizeGenres(value) } catch { return null }
+}
 
 function isPathInside(parentPath, candidatePath) {
   const relativePath = path.relative(parentPath, candidatePath)
@@ -59,6 +87,16 @@ function validateNarrativeTitle(value, label) {
 function parseFrontmatterValue(value) {
   const normalizedValue = value.trim()
 
+  if (normalizedValue.startsWith('[')) {
+    try {
+      const parsedValue = JSON.parse(normalizedValue)
+      return Array.isArray(parsedValue) && parsedValue.every((item) => typeof item === 'string')
+        ? parsedValue : null
+    } catch { return null }
+  }
+  if (normalizedValue === 'true') return true
+  if (normalizedValue === 'false') return false
+
   if (normalizedValue.startsWith('"') && normalizedValue.endsWith('"')) {
     try {
       const parsedValue = JSON.parse(normalizedValue)
@@ -97,7 +135,7 @@ function parseFrontmatter(content) {
     const key = line.slice(0, separatorIndex).trim()
     const value = parseFrontmatterValue(line.slice(separatorIndex + 1))
 
-    if (key && value !== null) {
+    if (key) {
       frontmatter.set(key, value)
     }
   }
@@ -114,16 +152,17 @@ function parseProjectManifest(content) {
 
   const type = frontmatter.get('tipo')
   const title = frontmatter.get('titulo')
+  const genres = manifestGenres(frontmatter)
 
   if (
     frontmatter.get('inkforge') !== '1' ||
     (type !== 'novela' && type !== 'saga') ||
-    typeof title !== 'string'
+    typeof title !== 'string' || genres === null
   ) {
     return null
   }
 
-  return { type, title }
+  return { type, title, genres }
 }
 
 function parseBookManifest(content) {
@@ -136,6 +175,9 @@ function parseBookManifest(content) {
   const title = frontmatter.get('titulo')
   const rawNumber = frontmatter.get('numero')
   const number = Number(rawNumber)
+  const genres = manifestGenres(frontmatter)
+  const inheritGenres = frontmatter.has('hereda_generos')
+    ? frontmatter.get('hereda_generos') : true
 
   if (
     frontmatter.get('inkforge') !== '1' ||
@@ -144,12 +186,12 @@ function parseBookManifest(content) {
     !Number.isInteger(number) ||
     number < 1 ||
     number > 99 ||
-    String(number) !== rawNumber
+    String(number) !== rawNumber || genres === null || typeof inheritGenres !== 'boolean'
   ) {
     return null
   }
 
-  return { title, number }
+  return { title, number, genres, inheritGenres }
 }
 
 function replaceFrontmatterTitle(content, title) {
@@ -207,12 +249,45 @@ function replaceFrontmatterTitle(content, title) {
   )
 }
 
-function projectManifest(title, type) {
+function replaceFrontmatterFields(content, fields) {
+  const bomLength = content.startsWith('\uFEFF') ? 1 : 0
+  const source = content.slice(bomLength)
+  if (!source.startsWith('---\n') && !source.startsWith('---\r\n')) {
+    throw new Error('El manifiesto no tiene un frontmatter controlado.')
+  }
+  const firstNewline = source.indexOf('\n')
+  const closingStart = source.indexOf('\n---', firstNewline + 1)
+  if (closingStart < 0 || !/^\n---(?:\r?\n|$)/u.test(source.slice(closingStart))) {
+    throw new Error('El manifiesto no tiene un frontmatter cerrado.')
+  }
+  const newline = source.slice(0, firstNewline + 1).endsWith('\r\n') ? '\r\n' : '\n'
+  const frontmatterStart = firstNewline + 1
+  const frontmatterEnd = source[closingStart - 1] === '\r' ? closingStart - 1 : closingStart
+  let frontmatter = source.slice(frontmatterStart, frontmatterEnd)
+  for (const [key, value] of Object.entries(fields)) {
+    const lines = frontmatter.split(/(?<=\n)/u)
+    const matching = lines.map((line, index) => ({ line, index })).filter(({ line }) =>
+      line.indexOf(':') !== -1 && line.slice(0, line.indexOf(':')).trim() === key)
+    if (matching.length > 1) throw new Error('El manifiesto contiene metadatos duplicados: ' + key)
+    if (matching.length === 1) {
+      const { line, index } = matching[0]
+      const ending = line.endsWith('\r\n') ? '\r\n' : line.endsWith('\n') ? '\n' : ''
+      lines[index] = key + ': ' + value + ending
+      frontmatter = lines.join('')
+    } else {
+      frontmatter += newline + key + ': ' + value
+    }
+  }
+  return content.slice(0, bomLength + frontmatterStart) + frontmatter + content.slice(bomLength + frontmatterEnd)
+}
+
+function projectManifest(title, type, genres = []) {
   return [
     '---',
     'inkforge: 1',
     'tipo: ' + type,
     'titulo: ' + JSON.stringify(title),
+    'generos: ' + JSON.stringify(genres),
     '---',
     '',
     '# ' + title,
@@ -220,13 +295,15 @@ function projectManifest(title, type) {
   ].join('\n')
 }
 
-function bookManifest(title, number) {
+function bookManifest(title, number, inheritGenres = true, genres = []) {
   return [
     '---',
     'inkforge: 1',
     'tipo: libro',
     'titulo: ' + JSON.stringify(title),
     'numero: ' + number,
+    'hereda_generos: ' + inheritGenres,
+    'generos: ' + JSON.stringify(genres),
     '---',
     '',
     '# ' + title,
@@ -273,7 +350,16 @@ async function readSafeManifest(filePath) {
     throw new Error('El manifiesto no es un archivo seguro.')
   }
 
-  return fs.readFile(filePath, 'utf8')
+  const fileHandle = await fs.open(filePath, 'r')
+  try {
+    const openedStats = await fileHandle.stat()
+    if (!openedStats.isFile() || stats.dev !== openedStats.dev || stats.ino !== openedStats.ino) {
+      throw new Error('El manifiesto cambió de archivo durante la lectura.')
+    }
+    return await fileHandle.readFile('utf8')
+  } finally {
+    await fileHandle.close()
+  }
 }
 
 async function rewriteExistingDocument(filePath, originalContent, nextContent) {
@@ -286,6 +372,10 @@ async function rewriteExistingDocument(filePath, originalContent, nextContent) {
   const fileHandle = await fs.open(filePath, 'r+')
 
   try {
+    const openedStats = await fileHandle.stat()
+    if (!openedStats.isFile() || stats.dev !== openedStats.dev || stats.ino !== openedStats.ino) {
+      throw new Error('El manifiesto cambió de archivo durante la escritura.')
+    }
     const currentContent = await fileHandle.readFile('utf8')
 
     if (currentContent !== originalContent) {
@@ -301,7 +391,7 @@ async function rewriteExistingDocument(filePath, originalContent, nextContent) {
   }
 }
 
-async function createBookStructure(booksRoot, title, number) {
+async function createBookStructure(booksRoot, title, number, inheritGenres = true, genres = []) {
   const directoryName = formatBookDirectoryName(number, title)
   const bookDirectory = path.join(booksRoot, directoryName)
   let directoryCreated = false
@@ -331,7 +421,7 @@ async function createBookStructure(booksRoot, title, number) {
     )
     await writeDocument(
       path.join(bookDirectory, 'Libro.md'),
-      bookManifest(title, number),
+      bookManifest(title, number, inheritGenres, genres),
     )
   } catch (error) {
     if (!directoryCreated && error?.code === 'EEXIST') {
@@ -341,8 +431,8 @@ async function createBookStructure(booksRoot, title, number) {
     if (directoryCreated) {
       try {
         await fs.rm(bookDirectory, { recursive: true, force: true })
-      } catch {
-        // Preserve the original creation error.
+      } catch (rollbackError) {
+        throw new AggregateError([error, rollbackError], 'La creación del libro falló y no se pudo retirar la carpeta incompleta.', { cause: error })
       }
     }
 
@@ -408,6 +498,51 @@ function createProjectLibrary(libraryRoot) {
     return realProjectsRoot
   }
 
+  async function resolveGenresRoot() {
+    const genresRoot = path.join(libraryRoot, GENRE_DIRECTORY_NAME)
+    let stats
+    try { stats = await fs.lstat(genresRoot) } catch (error) {
+      if (error?.code === 'ENOENT') return null
+      throw error
+    }
+    if (!stats.isDirectory() || stats.isSymbolicLink()) {
+      throw new Error('La carpeta de géneros no es un directorio seguro.')
+    }
+    const realLibraryRoot = await fs.realpath(libraryRoot)
+    const realGenresRoot = await fs.realpath(genresRoot)
+    if (path.relative(realLibraryRoot, realGenresRoot) !== GENRE_DIRECTORY_NAME) {
+      throw new Error('La carpeta de géneros no coincide con la ruta global esperada.')
+    }
+    return realGenresRoot
+  }
+
+  async function listGenreProfiles() {
+    const genresRoot = await resolveGenresRoot()
+    if (!genresRoot) return []
+    const entries = await fs.readdir(genresRoot, { withFileTypes: true })
+    const profiles = []
+    const seen = new Set()
+    for (const entry of entries) {
+      if (!entry.isFile() || entry.isSymbolicLink() ||
+          entry.name.startsWith('.') || !entry.name.endsWith('.md')) continue
+      const name = entry.name.slice(0, -3)
+      try {
+        if (validateGenreName(name) !== name) continue
+      } catch { continue }
+      const filePath = path.join(genresRoot, entry.name)
+      const stats = await fs.lstat(filePath)
+      if (!stats.isFile() || stats.isSymbolicLink()) continue
+      if (!isPathInside(genresRoot, await fs.realpath(filePath))) continue
+      const key = name.normalize('NFC').toLocaleLowerCase('es')
+      if (seen.has(key)) throw new Error('Hay perfiles de género con nombres incompatibles por mayúsculas.')
+      seen.add(key)
+      profiles.push({ name })
+    }
+    return profiles.sort((left, right) =>
+      left.name.localeCompare(right.name, 'es', { sensitivity: 'base' }) ||
+      left.name.localeCompare(right.name, 'es'))
+  }
+
   async function listProjects() {
     const realProjectsRoot = await resolveProjectsRoot(false)
 
@@ -438,7 +573,7 @@ function createProjectLibrary(libraryRoot) {
           continue
         }
 
-        const manifest = parseProjectManifest(await fs.readFile(manifestPath, 'utf8'))
+        const manifest = parseProjectManifest(await readSafeManifest(manifestPath))
 
         if (!manifest || manifest.title !== entry.name) {
           continue
@@ -561,7 +696,7 @@ function createProjectLibrary(libraryRoot) {
           continue
         }
 
-        const manifest = parseBookManifest(await fs.readFile(manifestPath, 'utf8'))
+        const manifest = parseBookManifest(await readSafeManifest(manifestPath))
 
         if (
           !manifest ||
@@ -616,6 +751,97 @@ function createProjectLibrary(libraryRoot) {
     return highestNumber + 1
   }
 
+  async function getGenreConfiguration(project, bookId = null) {
+    const currentProject = await getProject(project?.id)
+    if (!currentProject) throw new Error('La obra activa ya no está disponible.')
+    const projectContent = await readSafeManifest(path.join(currentProject.directoryPath, 'Proyecto.md'))
+    const projectManifestData = parseProjectManifest(projectContent)
+    if (!projectManifestData || projectManifestData.title !== currentProject.title ||
+        projectManifestData.type !== currentProject.type) {
+      throw new Error('Proyecto.md ya no coincide con la obra activa.')
+    }
+    const projectGenres = projectManifestData.genres
+    if (currentProject.type !== 'saga' || bookId === null) {
+      return {
+        projectGenres,
+        bookGenres: null,
+        inheritProjectGenres: null,
+        effectiveGenres: projectGenres,
+      }
+    }
+    const book = await getBook(currentProject, bookId)
+    if (!book) throw new Error('El libro activo ya no está disponible.')
+    const bookContent = await readSafeManifest(path.join(book.directoryPath, 'Libro.md'))
+    const bookManifestData = parseBookManifest(bookContent)
+    if (!bookManifestData || bookManifestData.title !== book.title ||
+        bookManifestData.number !== book.number) {
+      throw new Error('Libro.md ya no coincide con el libro activo.')
+    }
+    const bookGenres = bookManifestData.genres
+    const inheritProjectGenres = bookManifestData.inheritGenres
+    const effectiveGenres = inheritProjectGenres
+      ? normalizeGenres([...projectGenres, ...bookGenres])
+      : bookGenres
+    return { projectGenres, bookGenres, inheritProjectGenres, effectiveGenres }
+  }
+
+  async function updateProjectGenres(project, value, expectedValue) {
+    const genres = normalizeGenres(value)
+    const expectedGenres = normalizeGenres(expectedValue)
+    const currentProject = await getProject(project?.id)
+    if (!currentProject) throw new Error('La obra activa ya no está disponible.')
+    const manifestPath = path.join(currentProject.directoryPath, 'Proyecto.md')
+    const originalContent = await readSafeManifest(manifestPath)
+    const manifest = parseProjectManifest(originalContent)
+    if (!manifest || manifest.title !== currentProject.title ||
+        manifest.type !== currentProject.type) {
+      throw new Error('Proyecto.md ya no coincide con la obra activa.')
+    }
+    if (JSON.stringify(manifest.genres) !== JSON.stringify(expectedGenres)) {
+      throw new Error('Los géneros de la obra cambiaron externamente. Vuelve a abrir el diálogo.')
+    }
+    const nextContent = replaceFrontmatterFields(originalContent, {
+      generos: JSON.stringify(genres),
+    })
+    if (nextContent !== originalContent) {
+      await rewriteExistingDocument(manifestPath, originalContent, nextContent)
+    }
+    return genres
+  }
+
+  async function updateBookGenres(project, bookId, inheritGenres, value, expectedInheritGenres, expectedValue) {
+    if (typeof inheritGenres !== 'boolean') {
+      throw new Error('La herencia de géneros debe ser true o false.')
+    }
+    const genres = normalizeGenres(value)
+    const expectedGenres = normalizeGenres(expectedValue)
+    if (typeof expectedInheritGenres !== 'boolean') throw new Error('Falta la herencia esperada.')
+    const currentProject = await getProject(project?.id)
+    if (!currentProject || currentProject.type !== 'saga') {
+      throw new Error('La saga activa ya no está disponible.')
+    }
+    const book = await getBook(currentProject, bookId)
+    if (!book) throw new Error('El libro activo ya no está disponible.')
+    const manifestPath = path.join(book.directoryPath, 'Libro.md')
+    const originalContent = await readSafeManifest(manifestPath)
+    const manifest = parseBookManifest(originalContent)
+    if (!manifest || manifest.title !== book.title || manifest.number !== book.number) {
+      throw new Error('Libro.md ya no coincide con el libro activo.')
+    }
+    if (manifest.inheritGenres !== expectedInheritGenres ||
+        JSON.stringify(manifest.genres) !== JSON.stringify(expectedGenres)) {
+      throw new Error('Los géneros del libro cambiaron externamente. Vuelve a abrir el diálogo.')
+    }
+    const nextContent = replaceFrontmatterFields(originalContent, {
+      hereda_generos: String(inheritGenres),
+      generos: JSON.stringify(genres),
+    })
+    if (nextContent !== originalContent) {
+      await rewriteExistingDocument(manifestPath, originalContent, nextContent)
+    }
+    return { inheritGenres, genres }
+  }
+
   async function createProject(input) {
     if (!input || typeof input !== 'object') {
       throw new Error('Los datos de la obra no son válidos.')
@@ -631,6 +857,7 @@ function createProjectLibrary(libraryRoot) {
     const firstBookTitle = input.type === 'saga'
       ? validateNarrativeTitle(input.firstBookTitle, 'El título del primer libro')
       : null
+    const genres = normalizeGenres(input.genres ?? [])
     const realProjectsRoot = await resolveProjectsRoot(true)
     const projectDirectory = path.join(realProjectsRoot, title)
     let projectDirectoryCreated = false
@@ -674,13 +901,18 @@ function createProjectLibrary(libraryRoot) {
           path.join(projectDirectory, 'Libros'),
           firstBookTitle,
           1,
+          true,
+          [],
         )
       }
 
       await writeDocument(
         path.join(projectDirectory, 'Proyecto.md'),
-        projectManifest(title, input.type),
+        projectManifest(title, input.type, genres),
       )
+      const createdProject = await getProject(title)
+      if (!createdProject) throw new Error('La obra se creó, pero no pudo validarse.')
+      return createdProject
     } catch (error) {
       if (!projectDirectoryCreated && error?.code === 'EEXIST') {
         throw new Error('Ya existe una obra llamada "' + title + '".')
@@ -689,21 +921,13 @@ function createProjectLibrary(libraryRoot) {
       if (projectDirectoryCreated) {
         try {
           await fs.rm(projectDirectory, { recursive: true, force: true })
-        } catch {
-          // Preserve the original creation error.
+        } catch (rollbackError) {
+          throw new AggregateError([error, rollbackError], 'La creación falló y no se pudo retirar la obra incompleta.', { cause: error })
         }
       }
 
       throw error
-    }
-
-    const createdProject = await getProject(title)
-
-    if (!createdProject) {
-      throw new Error('La obra se creó, pero no pudo validarse.')
-    }
-
-    return createdProject
+  }
   }
 
   async function createBook(project, input) {
@@ -718,10 +942,13 @@ function createProjectLibrary(libraryRoot) {
     }
 
     const title = validateNarrativeTitle(input.bookTitle, 'El título del libro')
+    const genres = normalizeGenres(input.genres ?? [])
+    const inheritGenres = input.inheritGenres ?? true
+    if (typeof inheritGenres !== 'boolean') throw new Error('La herencia de géneros no es válida.')
     const booksRoot = await resolveBooksRoot(currentProject, true)
     const number = await findNextBookNumber(booksRoot)
 
-    return createBookStructure(booksRoot, title, number)
+    return createBookStructure(booksRoot, title, number, inheritGenres, genres)
   }
 
   async function renameProject(project, nextTitleValue) {
@@ -857,6 +1084,10 @@ function createProjectLibrary(libraryRoot) {
     getProject,
     listBooks,
     getBook,
+    listGenreProfiles,
+    getGenreConfiguration,
+    updateProjectGenres,
+    updateBookGenres,
     createProject,
     createBook,
     renameProject,

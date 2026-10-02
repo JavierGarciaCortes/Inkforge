@@ -1,4 +1,4 @@
-# Inkforge
+T# Inkforge
 
 Inkforge es una aplicación de escritorio para escribir y gestionar novelas y sagas mediante una Biblioteca de proyectos Markdown. Utiliza Electron, React y TypeScript, y mantiene los archivos Markdown reales como fuente de verdad narrativa.
 
@@ -19,6 +19,7 @@ La aplicación de escritorio ya permite:
 - actualizar el árbol del vault mediante un watcher;
 - gestionar una Biblioteca con novelas independientes y sagas de varios libros;
 - crear obras, añadir libros, cambiar el libro activo y renombrar novelas, sagas y libros;
+- asignar varios perfiles editoriales de género a obras y libros, con herencia configurable en sagas;
 - utilizar la interfaz en español, inglés, catalán o coreano;
 - abrir una Ayuda integrada y localizada con documentación de las funciones disponibles;
 - consultar una guía informativa para preparar proyectos compatibles con una futura importación;
@@ -95,12 +96,21 @@ webSecurity: true
 Inkforge trabaja exclusivamente mediante la Biblioteca. Las obras gestionadas siguen almacenándose físicamente en:
 
 ~~~text
-vault/Proyectos/
+vault/
+├── Generos/       Perfiles editoriales Markdown globales
+├── Plantillas/    Recursos reutilizables
+└── Proyectos/     Obras y sagas locales
 ~~~
 
 Ese directorio contiene manuscritos y datos locales, está incluido en `.gitignore` y no se versiona junto al código.
 
-El contenido heredado que pueda quedar directamente bajo `vault/` no se borra ni migra automáticamente, pero ya no funciona como obra activa de Inkforge.
+La raíz global contiene recursos reutilizables. Cada obra y saga conserva sus Markdown propios bajo `Proyectos/`; `Estilo/` dentro de una obra es específico de esa obra y no equivale a los perfiles globales de `Generos/`.
+
+Los perfiles son archivos `vault/Generos/<nombre>.md`, descubiertos al abrir los diálogos y por las herramientas MCP en cada consulta. Puedes añadirlos manualmente sin reiniciar. Una obra puede usar ninguno o varios. En una saga, cada libro hereda los perfiles de la saga por defecto y puede añadir los suyos; al desactivar la herencia usa solo sus propios perfiles. Las asignaciones viven en `Proyecto.md` y `Libro.md`; los géneros efectivos se calculan, no se almacenan. Si falta un perfil asignado, la configuración conserva su nombre y lo muestra como no disponible. Los manifiestos antiguos sin estos campos siguen abriéndose sin migración automática.
+
+Estos perfiles orientan la edición, no establecen canon ni sustituyen el Markdown de la obra. El mecanismo está implementado; el contenido editorial extenso de perfiles concretos se añadirá más adelante.
+
+La retirada de las carpetas heredadas que aún permanecen directamente en `vault/` está pendiente de autorización adicional: el entorno rechazó automáticamente su eliminación por contener archivos. Esas carpetas no son obras activas de la Biblioteca.
 
 Una Biblioteca vacía es un estado válido. Sin obra seleccionada se puede crear una novela o saga, seleccionar una existente y utilizar Ajustes y Ayuda. El Director requiere una obra; no trabaja narrativamente sobre el vault general ni sobre la raíz del repositorio.
 
@@ -163,7 +173,7 @@ El agente primary actual es `editor`. Los subagentes definidos en `opencode.json
 
 La integración se validó inicialmente con OpenCode 1.18.31. La compatibilidad depende de las capacidades disponibles, no de una versión rígida.
 
-La raíz técnica de Inkforge mantiene agentes, skills y MCP; el directorio de trabajo narrativo es la obra activa. El MCP recibe esa obra mediante `VAULT_PATH`. En cada turno, Inkforge proporciona al Director el libro activo de forma autoritativa, sin deducirlo a partir de fechas o archivos modificados. Ese contexto técnico se usa silenciosamente.
+La raíz técnica de Inkforge mantiene agentes, skills y MCP; el directorio de trabajo narrativo es la obra activa. El MCP recibe esa obra mediante `VAULT_PATH`; `INKFORGE_LIBRARY_ROOT` indica la Biblioteca global para recursos reutilizables. En cada turno, Inkforge proporciona al Director el libro activo y los nombres de sus géneros efectivos de forma autoritativa, sin deducirlos a partir de fechas o archivos modificados. El Director puede leer perfiles pertinentes mediante MCP sin cargar todos sus textos en cada mensaje. Ese contexto técnico se usa silenciosamente.
 
 El chat visible se guarda en `.inkforge/director-chat.json` dentro de cada obra. Cambiar de libro en una saga no crea otra conversación, y las fronteras técnicas de las sesiones OpenCode no dividen el historial visible. Esta continuidad del chat **no es canon ni memoria narrativa**: los Markdown siguen siendo la fuente de verdad.
 
@@ -178,7 +188,9 @@ Inkforge/
 │   └── src/                     Interfaz, i18n, componentes, hooks y tipos
 ├── docs/
 │   └── DEVELOPMENT_STATUS.md    Estado operativo y decisiones cerradas
-├── vault/                       Contenido narrativo Markdown
+├── vault/                       Biblioteca global
+│   ├── Generos/                 Perfiles editoriales Markdown
+│   ├── Plantillas/              Recursos reutilizables
 │   └── Proyectos/               Obras locales creadas por la Biblioteca
 ├── .opencode/                   Skills editoriales
 ├── .tools/                      Herramientas Python y servidor MCP
@@ -243,7 +255,7 @@ También están disponibles los scripts `build` y `preview` de Astro.
 
 ## Validado y pendiente
 
-Las funciones principales de edición, Biblioteca, persistencia, Ajustes y Director cuentan con validación manual. El detalle y los límites de esa validación se mantienen en [DEVELOPMENT_STATUS.md](docs/DEVELOPMENT_STATUS.md). No hay una suite automática propia confirmada.
+Las funciones principales de edición, Biblioteca, persistencia, Ajustes y Director cuentan con validación manual anterior. El mecanismo de perfiles de género aún no se ha validado. El detalle y los límites de la validación se mantienen en [DEVELOPMENT_STATUS.md](docs/DEVELOPMENT_STATUS.md). No hay una suite automática propia confirmada.
 
 ### Estructura localizada e importación futura
 
@@ -258,7 +270,7 @@ Pendientes reales:
 - desarrollar y validar la portabilidad Windows/Linux;
 - preparar packaging para Windows y revisar `projectRoot` en la aplicación empaquetada;
 - después, implementar la importación compatible, validada y no destructiva;
-- añadir perfiles de género y estilo, definir su herencia entre saga y libro y eliminar supuestos heredados de fantasía;
+- redactar posteriormente perfiles editoriales concretos y ampliar la personalización de estilo;
 - mejorar la resolución de conflictos con diff, elección de versión y merge;
 - desarrollar el borrado de obras/libros y la evolución posterior de Biblioteca y del flujo IA.
 

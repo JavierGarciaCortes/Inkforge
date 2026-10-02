@@ -55,6 +55,7 @@ El primary actual es `editor`; los subagentes heredados son `writer`, `structure
 - **`infrastructureRoot`:** raíz técnica de Inkforge con `AGENTS.md`, configuración, skills y MCP.
 - **`workingDirectory`:** obra gestionada activa.
 - El MCP recibe la obra mediante `VAULT_PATH`.
+- `INKFORGE_LIBRARY_ROOT` identifica la Biblioteca global (`vault/`); no cambia el significado de `VAULT_PATH`.
 - Cambiar de obra cambia el workspace y reconecta OpenCode.
 - Cambiar de libro dentro de una saga mantiene el workspace de la saga y no reinicia OpenCode.
 - Cada turno recibe el contexto autoritativo del libro activo desde Inkforge. No se deduce mediante fechas de modificación ni otras heurísticas.
@@ -124,7 +125,7 @@ Criterios cerrados:
 - Novela independiente: capítulos, planificación, canon, notas y recursos cuelgan de la obra.
 - Saga: `Mundo`, `Estilo` y `Referencias` son compartidos; cada libro tiene sus áreas propias bajo `Libros/<id>/...`.
 - `vault/Proyectos/` contiene datos locales de Biblioteca, está ignorado mediante `.gitignore` y no se versiona junto al código.
-- El contenido heredado directamente bajo `vault/` no se borra, mueve ni migra automáticamente. Ya no es un workspace activo de Inkforge.
+- La raíz `vault/` contiene recursos globales (`Generos/`, `Plantillas/`) y `Proyectos/`. No se migra automáticamente una obra antigua al abrirla.
 - Se eliminó el proyecto ficticio de tipo `legacy`, incluido `LEGACY_PROJECT`, y el modo funcional «Vault actual».
 - La representación de obra activa es `ActiveProject = LibraryProjectSummary | null`. `null` significa que no hay obra seleccionada, no un proyecto alternativo.
 
@@ -297,6 +298,16 @@ El cierre protegido se resuelve en Electron mediante `appWindow.onCloseRequested
 
 La Biblioteca permite crear novelas y sagas, añadir libros, seleccionarlos explícitamente y renombrar obras/libros. El borrado desde Inkforge sigue pendiente.
 
+### Perfiles editoriales globales
+
+El mecanismo de perfiles de género está implementado sobre Markdown, sin base de datos adicional. `vault/Generos/*.md` es el catálogo dinámico: los archivos directos y seguros se descubren en cada consulta, incluidos los añadidos manualmente durante una sesión. `vault/Plantillas/` conserva recursos globales reutilizables; `vault/Proyectos/` contiene las obras locales. `Estilo/` dentro de una obra o saga sigue siendo configuración específica de esa obra.
+
+`Proyecto.md` guarda `generos`; `Libro.md` guarda `hereda_generos` y sus `generos` propios. El libro hereda los géneros de la saga por defecto y añade los propios; con herencia desactivada usa solo los suyos. Los géneros efectivos se derivan en cada lectura. La configuración admite cero o varios perfiles, conserva los nombres asignados cuyo Markdown falte y los presenta como no disponibles. Los manifiestos antiguos carecen de estos campos por defecto y no se reescriben al abrirse. Cada manifiesto se guarda por separado, conservando cuerpo y metadatos ajenos.
+
+El Director recibe solo los nombres efectivos en su contexto privado y puede leer perfiles pertinentes con el MCP `fiction-context`. `VAULT_PATH` continúa siendo la obra activa; `INKFORGE_LIBRARY_ROOT` es la Biblioteca global. Los perfiles son orientación editorial, no canon. El contenido extenso de perfiles concretos queda para una investigación y redacción posterior. Este hito no se ha sometido a tests, lint, build ni validación de Electron/OpenCode en la presente sesión.
+
+La limpieza solicitada de carpetas y archivos heredados directamente bajo `vault/` no se completó: la revisión automática rechazó la eliminación de directorios poblados por el riesgo de destruir contenido. Se requiere autorización explícita adicional antes de retirarlos. Se prepararon el fallback de patrones reutilizables y la ruta de pendientes de la obra activa para esa retirada.
+
 ### Sin obra activa
 
 `activeProject = null` y `activeBook = null` son un estado válido. Si `vault/Proyectos` falta o no contiene obras válidas, Inkforge arranca sin crear contenido narrativo ni seleccionar carpetas arbitrariamente.
@@ -336,7 +347,7 @@ Abrir un documento no cambia el libro activo. Cambiar de libro con un borrador r
 
 ## 14. Validación confirmada
 
-Resultados comunicados de la validación del código funcional actual:
+Resultados comunicados de validaciones anteriores; no cubren el mecanismo de perfiles de género añadido en esta sesión:
 
 | Área | Resultado confirmado |
 |---|---|
@@ -420,7 +431,7 @@ En una saga renombrada se detectó que el frontmatter de `Proyecto.md` contiene 
 - Portabilidad Windows/Linux.
 - Packaging Windows y validación de `projectRoot` y rutas en el ejecutable.
 - Importación compatible.
-- Perfiles de género/estilo, herencia Saga → Libro y eliminación de supuestos editoriales heredados que no sean generales.
+- Contenido editorial de perfiles concretos y evolución posterior de estilo por obra.
 - Conflictos, diff, elección de versión y merge avanzados.
 - Borrado de obras y libros.
 - Evolución posterior de Biblioteca y del flujo IA.

@@ -18,9 +18,11 @@ import argparse
 from pathlib import Path
 from collections import defaultdict
 
-from vault import VAULT, CHAPTERS_DIR as ESCRITURA, STYLE_DIR, get_chapter_files, get_chapter_number
+from vault import VAULT, CHAPTERS_DIR as ESCRITURA, STYLE_DIR, TEMPLATES_DIR, get_chapter_files, get_chapter_number
 
 PATRONES = STYLE_DIR / "patrones.json"
+if not PATRONES.is_file():
+    PATRONES = TEMPLATES_DIR / "patrones.json"
 
 
 def cargar_patrones(ruta):

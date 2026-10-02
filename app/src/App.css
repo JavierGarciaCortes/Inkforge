@@ -1382,6 +1382,68 @@ dialog.settings-dialog {
   margin-top: 16px;
 }
 
+.genre-picker {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin: 16px 0;
+  padding: 12px;
+  border: 1px solid var(--border-emphasis);
+  border-radius: 4px;
+}
+
+.genre-picker legend {
+  padding: 0 4px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.genre-picker-list {
+  display: grid;
+  max-height: 160px;
+  gap: 8px;
+  overflow-y: auto;
+}
+
+.genre-picker-option,
+.genre-inherit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.genre-picker-option input,
+.genre-inherit input {
+  flex: 0 0 auto;
+  accent-color: var(--accent);
+}
+
+.genre-picker-option small {
+  color: var(--error-text);
+}
+
+.genre-inherit {
+  margin-top: 16px;
+}
+
+.genre-configuration-dialog {
+  width: min(520px, 100%);
+  max-height: calc(100svh - 40px);
+  overflow-y: auto;
+}
+
+.genre-configuration-dialog form + form {
+  margin-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.genre-configuration-dialog form > .dialog-button {
+  margin-top: 4px;
+}
+
 .project-dialog-create {
   border-color: var(--accent);
   color: var(--surface-panel);
