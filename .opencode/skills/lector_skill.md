@@ -29,7 +29,7 @@
 ## Anti-criterios (NO revisar)
 
 - Coherencia con lore no mencionado en el texto
-- Reglas de magia no explicadas aún
+- Reglas del mundo todavía no explicadas en el texto
 - Fidelidad a la cronología
 - Continuidad con capítulos anteriores (a menos que se indique lo contrario)
 

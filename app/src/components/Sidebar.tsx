@@ -29,6 +29,7 @@ interface SidebarProps {
   onAddBook: () => void
   onRenameProject: () => void
   onRenameBook: () => void
+  onConfigureGenres: () => void
   onReload: () => void
 }
 
@@ -143,6 +144,7 @@ export function Sidebar({
   onAddBook,
   onRenameProject,
   onRenameBook,
+  onConfigureGenres,
   onReload,
 }: SidebarProps) {
   const { t } = useTranslation()
@@ -192,6 +194,11 @@ export function Sidebar({
         {activeProject && (
           <button type="button" disabled={isProjectBusy} onClick={onRenameProject}>
             {activeProject.type === 'saga' ? t('sidebar.renameSaga') : t('sidebar.renameBook')}
+          </button>
+        )}
+        {activeProject && (
+          <button type="button" disabled={isProjectBusy} onClick={onConfigureGenres}>
+            {t('genres.title')}
           </button>
         )}
         {activeProject?.type === 'saga' && (

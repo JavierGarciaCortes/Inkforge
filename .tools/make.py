@@ -220,7 +220,7 @@ def _ritual(args: list[str]) -> int:
     _echo("Siguiente: editorial_letter(beta=true)")
     rc = _call("editorial_letter.py", "--beta") or rc
     _echo("Siguiente: get_foreshadowing()")
-    print("  -> Consultar vault/Referencias/Foreshadowing.md")
+    print("  -> Consultar Referencias/Foreshadowing.md de la obra activa")
     print("")
     return rc
 
@@ -237,8 +237,9 @@ def _ready(args: list[str]) -> int:
     else:
         print("(vacío)")
 
-    _echo("--- vault/Referencias/Pendientes.md (top 3) ---")
-    pendientes = REPO / "vault" / "Referencias" / "Pendientes.md"
+    _echo("--- Referencias/Pendientes.md de la obra activa (top 3) ---")
+    from vault import CONTENT_ROOT
+    pendientes = CONTENT_ROOT / "Referencias" / "Pendientes.md"
     if pendientes.exists():
         _print_pendientes(pendientes)
     else:

@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { CreateProjectInput, InkforgeProjectType } from '../types/inkforge'
+import { GenrePicker } from './GenrePicker'
+import { useGenreProfiles } from '../hooks/useGenreProfiles'
 
 interface ProjectDialogProps {
   isCreating: boolean
@@ -21,6 +23,8 @@ export function ProjectDialog({
   const [type, setType] = useState<InkforgeProjectType>('novela')
   const [narrativeTitle, setNarrativeTitle] = useState('')
   const [firstBookTitle, setFirstBookTitle] = useState('')
+  const [genres, setGenres] = useState<string[]>([])
+  const { profiles, state: genreState, reload: reloadGenres } = useGenreProfiles()
   const [validationError, setValidationError] = useState<
     'saga-title' | 'book-title' | 'first-book-title' | null
   >(null)
@@ -57,10 +61,12 @@ export function ProjectDialog({
           type: 'saga',
           sagaTitle: narrativeTitle,
           firstBookTitle,
+          genres,
         }
       : {
           type: 'novela',
           bookTitle: narrativeTitle,
+          genres,
         })
   }
 
@@ -127,6 +133,21 @@ export function ProjectDialog({
               }}
             />
           </label>
+        )}
+
+        <GenrePicker
+          profiles={profiles}
+          selected={genres}
+          onChange={setGenres}
+          disabled={isCreating}
+          label={t('genres.project')}
+        />
+        {genreState === 'loading' && <p>{t('genres.loading')}</p>}
+        {genreState === 'error' && (
+          <p className="project-dialog-error" role="alert">
+            {t('genres.catalogError')}
+            <button type="button" onClick={() => void reloadGenres()}>{t('common.retry')}</button>
+          </p>
         )}
 
         {(validationError || error) && (

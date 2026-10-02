@@ -1,6 +1,6 @@
 # [Nombre del elemento de lore]
 
-> **Tipo:** [magia / evento histórico / organización / profecía / criatura / concepto]
+> **Tipo:** [regla del mundo / evento / organización / concepto]
 > **Relacionado con:** [[Entrada relacionada]], [[Personaje]]
 
 ---
@@ -15,7 +15,7 @@
 
 ## Reglas / funcionamiento
 
-<!-- Si es magia: límites, costes, requisitos. Si es evento: causas y consecuencias. Si es organización: estructura y miembros. -->
+<!-- Límites, condiciones y consecuencias relevantes para este elemento. -->
 
 | Aspecto | Detalle |
 |---------|---------|

@@ -38,7 +38,7 @@ Estructura fija:
 ## Criterios de revisión
 
 - **Escalación**: ¿la tensión crece de forma orgánica?
-- **Coste**: ¿cada poder/ventaja tiene un precio visible?
+- **Consecuencias**: ¿las ventajas, decisiones y recursos tienen efectos coherentes?
 - **Proactividad del POV**: ¿el protagonista decide o reacciona?
 - **Promesas**: ¿cada siembra tiene o tendrá un pago?
 - **Estructura**: ¿cada escena tiene función narrativa?

@@ -7,6 +7,8 @@
 
 > **Rutas Inkforge:** `workingDirectory` = `VAULT_PATH` = raíz de la obra activa. No anteponer `vault/` ni crear esa subcarpeta. `Mundo/`, `Estilo/` y `Referencias/` están en la raíz (compartidos en saga). `Canon/`, `Capítulos/`, `Notas/`, `Planificación/` y `Recursos/` están en la raíz de una novela independiente o en `Libros/<carpeta física exacta del libro activo>/` en saga. Respetar la selección autoritativa de Inkforge: resolver la carpeta con `Libros/` y metadatos reales como `Libro.md`, nunca adivinarla por título o prefijo ni sustituirla por otro libro. Si persiste ambigüedad, preguntar antes de escribir. Mantener las APIs MCP y su resolución por `VAULT_PATH`; los Markdown reales son la fuente de verdad. Aplicar el contrato de rutas prioritario de AGENTS.md también al delegar.
 
+> **Géneros:** los nombres efectivos llegan desde Inkforge. Los perfiles globales viven en `INKFORGE_LIBRARY_ROOT/Generos` y se leen mediante MCP solo cuando sean pertinentes. Son orientación editorial, nunca canon. Prevalecen las instrucciones del usuario, el canon real y la guía de estilo de la obra. Crear o actualizar un perfil global exige una petición explícita del usuario.
+
 ---
 
 ## 🟢 Inicio de sesión (OBLIGATORIO)
@@ -34,19 +36,9 @@ Sin atajos. La memoria del editor es volátil; las tools y archivos son fuente d
 
 ---
 
-## 0. Pasada Stephen King (opcional)
+## 0. Revisión de prosa y estilo (opcional)
 
-Antes de la edición de prosa fina, ejecutar `check_king(chapter?)` o `prose_scanner.py --king` para:
-
-1. **Adverbios en diálogo**: «dijo suavemente», «preguntó bruscamente» → eliminar el adverbio, usar contexto
-2. **Voz pasiva**: «era + participio» → convertir a activa
-3. **Kill your darlings**: estimar el 10% de poda del capítulo
-4. **Puerta cerrada / abierta**: si el King Score > 15, recomendar no editar aún (seguir escribiendo)
-
-### Criterios King
-- **adverbio_dialogo**: todo adverbio tras verbo de diálogo se elimina. El contexto y la acción deben comunicar el tono.
-- **voz_pasiva_ser**: «La puerta fue abierta» → «Él abrió la puerta». Excepción: cuando el receptor de la acción es más relevante que el actor.
-- **Atribuciones no-"dijo"**: «exclamó, masculló, repuso» → cambiar a «dijo» a menos que el verbo aporte información única.
+Antes de editar prosa fina, consultar `get_style_diagnostics(chapter?)` y las reglas de estilo de la obra. Revisar adverbios, voz pasiva, atribuciones y densidad solo cuando afecten a la claridad o a la voz buscada. Aplicar criterios de perfiles editoriales efectivos únicamente si el usuario los ha asignado y resultan pertinentes.
 
 ---
 

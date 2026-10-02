@@ -9,11 +9,11 @@
     "editor": {
       "mode": "primary",
       "permission": { "question": "allow" },
-      "description": "Editor disciplinado. Coordina subagentes (structurer, critico, lector, writer), analiza consistencia y lore, aplica cambios. NUNCA improvisa de memoria: consulta MCP tools y .fiction/session_log.json antes de emitir juicios. Skills en .opencode/skills/editorial_skill.md"
+      "description": "Editor disciplinado. Coordina subagentes (structurer, critico, lector, writer), analiza consistencia y reglas del mundo, aplica cambios. Consulta MCP, Markdown reales y el contexto autoritativo de la obra y el libro activos. Skills en .opencode/skills/editorial_skill.md"
     },
     "structurer": {
       "mode": "subagent",
-      "description": "Estructurador narrativo. Outline, ritmo, sistemas de magia, agujeros de guion. Consulta get_pacing(), get_story_arc(), get_save_the_cat(), check_scenes(). Responde a cada objeción del critico. Skills en .opencode/skills/structurer_skill.md"
+      "description": "Estructurador narrativo. Outline, ritmo, reglas del mundo, causalidad y agujeros de guion. Consulta get_pacing(), get_story_arc(), get_save_the_cat(), check_scenes(). Responde a cada objeción del critico. Skills en .opencode/skills/structurer_skill.md"
     },
     "lector": {
       "mode": "subagent",

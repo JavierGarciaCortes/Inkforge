@@ -14,4 +14,4 @@ Notas:
 - Hilo de foreshadowing que se planta o paga:
 -->
 
-[[Personaje]] hizo algo. [[Lugar]] se extendía ante ella.
+<!-- Escribe aquí el capítulo de tu obra. -->

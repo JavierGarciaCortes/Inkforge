@@ -15,6 +15,15 @@
 - En este documento, **ámbito del libro activo** significa la raíz en una novela independiente y la carpeta exacta del libro activo dentro de `Libros/` en una saga. Las referencias a capítulos y su manifiesto siempre se resuelven en ese ámbito.
 - Las tools/MCP que resuelven rutas mediante `VAULT_PATH` conservan su uso y sus APIs; no añadirles manualmente el prefijo prohibido.
 - `infrastructureRoot` / project root es el repositorio Inkforge, distinto de la raíz de la obra. Las referencias a `.tools/`, `.opencode/`, `AGENTS.md`, `opencode.json` y al Makefile identifican infraestructura del repositorio, no carpetas que deban crearse en la obra. Resolver recursos técnicos existentes en su ubicación real.
+- `INKFORGE_LIBRARY_ROOT` es la raíz global de Biblioteca (`vault/` del repositorio). `Generos/`, `Plantillas/` y `Proyectos/` cuelgan de ella. `VAULT_PATH` sigue siendo la raíz de la obra activa, nunca la Biblioteca global ni su subcarpeta `vault/`.
+
+### Perfiles editoriales de género
+
+- Los perfiles globales son archivos Markdown reales en `INKFORGE_LIBRARY_ROOT/Generos/*.md`; el catálogo se descubre en cada consulta. Una obra puede asignar cero o varios perfiles. Los nombres efectivos de la obra o del libro activo llegan en el contexto autoritativo de Inkforge.
+- En una saga, el libro hereda los géneros de la saga por defecto y puede añadir los suyos; si desactiva la herencia, usa solo los propios. Si falta un archivo de perfil asignado, conservar el nombre y advertir que su contenido no está disponible; nunca inventarlo.
+- Leer con `list_genre_profiles` y `read_genre_profile` únicamente los perfiles pertinentes cuando se necesite orientación editorial. No cargar ni copiar todos los perfiles en cada turno.
+- Un perfil es guía editorial, no canon. Prioridad: instrucciones explícitas del usuario → canon y datos reales de la obra → guía de estilo específica de la obra → perfiles de género. Combinar perfiles sin imponer clichés ni reglas que contradigan el texto.
+- `create_genre_profile` y `update_genre_profile` solo se usan tras una petición explícita del usuario para crear o modificar un perfil global. Nunca modificar perfiles globales como efecto secundario de escribir o revisar una obra.
 
 ---
 
@@ -143,6 +152,8 @@ Recursos de infraestructura referenciados por los flujos siguientes (desde la ra
 
 Sin dependencias externas (stdlib). Se registra en `opencode.json` y se inicia solo.
 
+El mismo servidor ofrece `list_genre_profiles`, `read_genre_profile`, `create_genre_profile` y `update_genre_profile`; consultan `INKFORGE_LIBRARY_ROOT/Generos` dinámicamente. La creación y actualización requieren petición explícita del usuario.
+
 ### Tools base (10)
 
 | Tool | Uso |
@@ -196,7 +207,7 @@ python .tools/prose_scanner.py --ritmo       # estadísticas de longitud de fras
 python .tools/prose_scanner.py --validate    # detectar overlaps entre patrones
 ```
 
-Patrones en `Estilo/patrones.json`. Categorías:
+Patrones en `Estilo/patrones.json` de la obra, con fallback a `INKFORGE_LIBRARY_ROOT/Plantillas/patrones.json`. Categorías:
 - `ai_fingerprint` — alta prioridad, filtrar siempre
 - `fragile` — evaluar caso a caso
 - `voice` — solo si es muletilla
@@ -205,7 +216,7 @@ Patrones en `Estilo/patrones.json`. Categorías:
 
 ## 4. Workflow de revisión <!-- PROYECTO — adapta los capítulos a tu libro -->
 
-> **⚠️ Archivos de ejemplo:** las demostraciones y plantillas heredadas no son contenido real. Si se necesitan, localizar los recursos existentes sin suponer que hay una carpeta de plantillas en la obra. Las fichas reales están en `Mundo/`; los capítulos, en `Capítulos/` del ámbito del libro activo.
+> **⚠️ Plantillas globales:** `INKFORGE_LIBRARY_ROOT/Plantillas/` contiene recursos reutilizables, no contenido real de la obra. Las fichas reales están en `Mundo/`; los capítulos, en `Capítulos/` del ámbito del libro activo.
 
 ### ⚠️ Regla fundamental: quién escribe
 
