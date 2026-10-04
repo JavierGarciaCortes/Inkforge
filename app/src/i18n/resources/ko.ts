@@ -5,6 +5,7 @@ const ko = {
     library: '라이브러리',
     currentVault: '현재 볼트',
     cancel: '취소',
+    back: '뒤로',
     close: '닫기',
     retry: '다시 시도',
     unavailable: '{{title}} (사용할 수 없음)',
@@ -22,10 +23,11 @@ const ko = {
   },
   header: {
     connection: {
-      connected: 'OpenCode 연결됨',
-      connecting: 'OpenCode에 연결하는 중…',
-      error: 'OpenCode 연결 오류',
+      connected: '연결됨',
+      connecting: '연결 중…',
+      error: '오류',
     },
+    connectionContext: 'OpenCode 연결 상태: {{status}}',
     tagline: '글쓰기 공간',
     desktopVersion: '{{name}} Desktop v{{version}}',
     language: '인터페이스 언어',
@@ -50,6 +52,7 @@ const ko = {
     documentCount_other: '문서 {{count}}개',
     workVault: '작품 볼트',
     newWork: '새 작품',
+    manageWork: '작품 관리',
     activeWork: '활성 작품',
     renameSaga: '시리즈 이름 변경',
     renameBook: '책 이름 변경',
@@ -146,7 +149,7 @@ const ko = {
     intro: '현재 사용할 수 있는 기능과 향후 가져오기에 호환되는 프로젝트를 준비하는 방법을 확인하세요.',
     library: {
       title: '시작하기와 라이브러리',
-      works: 'Inkforge는 독립 소설과 시리즈를 지원합니다. 새 작품으로 작품을 만들고 활성 작품으로 기존 작품을 전환합니다.',
+      works: '왼쪽 영역에는 활성 작품과 유형, 새 작품, 작품 관리, 활성 작품 선택기, 문서 트리가 표시됩니다.',
       active: '시리즈에는 여러 책이 포함될 수 있습니다. 활성 책으로 작업할 책을 선택하며 탐색기 항목을 열어도 책이 자동으로 바뀌지 않습니다.',
     },
     projectTypes: {
@@ -154,6 +157,18 @@ const ko = {
       standalone: '독립 소설의 콘텐츠는 프로젝트 바로 아래에 있습니다.',
       saga: '시리즈에서는 세계관, 문체, 참고 자료를 공유합니다. 각 책은 자체 챕터, 기획, 캐논, 노트, 자료를 가집니다.',
       visibility: '시리즈의 다른 책은 활성 책과 시각적으로 섞여 표시되지 않습니다.',
+    },
+    manage: {
+      title: '작품 관리',
+      standalone: '독립 소설에서는 작품 관리에서 소설 이름을 변경하고 장르를 설정할 수 있습니다.',
+      saga: '시리즈에서는 시리즈 이름 변경, 장르, 책 추가를 한곳에서 제공합니다. 활성 책이 있으면 책 이름도 변경할 수 있습니다.',
+      navigation: '뒤로를 누르면 작품 관리로 돌아가고 닫기를 누르면 나갑니다. 장르를 저장해도 대화상자는 열린 상태로 유지됩니다. 이름을 변경하거나 책을 추가한 뒤에는 작품이 계속 활성 상태라면 작품 관리로 돌아갑니다.',
+    },
+    genres: {
+      title: '편집 장르',
+      selection: '작품에 프로필을 선택하지 않거나 하나 이상 지정할 수 있습니다. 시리즈에서는 같은 대화상자에서 시리즈와 활성 책의 장르를 설정합니다.',
+      inheritance: '상속을 켜면 책에 시리즈 장르와 책 고유 장르가 함께 적용됩니다. 끄면 책 고유 장르만 적용됩니다.',
+      guidance: '프로필은 편집 지침이며 캐논이 아닙니다. 디렉터는 프로필을 읽을 수 있고 명시적으로 요청하면 새 프로필을 만들거나 기존 프로필을 수정할 수 있습니다.',
     },
     editing: {
       title: '탐색과 편집',
@@ -171,8 +186,9 @@ const ko = {
     ai: {
       title: '채팅과 AI',
       openCode: 'Inkforge는 AI 연동에 로컬 OpenCode를 사용합니다.',
-      models: '공급자와 모델은 OpenCode에서 가져옵니다. Inkforge는 특정 공급자를 강제하지 않으며 필요한 경우 모델을 선택할 수 있습니다.',
-      retry: '모델이나 공급자 문제로 응답이 실패하면 선택한 모델로 다시 시도하는 옵션이 제공될 수 있습니다.',
+      models: '설정 → AI / 디렉터에서 모델과 변형을 선택하세요. 둘 다 OpenCode에서 가져오며 기본 변형은 OpenCode의 기본 동작을 사용합니다.',
+      retry: '호환되지 않는 모델 때문에 실패하면 모델을 변경한 뒤 메시지를 다시 시도할 수 있습니다.',
+      scope: '디렉터를 사용하려면 활성 작품이 필요합니다. 작품별로 대화가 보존되고 시리즈의 모든 책은 한 대화를 공유합니다. 질문이나 권한 요청이 나타나면 채팅에서 응답하세요.',
       identity: '도우미 응답은 Inkforge라는 이름으로 표시됩니다.',
     },
     language: {

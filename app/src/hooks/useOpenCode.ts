@@ -788,6 +788,37 @@ export function useOpenCode(projectId: string | null) {
 
     setError(null)
     const generation = projectGenerationRef.current
+    let variantForMessage = selectedVariant
+    if (selectedVariant) {
+      const catalog = await api.listModels()
+      if (!mountedRef.current || projectGenerationRef.current !== generation) {
+        return
+      }
+      if (!catalog.ok) {
+        setError(catalog.error)
+        return
+      }
+
+      setModels(catalog.value)
+      const currentModel = catalog.value.find((model) => (
+        model.providerID === selectedModel.providerID && model.modelID === selectedModel.modelID
+      ))
+      if (!currentModel) {
+        setUnavailableModelKey(modelKey(selectedModel))
+        return
+      }
+      setUnavailableModelKey(null)
+      if (!currentModel.variants.includes(selectedVariant)) {
+        variantForMessage = ''
+        setSelectedVariant('')
+        saveOpenCodeModelSelection({
+          providerID: currentModel.providerID,
+          modelID: currentModel.modelID,
+          displayName: `${currentModel.providerName} · ${currentModel.name}`,
+        })
+      }
+    }
+
     const currentSessionID = await ensureSession()
 
     if (!currentSessionID || projectGenerationRef.current !== generation) {
@@ -815,7 +846,7 @@ export function useOpenCode(projectId: string | null) {
       model: {
         providerID: selectedModel.providerID,
         modelID: selectedModel.modelID,
-        ...(selectedVariant ? { variant: selectedVariant } : {}),
+        ...(variantForMessage ? { variant: variantForMessage } : {}),
       },
       text,
     })
@@ -913,7 +944,7 @@ export function useOpenCode(projectId: string | null) {
     }
   }, [models, selectedVariant])
 
-  const chooseVariant = useCallback(async (variant: string) => {
+  const chooseVariant = useCallback((variant: string) => {
     if (!selectedModel || (variant && !selectedModel.variants.includes(variant))) {
       return
     }
@@ -927,27 +958,6 @@ export function useOpenCode(projectId: string | null) {
     })
     if (!failedMessageIDRef.current) {
       setError(null)
-    }
-    const api = window.inkforge?.opencode
-    const currentSessionID = sessionIDRef.current
-    const generation = projectGenerationRef.current
-
-    if (!api || !currentSessionID) {
-      return
-    }
-
-    const result = await api.switchModel({
-      projectId: projectIdRef.current,
-      sessionID: currentSessionID,
-      model: {
-        providerID: selectedModel.providerID,
-        modelID: selectedModel.modelID,
-        ...(variant ? { variant } : {}),
-      },
-    })
-
-    if (!result.ok && projectGenerationRef.current === generation) {
-      setError(result.error)
     }
   }, [selectedModel])
 

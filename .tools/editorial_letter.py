@@ -26,96 +26,32 @@ _insights_module = None
 def _insights_unavailable(*args, **kwargs):
     raise ImportError("Módulo editorial_insights no disponible. Verifica que el archivo existe.")
 
-analyze_style_diagnostics = _insights_unavailable
-analyze_dialogue_quality = _insights_unavailable
-analyze_save_the_cat = _insights_unavailable
-analyze_chekhov_gun = _insights_unavailable
-analyze_first_pages = _insights_unavailable
-analyze_backstory_dumps = _insights_unavailable
-analyze_scene_summary_ratio = _insights_unavailable
-classify_story_arc = _insights_unavailable
-analyze_revision_hotspots = _insights_unavailable
 analyze_advanced_all = _insights_unavailable
 
 try:
     from tools import editorial_insights as _insights_module
-    analyze_style_diagnostics = _insights_module.analyze_style_diagnostics
-    analyze_dialogue_quality = _insights_module.analyze_dialogue_quality
-    analyze_save_the_cat = _insights_module.analyze_save_the_cat
-    analyze_chekhov_gun = _insights_module.analyze_chekhov_gun
-    analyze_first_pages = _insights_module.analyze_first_pages
-    analyze_backstory_dumps = _insights_module.analyze_backstory_dumps
-    analyze_scene_summary_ratio = _insights_module.analyze_scene_summary_ratio
-    classify_story_arc = _insights_module.classify_story_arc
-    analyze_revision_hotspots = _insights_module.analyze_revision_hotspots
     analyze_advanced_all = _insights_module.analyze_all
     HAS_INSIGHTS = True
 except ImportError:
     pass
 
 from vault import (
-    VAULT, CHAPTERS_DIR, CHARACTERS_DIRS, FORESHADOWING_FILE,
-    CONFIG_FILE, get_chapter_files,
-    get_chapter_number, strip_yaml, strip_wikilinks,
+    project_root, current_book, chapter_dir, character_dirs, planning_file,
+    scoped_book, get_chapter_files, get_chapter_number, get_chapter_title,
+    get_chapter_pov, get_chapter_field, strip_yaml, strip_wikilinks,
 )
 
-PERSONAJES_DIR = CHARACTERS_DIRS[0] if CHARACTERS_DIRS else VAULT / "Mundo" / "Personajes"
-
-# ── Capítulos y acts (desde config, con auto-generación por defecto) ──
-
-def _load_acts_config() -> tuple[dict, dict, dict, int]:
-    """Carga ACTS, ACT_LABELS, POV_MAP y midpoint_chapter desde .fiction/config.json.
-    Si no están definidos, genera 3 actos equilibrados desde el manifiesto.
-    """
-    midpoint = 0
-    default_pov = "?"
-    try:
-        from vault import load_config
-        cfg = load_config()
-        acts_raw = cfg.get("acts")
-        labels_raw = cfg.get("act_labels", {})
-        pov_map_raw = cfg.get("pov_map", {})
-        midpoint = cfg.get("midpoint_chapter", 0)
-        default_pov = cfg.get("default_pov", "?")
-
-        if acts_raw:
-            acts = {int(k): v for k, v in acts_raw.items()}
-            labels = {int(k): v for k, v in labels_raw.items()}
-            pov_map = {int(k): v for k, v in pov_map_raw.items()}
-            return acts, labels, pov_map, midpoint, default_pov
-    except Exception:
-        pass
-
-    # Auto-generar 3 actos balanceados desde el manifiesto
-    try:
-        from vault import get_manifiesto
-        m = get_manifiesto()
-        total = m.total_capitulos()
-        if total > 0:
-            third = max(1, total // 3)
-            acts = {
-                1: list(range(0, third)),
-                2: list(range(third, 2 * third)),
-                3: list(range(2 * third, total)),
-            }
-            labels = {1: "Setup", 2: "Confrontación", 3: "Resolución"}
-            return acts, labels, {}, midpoint, default_pov
-    except Exception:
-        pass
-
-    return {1: [1], 2: [2], 3: [3]}, {1: "Setup", 2: "Confrontación", 3: "Resolución"}, {}, midpoint, default_pov
-
-
-ACTS, ACT_LABELS, POV_MAP, MIDPOINT_CHAPTER, DEFAULT_POV = _load_acts_config()
+def _declared_acts(chapters: list[dict]) -> dict[str, list[int]]:
+    """Agrupa solo actos declarados por los Markdown; no impone tres actos."""
+    acts: dict[str, list[int]] = {}
+    for chapter in chapters:
+        if chapter.get("act"):
+            acts.setdefault(chapter["act"], []).append(chapter["num"])
+    return acts
 
 
 def _get_project_title() -> str:
-    """Lee el título del proyecto desde .fiction/config.json."""
-    try:
-        from vault import load_config
-        return load_config().get("title", "Sin título")
-    except Exception:
-        return "Sin título"
+    return current_book().title
 
 
 def strip_dialogue(text: str) -> str:
@@ -127,8 +63,7 @@ def read_chapter(filepath: Path) -> dict:
     num = get_chapter_number(filepath)
     raw = filepath.read_text("utf-8")
     clean = strip_yaml(raw)
-    title_match = re.search(r"#\s*Capítulo\s+\d+[:\s]*(.+)", raw)
-    title = title_match.group(1).strip() if title_match else ""
+    title = get_chapter_title(raw)
     words = len(clean.split())
     return {
         "num": num,
@@ -137,6 +72,9 @@ def read_chapter(filepath: Path) -> dict:
         "raw": raw,
         "text": clean,
         "words": words,
+        "pov": get_chapter_pov(filepath),
+        "act": get_chapter_field(filepath, "acto"),
+        "midpoint": get_chapter_field(filepath, "midpoint") == "true",
     }
 
 
@@ -150,21 +88,21 @@ def analyze_structure(chapters: list[dict]) -> dict:
     std_dev = variance ** 0.5
 
     act_stats = {}
-    for act_num, cap_nums in ACTS.items():
+    for act_num, cap_nums in _declared_acts(chapters).items():
         act_chapters = [c for c in chapters if c["num"] in cap_nums]
         act_words = sum(c["words"] for c in act_chapters)
         act_stats[act_num] = {
-            "label": ACT_LABELS[act_num],
+            "label": act_num,
             "chapters": cap_nums,
             "words": act_words,
-            "pct": round(act_words / total_words * 100, 1),
+            "pct": round(act_words / total_words * 100, 1) if total_words else 0,
             "count": len(act_chapters),
         }
 
     # POV distribution
     pov_counts = Counter()
     for c in chapters:
-        pov = POV_MAP.get(c["num"], DEFAULT_POV)
+        pov = c.get("pov") or "—"
         pov_counts[pov] += 1
 
     max_chapter = max(chapters, key=lambda c: c["words"])
@@ -178,8 +116,8 @@ def analyze_structure(chapters: list[dict]) -> dict:
         "max_chapter": {"num": max_chapter["num"], "words": max_chapter["words"]},
         "acts": act_stats,
         "pov": dict(pov_counts),
-        "midpoint_chapter": MIDPOINT_CHAPTER,
-        "midpoint_words": next((c["words"] for c in chapters if c["num"] == MIDPOINT_CHAPTER), 0),
+        "midpoint_chapter": next((c["num"] for c in chapters if c.get("midpoint")), None),
+        "midpoint_words": next((c["words"] for c in chapters if c.get("midpoint")), None),
     }
 
 
@@ -319,7 +257,7 @@ def _load_character_names() -> dict[str, str]:
     Genera un dict {nombre: regex_para_buscar}."""
     names = {}
     # 1. Desde archivos de personaje en characters_dirs
-    for cd in CHARACTERS_DIRS:
+    for cd in character_dirs():
         if cd and cd.exists():
             for f in sorted(cd.glob("*.md")):
                 name = f.stem.replace("-", " ").replace("_", " ")
@@ -335,7 +273,7 @@ def _load_character_names() -> dict[str, str]:
                     else:
                         names[name] = rf"\b{escaped}\b"
     # 2. Desde las fichas de personaje
-    for d in CHARACTERS_DIRS:
+    for d in character_dirs():
         if d.is_dir():
             for f in d.glob("*.md"):
                 char_name = f.stem
@@ -346,9 +284,6 @@ def _load_character_names() -> dict[str, str]:
                         names[char_name] = rf"\b({re.escape(first)}|{escaped})\b"
                     else:
                         names[char_name] = rf"\b{escaped}\b"
-    # 3. Fallback: nombres hardcoded mínimos para funcionalidad básica
-    if not names:
-        names = {"Protagonista": r"\b(ella|él|protagonista)\b"}
     return names
 
 
@@ -364,7 +299,6 @@ def _load_dialogue_markers() -> dict[str, dict]:
     }
 
 
-CHARACTER_NAMES = _load_character_names()
 CHARACTER_DIALOGUE_MARKERS = _load_dialogue_markers()
 
 
@@ -382,7 +316,7 @@ def analyze_voice(chapters: list[dict]) -> dict:
 
     for c in chapters:
         text = c["text"]
-        for char_name, pattern in CHARACTER_NAMES.items():
+        for char_name, pattern in _load_character_names().items():
             if re.search(pattern, text, re.IGNORECASE):
                 per_character[char_name]["appearances"].append(c["num"])
 
@@ -444,10 +378,11 @@ THREAD_STATUS_RE = re.compile(r"\*\*Status\*\*\s*\|\s*(.*?)(?:\n|$)")
 
 
 def analyze_foreshadowing() -> dict:
-    if not FORESHADOWING_FILE.exists():
+    foreshadowing_file = planning_file("Foreshadowing.md")
+    if not foreshadowing_file.exists():
         return {"error": "Foreshadowing.md no encontrado"}
 
-    text = FORESHADOWING_FILE.read_text("utf-8")
+    text = foreshadowing_file.read_text("utf-8")
 
     # Parse thread sections (## numbered + ### under Hilos abiertos)
     thread_pattern = re.compile(
@@ -502,11 +437,11 @@ def analyze_pacing(chapters: list[dict]) -> dict:
 
     # Act balance
     act_words = {}
-    for act_num, cap_nums in ACTS.items():
+    for act_num, cap_nums in _declared_acts(chapters).items():
         act_chapters = [c for c in chapters if c["num"] in cap_nums]
         act_words[act_num] = {
             "total": sum(c["words"] for c in act_chapters),
-            "label": ACT_LABELS[act_num],
+            "label": act_num,
             "caps": [c["num"] for c in act_chapters],
         }
 
@@ -788,10 +723,10 @@ def analyze_hooks(chapters: list[dict]) -> dict:
 
 def analyze_promise_payoff(chapters: list[dict]) -> dict:
     """Mide distancia entre siembras y pagos en foreshadowing, y busca puntos de contacto intermedios."""
-    if not FORESHADOWING_FILE.exists():
+    foreshadowing_file = planning_file("Foreshadowing.md")
+    if not foreshadowing_file.exists():
         return {"error": "Foreshadowing.md no encontrado"}
 
-    text = FORESHADOWING_FILE.read_text("utf-8")
 
     # Parse thread sections with plant/payoff info
     thread_pattern = re.compile(
@@ -861,20 +796,19 @@ def analyze_promise_payoff(chapters: list[dict]) -> dict:
 # ── Análisis avanzado de atribución de diálogo ───────────────
 
 def _build_attribution_patterns() -> dict[str, str]:
-    """Genera patrones de atribución de diálogo desde CHARACTER_NAMES."""
+    """Genera patrones de atribución desde las fichas actuales de personaje."""
     patterns = {}
-    for name, name_regex in CHARACTER_NAMES.items():
+    for name, name_regex in _load_character_names().items():
         first_name = name.split()[0]
         verbs = r"(dijo|preguntó|respondió|susurró|gritó|alcanzó a decir)"
         patterns[name] = rf"{verbs}\s+({re.escape(first_name)}|{name})"
     return patterns
 
 
-CHARACTER_DIALOGUE_ATTRIBUTION = _build_attribution_patterns()
-
 
 def analyze_dialogue_attribution(chapters: list[dict]) -> dict:
     """Analiza consistencia de voz por personaje a lo largo del libro."""
+    attribution_patterns = _build_attribution_patterns()
     per_char = defaultdict(lambda: {
         "chapters": [],
         "total_lines": 0,
@@ -885,11 +819,11 @@ def analyze_dialogue_attribution(chapters: list[dict]) -> dict:
         "short_lines": 0,
     })
 
-    char_names_list = list(CHARACTER_NAMES.keys())
+    char_names_list = list(_load_character_names())
 
     for c in chapters:
         text = c["text"]
-        for char_name, attr_pattern in CHARACTER_DIALOGUE_ATTRIBUTION.items():
+        for char_name, attr_pattern in attribution_patterns.items():
             matches = re.findall(attr_pattern, text, re.IGNORECASE)
             if matches:
                 per_char[char_name]["chapters"].append(c["num"])
@@ -1041,31 +975,23 @@ def analyze_sensory_immersion(chapters: list[dict]) -> dict:
 REVISION_PHASES = [
     {
         "phase": 1,
-        "name": "Cimientos estructurales",
-        "weeks": "1-2",
-        "focus": ["Argumento general", "Estructura de actos", "Tiempo del inciting incident",
-                   "Midpoint", "Clímax", "Arcos de personaje principales"],
+        "name": "Coherencia estructural",
+        "focus": ["Argumento declarado", "Continuidad", "Consecuencias de las decisiones"],
     },
     {
         "phase": 2,
         "name": "Personajes y diálogo",
-        "weeks": "3-4",
-        "focus": ["Consistencia de voz", "Profundidad de secundarios",
-                   "Atribución de diálogo", "Motivación de antagonista", "Química entre personajes"],
+        "focus": ["Consistencia de voz", "Motivaciones documentadas", "Diálogo"],
     },
     {
         "phase": 3,
         "name": "Ritmo y prosa",
-        "weeks": "5-6",
-        "focus": ["Transiciones entre escenas", "Variedad de tensión",
-                   "Show vs tell", "Inmersión sensorial", "Muletillas y patrones"],
+        "focus": ["Transiciones", "Ritmo", "Claridad de prosa"],
     },
     {
         "phase": 4,
         "name": "Pulido final",
-        "weeks": "7-8",
-        "focus": ["Consistencia de objetos/tiempo/clima", "Ganchos de capítulo",
-                   "Cierres", "Continuidad", "Foreshadowing pendiente"],
+        "focus": ["Objetos, tiempo y clima", "Continuidad", "Hilos abiertos"],
     },
 ]
 
@@ -1077,7 +1003,7 @@ def generate_revision_plan(priorities: list[dict]) -> str:
     lines.append("")
 
     for phase in REVISION_PHASES:
-        lines.append(f"## Fase {phase['phase']}: {phase['name']} ({phase['weeks']} semanas)")
+        lines.append(f"## Fase {phase['phase']}: {phase['name']}")
         lines.append("")
         lines.append("**Enfoque:** " + ", ".join(phase["focus"]))
         lines.append("")
@@ -1094,39 +1020,6 @@ def generate_revision_plan(priorities: list[dict]) -> str:
                 lines.append(f"  *{p['detail']}*")
                 lines.append("")
 
-        # Add default structural tasks for this phase
-        phase_defaults = {
-            1: [
-                "Revisar que el inciting incident ocurra en el primer 25% del libro",
-                "Verificar que el midpoint suba las apuestas significativamente",
-                "Asegurar que cada acto tenga un peso proporcional (ideal: ~33% cada uno)",
-                "Comprobar que el clímax resuelva la pregunta central de la historia",
-            ],
-            2: [
-                "Leer el diálogo de cada personaje de corrido para verificar consistencia",
-                "Identificar secundarios planos y darles motivación propia",
-                "Asegurar que cada personaje suene distinto (longitud de frase, vocabulario, tics)",
-            ],
-            3: [
-                "Revisar transiciones entre escenas — que no sean bruscas ni confusas",
-                "Alternar tipos de escena (diálogo, acción, reflexión) para evitar monotonía",
-                "Buscar emociones contadas y anclarlas con descripción física",
-                "Ejecutar prose_scanner y reducir patrones sobre target",
-            ],
-            4: [
-                "Ejecutar consistency_check para verificar objetos, tiempo, clima",
-                "Leer en voz alta el primer y último párrafo de cada capítulo",
-                "Verificar que todos los hilos de foreshadowing estén cerrados o intencionalmente abiertos",
-                "Última pasada de continuidad: fechas, nombres, descripciones físicas",
-            ],
-        }
-
-        lines.append("**Tareas adicionales recomendadas:**")
-        lines.append("")
-        for task in phase_defaults.get(phase["phase"], []):
-            lines.append(f"- {task}")
-        lines.append("")
-
     return "\n".join(lines)
 
 
@@ -1142,7 +1035,7 @@ def _match_priorities_to_phase(priorities: list[dict], phase: int) -> list[dict]
     if phase == 1:
         return [p for p in priorities if p["severity"] == "alta"]
     elif phase == 2:
-        char_names_list = list(CHARACTER_NAMES.keys())
+        char_names_list = list(_load_character_names())
         char_keywords = ["voz", "personaje", "diálogo"] + char_names_list
         return [p for p in priorities if p["severity"] == "media"
                 and any(kw in p["issue"].lower() for kw in char_keywords)]
@@ -1159,7 +1052,7 @@ def _match_priorities_to_phase(priorities: list[dict], phase: int) -> list[dict]
 
 def compare_versions(old_dir: str | None = None, new_dir: str | None = None) -> str:
     """Compara dos versiones del manuscrito y reporta cambios."""
-    current_dir = CHAPTERS_DIR
+    current_dir = chapter_dir()
 
     if not old_dir:
         return ("# Comparación de Versiones\n\n"
@@ -1182,13 +1075,13 @@ def compare_versions(old_dir: str | None = None, new_dir: str | None = None) -> 
     old_chapters = {}
     for f in old_files:
         num = get_chapter_number(f)
-        if num is not None and num <= 99:
+        if num is not None:
             old_chapters[num] = f.read_text("utf-8")
 
     new_chapters = {}
     for f in new_files:
         num = get_chapter_number(f)
-        if num is not None and num <= 99:
+        if num is not None:
             new_chapters[num] = f.read_text("utf-8")
 
     common = set(old_chapters.keys()) & set(new_chapters.keys())
@@ -1383,13 +1276,11 @@ def _detect_strengths(struct, prose, scenes, sensory, foreshadowing_info) -> lis
     """Detecta fortalezas del manuscrito basado en datos."""
     strengths = []
 
-    # Structure
-    strengths.append({
-        "area": "Estructura",
-        "detail": f"Tres actos equilibrados ({struct['acts'][1]['pct']}% / "
-                  f"{struct['acts'][2]['pct']}% / {struct['acts'][3]['pct']}%) "
-                  f"con midpoint claro en capítulo {struct['midpoint_chapter']:02d}",
-    })
+    if struct["acts"]:
+        strengths.append({
+            "area": "Estructura",
+            "detail": f"Actos declarados en los capítulos: {', '.join(struct['acts'])}.",
+        })
 
     # Foreshadowing
     if foreshadowing_info["pct_closed"] >= 80:
@@ -1451,7 +1342,8 @@ def generate_letter(chapters: list[dict], cap_filter: int | None = None) -> str:
     lines.append(f"| Capítulo más largo | cap{struct['max_chapter']['num']:02d} ({struct['max_chapter']['words']} palabras) |")
     lines.append(f"| Capítulo más corto | cap{struct['min_chapter']['num']:02d} ({struct['min_chapter']['words']} palabras) |")
     midpoint_num = struct['midpoint_chapter']
-    lines.append(f"| Midpoint | Capítulo {midpoint_num:02d} ({struct['midpoint_words']} palabras) |")
+    if midpoint_num is not None:
+        lines.append(f"| Midpoint declarado | Capítulo {midpoint_num:02d} ({struct['midpoint_words']} palabras) |")
     pov_parts = [f"{p} ({c} {'cap' if c == 1 else 'caps'})" for p, c in sorted(struct["pov"].items())]
     lines.append(f"| POV | {', '.join(pov_parts)} |")
     lines.append(f"| Hilos foreshadowing | {foreshadowing['closed']}/{foreshadowing['total']} cerrados |")
@@ -1460,14 +1352,15 @@ def generate_letter(chapters: list[dict], cap_filter: int | None = None) -> str:
     # ── Estructura ──
     lines.append("## Estructura")
     lines.append("")
-    lines.append("### Actos")
-    lines.append("")
-    lines.append(f"| Acto | Capítulos | Palabras | % |")
-    lines.append(f"|---|---|---|---|")
-    for act_num in sorted(struct["acts"]):
-        a = struct["acts"][act_num]
-        lines.append(f"| {a['label']} | {_fmt_range(a['chapters'])} | {a['words']} | {a['pct']}% |")
-    lines.append("")
+    if struct["acts"]:
+        lines.append("### Actos declarados")
+        lines.append("")
+        lines.append("| Acto | Capítulos | Palabras | % |")
+        lines.append("|---|---|---|---|")
+        for act_num in sorted(struct["acts"]):
+            a = struct["acts"][act_num]
+            lines.append(f"| {a['label']} | {_fmt_range(a['chapters'])} | {a['words']} | {a['pct']}% |")
+        lines.append("")
 
     # Word count table
     lines.append("### Palabras por capítulo")
@@ -1475,7 +1368,7 @@ def generate_letter(chapters: list[dict], cap_filter: int | None = None) -> str:
     lines.append(f"| Cap | Título | POV | Palabras | vs media |")
     lines.append(f"|---|---|---|---|---|")
     for c in sorted(chapters, key=lambda x: x["num"]):
-        pov = POV_MAP.get(c["num"], DEFAULT_POV)
+        pov = c.get("pov") or "—"
         diff = c["words"] - struct["mean_words"]
         diff_str = f"+{diff:.0f}" if diff > 0 else f"{diff:.0f}"
         lines.append(f"| {c['num']:02d} | {c['title']} | {pov} | {c['words']} | {diff_str} |")
@@ -1546,7 +1439,7 @@ def generate_letter(chapters: list[dict], cap_filter: int | None = None) -> str:
     # Character appearances
     lines.append("### Apariciones de personajes")
     lines.append("")
-    for char_name in sorted(CHARACTER_NAMES.keys()):
+    for char_name in sorted(_load_character_names()):
         apps = voice.get("character_appearances", {}).get(char_name, [])
         caps_str = ", ".join(f"{n:02d}" for n in sorted(apps)) if apps else "—"
         lines.append(f"- **{char_name}**: caps {caps_str}")
@@ -1572,18 +1465,14 @@ def generate_letter(chapters: list[dict], cap_filter: int | None = None) -> str:
         lines.append(f"- Capítulo {o['chapter']:02d} ({o['words']} pal.) — **{direction}**")
     lines.append("")
 
-    # Act balance
-    lines.append("### Balance por acto")
-    lines.append("")
-    for act_num in sorted(pacing["act_words"]):
-        a = pacing["act_words"][act_num]
-        caps = struct["acts"][act_num]
-        expected = round(100 / 3, 1)
-        actual = round(a["total"] / struct["total_words"] * 100, 1)
-        diff = round(actual - expected, 1)
-        bar = "█" * int(actual / 2)
-        lines.append(f"- **{a['label']}**: {a['total']} pal. ({actual}%) {bar} {'+' if diff > 0 else ''}{diff}% vs equilibrio")
-    lines.append("")
+    if pacing["act_words"]:
+        lines.append("### Actos declarados")
+        lines.append("")
+        for act_num in sorted(pacing["act_words"]):
+            act = pacing["act_words"][act_num]
+            actual = round(act["total"] / struct["total_words"] * 100, 1) if struct["total_words"] else 0
+            lines.append(f"- **{act['label']}**: {act['total']} palabras ({actual}%)")
+        lines.append("")
 
     # ── Análisis de escenas ──
     scenes = analyze_scene_function(chapters)
@@ -1754,7 +1643,7 @@ def _generate_priorities(
     priorities = []
 
     # Structure: check if any mentioned character appears in person too late
-    char_list = list(CHARACTER_NAMES.keys())
+    char_list = list(_load_character_names())
     for char_name in char_list[:min(3, len(char_list))]:
         first_appearance = _first_dialogue_chapter(chapters, char_name)
         total_caps = len(chapters)
@@ -1764,7 +1653,7 @@ def _generate_priorities(
                 "issue": f"{char_name} primera escena con voz propia tarde "
                          f"(cap {first_appearance:02d})",
                 "detail": f"{char_name} podría necesitar una escena temprana "
-                          "para establecer el personaje antes del midpoint.",
+                          "si su presencia temprana es necesaria para el arco documentado.",
             })
 
     # Prose: "como si" clusters
@@ -1843,7 +1732,7 @@ def _generate_priorities(
             )
             # Detectar personaje con perfil preguntativo desde las fichas
             voice_name = "personaje"
-            for d in CHARACTERS_DIRS:
+            for d in character_dirs():
                 if d.is_dir():
                     for f in d.glob("*.md"):
                         if f.stem.startswith("_") or f.stem.startswith("."):
@@ -1871,8 +1760,6 @@ def _generate_verdict(
 
     verdict = (
         f"Manuscrito de {struct['total_words']} palabras en {struct['total_chapters']} capítulos. "
-        f"Estructura de tres actos sólida, midpoint en capítulo "
-        f"{struct['midpoint_chapter']:02d}. "
         f"{foreshadowing['closed']}/{foreshadowing['total']} hilos de foreshadowing cerrados. "
     )
 
@@ -1957,11 +1844,6 @@ def generate_json(chapters: list[dict], cap_filter: int | None = None) -> str:
     if HAS_INSIGHTS and _insights_module is not None:
         try:
             advanced = analyze_advanced_all(chapters)
-            arc = classify_story_arc(
-                {k: {"mean_intensity": v.get("mean_intensity", 0)}
-                 for k, v in emotions.items()}, None,
-            )
-            advanced["story_arc"] = arc
             output["insights"] = advanced
         except Exception:
             pass
@@ -2007,10 +1889,17 @@ def main():
     parser.add_argument("--resumen", action="store_true", help="Solo tabla de prioridades")
     parser.add_argument("--beta", action="store_true", help="Informe profesional sintético completo")
     parser.add_argument("--plan", action="store_true", help="Generar plan de revisión faseado")
-    parser.add_argument("--insights", action="store_true", help="Análisis avanzados: estilo, diálogo, Save the Cat, Chekhov, arco, etc.")
+    parser.add_argument("--insights", action="store_true", help="Análisis avanzados generales; marcos específicos se solicitan aparte")
+    parser.add_argument("--book-scope", help="Libros/<id> autoritativo; obligatorio en saga")
     parser.add_argument("--compare", type=str, nargs="*", metavar=("OLD_DIR", "NEW_DIR"),
                         help="Comparar dos versiones: --compare old_dir new_dir")
     args = parser.parse_args()
+
+    with scoped_book(args.book_scope):
+        run_letter(args)
+
+
+def run_letter(args):
 
     files = get_chapter_files()
     if not files:
@@ -2029,7 +1918,6 @@ def main():
             print("Error: módulo editorial_insights no disponible.")
             sys.exit(1)
         advanced = analyze_advanced_all(chapters)
-        advanced["story_arc"] = classify_story_arc(None, chapters)
         print(_insights_module.format_markdown(advanced))
     elif args.plan:
         prose = analyze_prose(chapters)

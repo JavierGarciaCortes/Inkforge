@@ -12,6 +12,7 @@ import { HelpDialog } from './components/HelpDialog'
 import { NarrativeNameDialog } from './components/NarrativeNameDialog'
 import { ProjectDialog } from './components/ProjectDialog'
 import { Sidebar } from './components/Sidebar'
+import { WorkManagementDialog } from './components/WorkManagementDialog'
 import { i18n } from './i18n'
 import { loadOpenCodeModelSelection } from './storage/model-selection-storage'
 import { loadDirectorWidth, MAX_DIRECTOR_WIDTH, saveDirectorWidth } from './storage/director-width-storage'
@@ -20,7 +21,6 @@ import type {
   ActiveProject,
   CreateProjectInput,
   CreateBookInput,
-  InkforgeAppInfo,
   LibraryActivationResult,
   LibraryBookSummary,
   LibraryProjectSummary,
@@ -67,6 +67,8 @@ type PendingAction =
   | { type: NarrativeDialogKind }
 
 type NarrativeDialogKind = 'rename-project' | 'rename-book'
+type WorkManagementAction = NarrativeDialogKind | 'add-book' | 'genres'
+type WorkManagementNavigation = { projectId: string; action: WorkManagementAction | null }
 
 function getDirectorBounds(workspaceWidth: number, compact: boolean) {
   const minimum = compact ? 260 : 280
@@ -82,7 +84,6 @@ function clampDirectorWidth(width: number, bounds: ReturnType<typeof getDirector
 
 function App() {
   const { t } = useTranslation()
-  const [appInfo, setAppInfo] = useState<InkforgeAppInfo | null>(null)
   const [projects, setProjects] = useState<LibraryProjectSummary[]>([])
   const [activeProject, setActiveProject] = useState<ActiveProject>(null)
   const [books, setBooks] = useState<LibraryBookSummary[]>([])
@@ -90,6 +91,7 @@ function App() {
   const [isProjectBusy, setIsProjectBusy] = useState(false)
   const [projectError, setProjectError] = useState<string | null>(null)
   const [isProjectDialogOpen, setIsProjectDialogOpen] = useState(false)
+  const [workManagementNavigation, setWorkManagementNavigation] = useState<WorkManagementNavigation | null>(null)
   const [isHelpOpen, setIsHelpOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(() => loadOpenCodeModelSelection() === null)
   const unavailableModelPrompts = useRef(new Set<string>())
@@ -137,6 +139,7 @@ function App() {
   const readRequestId = useRef(0)
   const saveRequestId = useRef(0)
 
+  const activeProjectId = activeProject?.id ?? null
   const isDirty = documentState === 'ready' && document !== null && draftContent !== document.content
 
   const directorBounds = getDirectorBounds(directorLayout.workspaceWidth, directorLayout.compact)
@@ -333,12 +336,6 @@ function App() {
       : () => undefined
 
     if (bridge) {
-      bridge.getAppInfo().then((info) => {
-        if (isEffectActive) {
-          setAppInfo(info)
-        }
-      }).catch(() => undefined)
-
       const requestId = libraryRequestId.current + 1
       libraryRequestId.current = requestId
 
@@ -403,6 +400,15 @@ function App() {
       booksRequestId.current += 1
       readRequestId.current += 1
       saveRequestId.current += 1
+      const libraryOperationActive = libraryOperationActiveRef.current
+      setWorkManagementNavigation((current) => {
+        if (!current || !scope.activeProject) return null
+        if (scope.activeProject.id !== current.projectId) {
+          return current.action === 'rename-project' && libraryOperationActive
+            ? current : null
+        }
+        return current.action !== null && !libraryOperationActive ? null : current
+      })
       setActiveProject(scope.activeProject)
       setActiveBook(scope.activeBook)
       setBooks(scope.books)
@@ -424,6 +430,7 @@ function App() {
 
   const finishProjectActivation = useCallback((nextScope: LibraryActivationResult) => {
     booksRequestId.current += 1
+    setWorkManagementNavigation(null)
     setIsBookDialogOpen(false)
     setIsGenreDialogOpen(false)
     resetDocumentForProjectChange()
@@ -572,6 +579,8 @@ function App() {
 
       setIsBookDialogOpen(false)
       finishBookActivation(nextActiveBook)
+      setWorkManagementNavigation((current) => current?.action === 'add-book'
+        ? { ...current, action: null } : current)
     } catch (error) {
       if (isMounted.current && libraryRequestId.current === requestId) {
         setProjectError(getLibraryError(error, i18n.t('errors.addBook')))
@@ -608,6 +617,11 @@ function App() {
       resetDocumentForProjectChange()
       setNarrativeDialog(null)
       setActiveProject(nextActiveProject)
+      setWorkManagementNavigation((current) => {
+        if (nextActiveProject === null) return null
+        return current?.action === 'rename-project'
+          ? { projectId: nextActiveProject.id, action: null } : current
+      })
       setVaultTree([])
       setVaultState('loading')
       setVaultError(null)
@@ -647,6 +661,8 @@ function App() {
 
       setNarrativeDialog(null)
       finishBookActivation(nextActiveBook)
+      setWorkManagementNavigation((current) => current?.action === 'rename-book'
+        ? { ...current, action: null } : current)
     } catch (error) {
       if (isMounted.current && libraryRequestId.current === requestId) {
         setProjectError(getLibraryError(error, i18n.t('errors.renameBook')))
@@ -659,6 +675,13 @@ function App() {
     }
   }, [finishBookActivation])
 
+  const returnToWorkManagement = useCallback((action: WorkManagementAction) => {
+    setWorkManagementNavigation((current) => {
+      if (current?.action !== action) return current
+      return activeProjectId === current.projectId ? { ...current, action: null } : null
+    })
+  }, [activeProjectId])
+
   const cancelProjectDialog = useCallback(() => {
     setIsProjectDialogOpen(false)
     setProjectError(null)
@@ -667,7 +690,8 @@ function App() {
   const cancelNarrativeDialog = useCallback(() => {
     setNarrativeDialog(null)
     setProjectError(null)
-  }, [])
+    if (narrativeDialog) returnToWorkManagement(narrativeDialog)
+  }, [narrativeDialog, returnToWorkManagement])
 
   const openDocument = async (relativePath: string) => {
     if (!activeProject || relativePath === selectedPath) {
@@ -814,9 +838,26 @@ function App() {
     else setNarrativeDialog(type)
   }
 
+  const openManagementAction = (action: WorkManagementAction) => {
+    if (!activeProject || (action !== 'genres' && (
+      isProjectBusy || libraryOperationActiveRef.current || saveState === 'saving'
+    ))) return
+
+    setWorkManagementNavigation({ projectId: activeProject.id, action })
+    if (action === 'genres') setIsGenreDialogOpen(true)
+    else requestNarrativeDialog(action)
+  }
+
   const cancelPendingAction = useCallback(() => {
+    if (pendingAction && (
+      pendingAction.type === 'add-book' ||
+      pendingAction.type === 'rename-project' ||
+      pendingAction.type === 'rename-book'
+    )) {
+      returnToWorkManagement(pendingAction.type)
+    }
     setPendingAction(null)
-  }, [])
+  }, [pendingAction, returnToWorkManagement])
 
   const discardPendingChanges = async () => {
     const action = pendingAction
@@ -1090,6 +1131,8 @@ function App() {
       ? activeBook?.title ?? ''
       : ''
   const narrativeDialogSubmitLabel = t('dialogs.rename')
+  const managedAction = workManagementNavigation?.projectId === activeProjectId
+    ? workManagementNavigation?.action : null
   const isCloseWindowPending = pendingAction?.type === 'close-window'
   const isProjectChangePending = pendingAction?.type === 'switch-project'
     || pendingAction?.type === 'new-project'
@@ -1115,7 +1158,6 @@ function App() {
   return (
     <div className="app-shell">
       <AppHeader
-        appInfo={appInfo}
         onHelp={() => setIsHelpOpen(true)}
         onSettings={() => setIsSettingsOpen(true)}
         connectionState={connectionState}
@@ -1140,10 +1182,9 @@ function App() {
           onProjectChange={requestProjectChange}
           onBookChange={requestBookChange}
           onNewProject={requestNewProject}
-          onAddBook={() => requestNarrativeDialog('add-book')}
-          onRenameProject={() => requestNarrativeDialog('rename-project')}
-          onRenameBook={() => requestNarrativeDialog('rename-book')}
-          onConfigureGenres={() => setIsGenreDialogOpen(true)}
+          onManageWork={() => {
+            if (activeProject) setWorkManagementNavigation({ projectId: activeProject.id, action: null })
+          }}
           onReload={retryVault}
         />
         <DocumentWorkspace
@@ -1186,6 +1227,20 @@ function App() {
           onConnectionStateChange={setConnectionState}
         />
       </div>
+      {workManagementNavigation && workManagementNavigation.action === null &&
+        activeProject?.id === workManagementNavigation.projectId && activeProject && (
+        <WorkManagementDialog
+          project={activeProject}
+          activeBook={activeBook}
+          isProjectBusy={isProjectBusy}
+          isActiveBookAvailable={activeBook === null || books.some((book) => book.id === activeBook.id)}
+          onCancel={() => setWorkManagementNavigation(null)}
+          onRenameProject={() => openManagementAction('rename-project')}
+          onConfigureGenres={() => openManagementAction('genres')}
+          onAddBook={() => openManagementAction('add-book')}
+          onRenameBook={() => openManagementAction('rename-book')}
+        />
+      )}
       {isProjectDialogOpen && (
         <ProjectDialog
           isCreating={isProjectBusy}
@@ -1198,7 +1253,12 @@ function App() {
         <BookDialog
           isCreating={isProjectBusy}
           error={projectError}
-          onCancel={() => { setIsBookDialogOpen(false); setProjectError(null) }}
+          exitLabel={managedAction === 'add-book' ? t('common.back') : undefined}
+          onCancel={() => {
+            setIsBookDialogOpen(false)
+            setProjectError(null)
+            returnToWorkManagement('add-book')
+          }}
           onCreate={(input) => void createLibraryBook(input)}
         />
       )}
@@ -1208,7 +1268,11 @@ function App() {
           projectId={activeProject.id}
           projectType={activeProject.type}
           bookId={activeBook?.id ?? null}
-          onCancel={() => setIsGenreDialogOpen(false)}
+          exitLabel={managedAction === 'genres' ? t('common.back') : t('common.close')}
+          onCancel={() => {
+            setIsGenreDialogOpen(false)
+            returnToWorkManagement('genres')
+          }}
         />
       )}
       {narrativeDialog && (
@@ -1218,6 +1282,7 @@ function App() {
           label={narrativeDialogLabel}
           initialValue={narrativeDialogInitialValue}
           submitLabel={narrativeDialogSubmitLabel}
+          exitLabel={managedAction === narrativeDialog ? t('common.back') : undefined}
           isSubmitting={isProjectBusy}
           error={projectError}
           onCancel={cancelNarrativeDialog}

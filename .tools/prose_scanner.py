@@ -1,7 +1,7 @@
 """
 prose_scanner.py — Escáner de patrones de prosa.
 
-Lee los capítulos (desde manifiesto.json), los patrones de Estilo/patrones.json,
+Lee los capítulos desde su Markdown y los patrones de Estilo/patrones.json,
 y genera un informe de densidad, severidad y clusters por capítulo.
 
 Uso:
@@ -18,11 +18,12 @@ import argparse
 from pathlib import Path
 from collections import defaultdict
 
-from vault import VAULT, CHAPTERS_DIR as ESCRITURA, STYLE_DIR, TEMPLATES_DIR, get_chapter_files, get_chapter_number
+from vault import chapter_dir, style_dir, templates_dir, planning_file, scoped_book, get_chapter_files, get_chapter_number
 
-PATRONES = STYLE_DIR / "patrones.json"
-if not PATRONES.is_file():
-    PATRONES = TEMPLATES_DIR / "patrones.json"
+
+def pattern_file() -> Path:
+    local = style_dir() / "patrones.json"
+    return local if local.is_file() else templates_dir() / "patrones.json"
 
 
 def cargar_patrones(ruta):
@@ -257,7 +258,7 @@ def reporte_global(caps_data, cfg):
         for name, r in d["resultados"].items():
             total_patrones[name] += r["count"]
 
-    patrones, _ = cargar_patrones(PATRONES)
+    patrones, _ = cargar_patrones(pattern_file())
 
     # ── Patrones ──
     print(f"  Total: {total_palabras} palabras en {len(caps_data)} capítulos\n")
@@ -379,7 +380,7 @@ def reporte_json(caps_data):
 def scan_chapter(num: str, context_mode: str = "short") -> dict | None:
     """Escanea un capítulo y devuelve dict con resultados listos para JSON."""
     target = str(int(num)) if num.isdigit() else num
-    patrones, cfg = cargar_patrones(PATRONES)
+    patrones, cfg = cargar_patrones(pattern_file())
     caps = listar_capitulos()
     for archivo in caps:
         n = get_chapter_number(archivo.name)
@@ -404,7 +405,7 @@ def scan_chapter(num: str, context_mode: str = "short") -> dict | None:
 
 def scan_all(context_mode: str = "short") -> list[dict]:
     """Escanea todos los capítulos y devuelve lista de dicts."""
-    patrones, cfg = cargar_patrones(PATRONES)
+    patrones, cfg = cargar_patrones(pattern_file())
     caps = listar_capitulos()
     results = []
     for archivo in caps:
@@ -540,7 +541,7 @@ def validar_patrones(ruta) -> list[dict]:
 def actualizar_estado(ruta_estado: str | None = None) -> str:
     """Actualiza la tabla de scores en Estado.md con los últimos datos del scanner."""
     if ruta_estado is None:
-        ruta_estado = str(VAULT / "Referencias" / "Estado.md")
+        ruta_estado = str(planning_file("Estado.md"))
     estado_path = Path(ruta_estado)
     if not estado_path.exists():
         return f"No se encuentra Estado.md en: {ruta_estado}"
@@ -601,7 +602,7 @@ def _reporte_ritmo(caps_data: list):
     print(f"\n{' | '.join(headers)}")
     print(f"{' | '.join('---' for _ in headers)}")
     for d in caps_data:
-        texto = open(ESCRITURA / d["archivo"], encoding="utf-8").read()
+        texto = (chapter_dir() / d["archivo"]).read_text(encoding="utf-8")
         r = analizar_ritmo(texto)
         if r["total_frases"] == 0:
             continue
@@ -669,9 +670,9 @@ def reporte_king(caps_data: list):
     print("  " + "-" * 80)
     for d in caps_data:
         k = analisis_king(
-            open(ESCRITURA / d["archivo"], encoding="utf-8").read(),
+            (chapter_dir() / d["archivo"]).read_text(encoding="utf-8"),
             d["resultados"],
-            cargar_patrones(PATRONES)[1],
+            cargar_patrones(pattern_file())[1],
         )
         king_score = k["king_score"]
         adverbios = k["adverbios_dialogo"]
@@ -729,7 +730,7 @@ def reporte_king(caps_data: list):
 
 def export_king(num: str) -> dict | None:
     """Exporta análisis King de un capítulo para MCP."""
-    patrones, cfg = cargar_patrones(PATRONES)
+    patrones, cfg = cargar_patrones(pattern_file())
     caps = listar_capitulos()
     for archivo in caps:
         n = get_chapter_number(archivo.name)
@@ -755,7 +756,7 @@ def export_king(num: str) -> dict | None:
 
 def export_king_all() -> dict:
     """Exporta análisis King de todos los capítulos."""
-    patrones, cfg = cargar_patrones(PATRONES)
+    patrones, cfg = cargar_patrones(pattern_file())
     caps = listar_capitulos()
     results = {}
     for archivo in caps:
@@ -929,11 +930,18 @@ def main():
     parser.add_argument("--door", choices=["closed", "open"], default="open",
                         help="Modo puerta cerrada (solo crítico, primer borrador) o abierta (full, revisión)")
     parser.add_argument("--update-estado", action="store_true",
-                        help="Actualizar scores en Referencias/Estado.md")
+                        help="Actualizar scores en Planificación/Estado.md del libro")
+    parser.add_argument("--book-scope", help="Libros/<id> autoritativo; obligatorio en saga")
     args = parser.parse_args()
 
+    with scoped_book(args.book_scope):
+        run_scan(args)
+
+
+def run_scan(args):
+
     if args.validate:
-        warnings = validar_patrones(PATRONES)
+        warnings = validar_patrones(pattern_file())
         if not warnings:
             print("✅ No se detectaron overlaps entre patrones.")
         else:
@@ -948,7 +956,7 @@ def main():
         print(actualizar_estado())
         return
 
-    patrones, cfg = cargar_patrones(PATRONES)
+    patrones, cfg = cargar_patrones(pattern_file())
     caps = listar_capitulos()
 
     caps_data = []
@@ -984,7 +992,7 @@ def main():
         caps_data.append(entry)
 
     if not caps_data:
-        print(f"No se encontraron capítulos. Buscando en: {ESCRITURA}")
+        print(f"No se encontraron capítulos. Buscando en: {chapter_dir()}")
         return
 
     if args.king:
@@ -999,7 +1007,7 @@ def main():
         for d in caps_data:
             modo_review(
                 Path(d["archivo"]),
-                open(ESCRITURA / d["archivo"], encoding="utf-8").read(),
+                (chapter_dir() / d["archivo"]).read_text(encoding="utf-8"),
                 d["palabras"],
                 d["resultados"],
                 cfg,

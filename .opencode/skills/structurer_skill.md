@@ -1,50 +1,7 @@
-# Structurer Skill — Análisis estructural para ficción
+# Structurer — estructura narrativa
 
-> Uso: cargar con `skill("structurer")` antes de delegar análisis estructural.
+Respetar `AGENTS.md`: `VAULT_PATH` apunta a la obra y, en saga, usar el `book_scope` explícito `Libros/<id>` de Inkforge para todas las herramientas de contenido. La estructura del libro reside en sus capítulos y Markdown de `Planificación/` y `Canon/`; el mundo y las referencias compartidas se leen en la raíz de la saga.
 
----
+Leer primero el manuscrito y la planificación que existan. Consultar `get_pacing`, `check_scenes`, `check_emotional_arc`, `get_foreshadowing` o `get_chekhov_gun` de acuerdo con el problema. `get_story_arc` y `get_save_the_cat` son opciones si el usuario pide esos marcos o la obra los adopta expresamente. No asumir tres actos, midpoint, protagonista único ni una estructura de beats universal.
 
-## Tools MCP a consultar (en orden)
-
-1. `get_pacing()` — outliers de ritmo, balance de actos
-2. `get_story_arc()` — arco Vonnegut del manuscrito completo
-3. `get_save_the_cat()` — 15 beats de Save the Cat
-4. `get_chekhov_gun()` — objetos sembrados vs pagados
-5. `get_foreshadowing(thread?)` — ledger de siembras
-6. `check_scenes(chapter?)` — clasificación de escenas
-7. `check_emotional_arc(chapter?)` — intensidad emocional
-8. `check_pacing(chapter?)` — variación de frases
-
-## Archivos de referencia
-
-- `Referencias/Trama.md` — conflicto aparente y real
-- `Referencias/Outliner.md` — word counts, decisiones, hoja de ruta
-- `Referencias/Cronología.md` — línea temporal
-- `Referencias/Foreshadowing.md` — promesas narrativas
-- `Referencias/Léxico.md` — glosario de términos
-- `.fiction/config.json` — acts, POV por defecto
-
-## Formato de respuesta
-
-Estructura fija:
-
-1. **Resumen ejecutivo** (2-3 líneas)
-2. **Coherencia del worldbuilding** — agujeros lógicos, contradicciones (consultar `Referencias/Fundamentos.md` como base canónica)
-3. **Estructura narrativa** — cómo encaja en el arco de tres actos
-4. **Riesgos estructurales** — paradojas, hilos sueltos, problemas de pacing
-5. **Recomendaciones concretas** — priorizadas (ahora / antes de escribir / planificar)
-6. **Preguntas abiertas** — decisiones pendientes
-
-## Criterios de revisión
-
-- **Escalación**: ¿la tensión crece de forma orgánica?
-- **Consecuencias**: ¿las ventajas, decisiones y recursos tienen efectos coherentes?
-- **Proactividad del POV**: ¿el protagonista decide o reacciona?
-- **Promesas**: ¿cada siembra tiene o tendrá un pago?
-- **Estructura**: ¿cada escena tiene función narrativa?
-
-## Interacción con otros agentes
-
-- Responder explícitamente a cada objeción del `critico`. Sin silencios.
-- Implementar o rechazar con argumento. No dejar puntos sin resolver.
-- Máximo 3 rondas de iteración antes de presentar al usuario.
+Entregar hallazgos apoyados en capítulos concretos, riesgos, alternativas y preguntas abiertas. Distinguir una contradicción documentada de una preferencia estructural. No escribir cambios sin una orden de edición.

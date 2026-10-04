@@ -3,7 +3,7 @@
 consistency_check.py — Verificador de consistencia fina.
 
 Chequea objetos desde lore, tiempo/clima desde YAML de capítulos.
-Lee objetos desde vault/Mundo/Historia/*.md y metadatos YAML.
+Lee objetos desde Mundo/Historia/*.md de la obra y metadatos YAML del libro.
 
 Uso:
     python .tools/consistency_check.py                   # resumen global
@@ -20,9 +20,8 @@ import sys
 from pathlib import Path
 
 from vault import (
-    CONTENT_ROOT,
-    CHAPTERS_DIR,
-    WORLD_DIRS,
+    world_dirs,
+    scoped_book,
     get_chapter_files,
     get_chapter_number,
     read_chapter,
@@ -35,13 +34,14 @@ from vault import (
 
 
 def _get_lore_objects() -> list[dict]:
-    """Extrae objetos con alias desde vault/Mundo/Historia/*.md."""
+    """Extrae objetos con alias desde Mundo/Historia/*.md de la obra."""
     objects = []
-    for d in WORLD_DIRS:
-        if not d.is_dir():
+    for world in world_dirs():
+        d = world / "Historia"
+        if not d.is_dir() or d.is_symlink() or getattr(d, "is_junction", lambda: False)():
             continue
         for hf in sorted(d.glob("*.md")):
-            if hf.stem.startswith("_") or hf.stem.startswith("."):
+            if hf.stem.startswith("_") or hf.stem.startswith(".") or hf.is_symlink():
                 continue
             text = hf.read_text("utf-8")
             name = hf.stem
@@ -248,7 +248,14 @@ def main():
         "--json", action="store_true",
         help="Salida JSON",
     )
+    parser.add_argument("--book-scope", help="Libros/<id> autoritativo; obligatorio en saga")
     args = parser.parse_args()
+
+    with scoped_book(args.book_scope):
+        run_checks(args)
+
+
+def run_checks(args):
 
     lore_objects = _get_lore_objects()
 

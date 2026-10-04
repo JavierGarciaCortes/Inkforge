@@ -13,7 +13,7 @@
     },
     "structurer": {
       "mode": "subagent",
-      "description": "Estructurador narrativo. Outline, ritmo, reglas del mundo, causalidad y agujeros de guion. Consulta get_pacing(), get_story_arc(), get_save_the_cat(), check_scenes(). Responde a cada objeción del critico. Skills en .opencode/skills/structurer_skill.md"
+      "description": "Estructurador narrativo. Outline, ritmo, reglas del mundo, causalidad y agujeros de guion. Consulta herramientas del libro seleccionado; los marcos específicos solo se usan cuando el contexto o el usuario los justifica. Skills en .opencode/skills/structurer_skill.md"
     },
     "lector": {
       "mode": "subagent",
@@ -25,13 +25,14 @@
     },
     "query": {
       "mode": "subagent",
-      "description": "Creador de cartas editoriales. Genera loglines, sinopsis, comparables y cartas completas para presentar a editoriales o agentes literarios. NO spoilea la paradoja. Skills en .opencode/skills/query_skill.md"
+      "description": "Creador de cartas editoriales. Genera loglines, sinopsis, comparables y cartas completas para presentar a editoriales o agentes literarios según el libro seleccionado. Skills en .opencode/skills/query_skill.md"
     }
   },
   "mcp": {
-    "fiction-context": {
+    "inkforge-context": {
       "type": "local",
-      "command": ["python", ".tools/fiction_mcp.py"],
+      "command": ["python", ".tools/inkforge_mcp.py"],
+      "cwd": "{env:INKFORGE_INFRASTRUCTURE_ROOT}",
       "enabled": true,
       "description": "Contexto de escritura: personajes, lore, continuidad, foreshadowing"
     }

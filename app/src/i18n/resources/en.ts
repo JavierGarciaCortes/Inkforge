@@ -5,6 +5,7 @@ const en = {
     library: 'Library',
     currentVault: 'Current vault',
     cancel: 'Cancel',
+    back: 'Back',
     close: 'Close',
     retry: 'Retry',
     unavailable: '{{title}} (unavailable)',
@@ -22,10 +23,11 @@ const en = {
   },
   header: {
     connection: {
-      connected: 'OpenCode connected',
-      connecting: 'Connecting to OpenCode…',
-      error: 'OpenCode connection error',
+      connected: 'Connected',
+      connecting: 'Connecting…',
+      error: 'Error',
     },
+    connectionContext: 'OpenCode connection: {{status}}',
     tagline: 'Writing workspace',
     desktopVersion: '{{name}} Desktop v{{version}}',
     language: 'Interface language',
@@ -50,6 +52,7 @@ const en = {
     documentCount_other: '{{count}} documents',
     workVault: 'Work vault',
     newWork: 'New work',
+    manageWork: 'Manage work',
     activeWork: 'Active work',
     renameSaga: 'Rename saga',
     renameBook: 'Rename book',
@@ -146,7 +149,7 @@ const en = {
     intro: 'Review the available features and the guide for preparing a project compatible with a future import flow.',
     library: {
       title: 'Getting started and Library',
-      works: 'Inkforge works with standalone novels and sagas. New work creates a work, and Active work switches between existing works.',
+      works: 'The sidebar shows the active work and its type, New work, Manage work, the Active work selector, and the document tree.',
       active: 'A saga can contain several books. Active book selects the book you are working on; opening an explorer item does not switch books.',
     },
     projectTypes: {
@@ -154,6 +157,18 @@ const en = {
       standalone: 'In a standalone novel, content sits directly under the project.',
       saga: 'In a saga, World, Style, and References are shared. Each book has its own Chapters, Planning, Canon, Notes, and Resources.',
       visibility: 'The other books in a saga are not visually mixed with the active book.',
+    },
+    manage: {
+      title: 'Manage work',
+      standalone: 'For a standalone novel, Manage work lets you rename it and configure its genres.',
+      saga: 'For a saga, it groups Rename saga, Genres, and Add book; when a book is active, you can also rename that book.',
+      navigation: 'Back returns from an action to Manage work, and Close exits. Saving genres keeps the dialog open; after renaming or adding a book, you return to Manage work if the work is still active.',
+    },
+    genres: {
+      title: 'Editorial genres',
+      selection: 'Assign zero, one, or several profiles to a work. In a saga, the same dialog configures both saga genres and the active book’s genres.',
+      inheritance: 'With inheritance on, a book combines saga genres with its own; with inheritance off, it uses only its own.',
+      guidance: 'Profiles guide editing but are not canon. The Director can read them and create or update one when you explicitly ask.',
     },
     editing: {
       title: 'Explore and edit',
@@ -171,8 +186,9 @@ const en = {
     ai: {
       title: 'Chat and AI',
       openCode: 'Inkforge uses local OpenCode for AI integration.',
-      models: 'Providers and models come from OpenCode. Inkforge does not require a specific provider and lets you select a model when appropriate.',
-      retry: 'If a response fails because of the model or provider, a retry with the selected model may be offered.',
+      models: 'Choose a model and variant in Settings → AI / Director. Both come from OpenCode; the default variant uses OpenCode’s default behavior.',
+      retry: 'If an incompatible model fails, you can change models and retry the message.',
+      scope: 'The Director needs an active work. Each work keeps its conversation, and books in a saga share one; answer questions and permissions in the chat when they appear.',
       identity: 'Assistant responses are displayed with the Inkforge identity.',
     },
     language: {

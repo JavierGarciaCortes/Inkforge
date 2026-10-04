@@ -9,10 +9,11 @@ interface BookDialogProps {
   isCreating: boolean
   error: string | null
   onCancel: () => void
+  exitLabel?: string
   onCreate: (input: CreateBookInput) => void
 }
 
-export function BookDialog({ isCreating, error, onCancel, onCreate }: BookDialogProps) {
+export function BookDialog({ isCreating, error, onCancel, exitLabel, onCreate }: BookDialogProps) {
   const { t } = useTranslation()
   const titleRef = useRef<HTMLInputElement>(null)
   const [bookTitle, setBookTitle] = useState('')
@@ -77,7 +78,7 @@ export function BookDialog({ isCreating, error, onCancel, onCreate }: BookDialog
         )}
         <div className="confirm-dialog-actions">
           <button className="dialog-button dialog-button-secondary" type="button"
-            disabled={isCreating} onClick={onCancel}>{t('common.cancel')}</button>
+            disabled={isCreating} onClick={onCancel}>{exitLabel ?? t('common.cancel')}</button>
           <button className="dialog-button project-dialog-create" type="submit"
             disabled={isCreating}>{isCreating ? t('projectDialog.creating') : t('projectDialog.create')}</button>
         </div>

@@ -110,6 +110,24 @@ export function HelpDialog({ onClose }: HelpDialogProps) {
           </section>
 
           <section className="help-section">
+            <h3>{t('help.manage.title')}</h3>
+            <ul className="help-list">
+              <li>{t('help.manage.standalone')}</li>
+              <li>{t('help.manage.saga')}</li>
+              <li>{t('help.manage.navigation')}</li>
+            </ul>
+          </section>
+
+          <section className="help-section">
+            <h3>{t('help.genres.title')}</h3>
+            <ul className="help-list">
+              <li>{t('help.genres.selection')}</li>
+              <li>{t('help.genres.inheritance')}</li>
+              <li>{t('help.genres.guidance')}</li>
+            </ul>
+          </section>
+
+          <section className="help-section">
             <h3>{t('help.editing.title')}</h3>
             <ul className="help-list">
               <li>{t('help.editing.open')}</li>
@@ -134,6 +152,7 @@ export function HelpDialog({ onClose }: HelpDialogProps) {
               <li>{t('help.ai.openCode')}</li>
               <li>{t('help.ai.models')}</li>
               <li>{t('help.ai.retry')}</li>
+              <li>{t('help.ai.scope')}</li>
               <li>{t('help.ai.identity')}</li>
             </ul>
           </section>

@@ -758,8 +758,10 @@ class OpenCodeClient {
     const environment = { ...process.env }
     delete environment.VAULT_PATH
     delete environment.INKFORGE_LIBRARY_ROOT
+    delete environment.INKFORGE_INFRASTRUCTURE_ROOT
     if (this.workingDirectory !== null) environment.VAULT_PATH = this.workingDirectory
     environment.INKFORGE_LIBRARY_ROOT = this.libraryRoot
+    environment.INKFORGE_INFRASTRUCTURE_ROOT = this.infrastructureRoot.replace(/\\/g, '/')
     return new Promise((resolve, reject) => {
       const child = spawn(
         'opencode',
@@ -1033,6 +1035,12 @@ class OpenCodeClient {
 
   async listModels() {
     await this.ensureConnected()
+    const generation = this.workspaceGeneration
+    const providers = await this.fetchJson(this.withDirectory('/provider', true))
+    if (generation !== this.workspaceGeneration) {
+      throw new OpenCodeError('invalid_request', 'La obra activa ha cambiado.')
+    }
+    this.models = normalizeModels(providers)
     return this.models.map((model) => ({ ...model, variants: [...model.variants] }))
   }
 
@@ -1121,9 +1129,9 @@ class OpenCodeClient {
     }
 
     if (
-      typeof model.variant === 'string' &&
-      model.variant.length > 0 &&
-      !availableModel.variants.includes(model.variant)
+      model.variant !== undefined &&
+      (typeof model.variant !== 'string' ||
+        (model.variant.length > 0 && !availableModel.variants.includes(model.variant)))
     ) {
       throw new OpenCodeError('invalid_request', 'La variante seleccionada no está disponible para este modelo.')
     }
@@ -1155,10 +1163,14 @@ class OpenCodeClient {
         model: {
           providerID: input.model.providerID,
           modelID: input.model.modelID,
-          ...(input.model.variant ? { variant: input.model.variant } : {}),
         },
-        ...(typeof input.system === 'string' ? { system: input.system } : {}),
-        parts: [{ type: 'text', text }],
+        ...(input.model.variant ? { variant: input.model.variant } : {}),
+        parts: [
+          ...(typeof input.system === 'string'
+            ? [{ type: 'text', text: input.system, synthetic: true }]
+            : []),
+          { type: 'text', text },
+        ],
       },
       timeout: 10 * 60 * 1000,
     })
