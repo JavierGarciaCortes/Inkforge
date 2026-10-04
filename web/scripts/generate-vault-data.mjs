@@ -8,6 +8,60 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(fileURLToPath(import.meta.url), "../../../");
 const OUT = path.join(ROOT, "web/src/data/vault.json");
+const projectPath = process.env.VAULT_PATH;
+if (!projectPath) throw new Error("VAULT_PATH debe indicar la raíz de una obra Inkforge.");
+const PROJECT_ROOT = fs.realpathSync(projectPath);
+
+function manifest(directory, filename) {
+  const lines = fs.readFileSync(path.join(directory, filename), "utf-8").replace(/^\uFEFF/u, "").split(/\r?\n/u);
+  if (lines[0] !== "---") throw new Error(`${filename} no tiene frontmatter válido.`);
+  const end = lines.indexOf("---", 1);
+  if (end < 0) throw new Error(`${filename} no tiene frontmatter cerrado.`);
+  const fields = new Map();
+  for (const line of lines.slice(1, end)) {
+    const index = line.indexOf(":");
+    if (index < 0) continue;
+    const key = line.slice(0, index).trim();
+    const raw = line.slice(index + 1).trim();
+    let value = raw;
+    if (raw.startsWith('"') && raw.endsWith('"')) {
+      try { value = JSON.parse(raw); } catch { throw new Error(`${filename} contiene un campo no válido.`); }
+    }
+    fields.set(key, value);
+  }
+  return fields;
+}
+
+const project = manifest(PROJECT_ROOT, "Proyecto.md");
+if (project.get("inkforge") !== "1" || !["novela", "saga"].includes(project.get("tipo")) || !project.get("titulo")) {
+  throw new Error("VAULT_PATH no contiene una obra Inkforge válida.");
+}
+const scopeIndex = process.argv.indexOf("--book-scope");
+const bookScope = scopeIndex >= 0 ? process.argv[scopeIndex + 1] : process.env.INKFORGE_BOOK_SCOPE ?? null;
+let BOOK_ROOT = PROJECT_ROOT;
+let book = project;
+if (project.get("tipo") === "saga") {
+  if (!bookScope || !/^Libros\/[^/\\:]+$/u.test(bookScope) ||
+      [".", ".."].includes(bookScope.slice("Libros/".length))) {
+    throw new Error("Una saga requiere --book-scope Libros/<id> explícito.");
+  }
+  if (fs.lstatSync(path.join(PROJECT_ROOT, "Libros")).isSymbolicLink() ||
+      fs.lstatSync(path.join(PROJECT_ROOT, bookScope)).isSymbolicLink()) {
+    throw new Error("El scope de libro no puede usar enlaces simbólicos.");
+  }
+  const booksRoot = fs.realpathSync(path.join(PROJECT_ROOT, "Libros"));
+  BOOK_ROOT = fs.realpathSync(path.join(PROJECT_ROOT, bookScope));
+  if (path.dirname(booksRoot) !== PROJECT_ROOT || path.dirname(BOOK_ROOT) !== booksRoot) {
+    throw new Error("El scope de libro sale de la obra.");
+  }
+  book = manifest(BOOK_ROOT, "Libro.md");
+  if (book.get("inkforge") !== "1" || book.get("tipo") !== "libro" || !book.get("titulo") ||
+      !/^(?:[1-9]|[1-9][0-9])$/u.test(book.get("numero") ?? "")) {
+    throw new Error("El Libro.md seleccionado no es válido.");
+  }
+} else if (bookScope) {
+  throw new Error("Una novela independiente usa la raíz de la obra como scope.");
+}
 
 function slug(s) {
   return s
@@ -33,7 +87,7 @@ function stripMd(t) {
 const ESC = "\x00";
 
 function read(p) {
-  return fs.readFileSync(path.join(ROOT, p), "utf-8");
+  return fs.readFileSync(path.join(PROJECT_ROOT, p), "utf-8");
 }
 
 function splitTable(line) {
@@ -57,12 +111,12 @@ function parseSections(text) {
 
 // ── Characters ──
 function getCharacters() {
-  const dir = path.join(ROOT, "vault/Mundo/Personajes");
+  const dir = path.join(PROJECT_ROOT, "Mundo/Personajes");
   if (!fs.existsSync(dir)) return [];
   const chars = [];
   for (const f of fs.readdirSync(dir).sort()) {
     if (!f.endsWith(".md")) continue;
-    const text = read(`vault/Mundo/Personajes/${f}`);
+    const text = read(`Mundo/Personajes/${f}`);
     const m = text.match(/^#\s+(.+)/m);
     if (!m) continue;
     const name = m[1].trim();
@@ -115,12 +169,12 @@ function getCharacters() {
 
 // ── Entities ──
 function getEntities() {
-  const dir = path.join(ROOT, "vault/Mundo/Historia");
+  const dir = path.join(PROJECT_ROOT, "Mundo/Historia");
   if (!fs.existsSync(dir)) return [];
   const entities = [];
   for (const f of fs.readdirSync(dir).sort()) {
     if (!f.endsWith(".md")) continue;
-    const text = read(`vault/Mundo/Historia/${f}`);
+    const text = read(`Mundo/Historia/${f}`);
     const m = text.match(/^#\s+(.+)/m);
     if (!m) continue;
     const name = m[1].trim();
@@ -152,12 +206,12 @@ function getEntities() {
 
 // ── Places ──
 function getPlaces() {
-  const dir = path.join(ROOT, "vault/Mundo/Lugares");
+  const dir = path.join(PROJECT_ROOT, "Mundo/Lugares");
   if (!fs.existsSync(dir)) return [];
   const places = [];
   for (const f of fs.readdirSync(dir).sort()) {
     if (!f.endsWith(".md")) continue;
-    const text = read(`vault/Mundo/Lugares/${f}`);
+    const text = read(`Mundo/Lugares/${f}`);
     const m = text.match(/^#\s+(.+)/m);
     if (!m) continue;
     const name = m[1].trim();
@@ -185,7 +239,7 @@ function getPlaces() {
 
 // ── Timeline ──
 function getTimeline() {
-  const fp = path.join(ROOT, "vault/Referencias/Cronología.md");
+  const fp = path.join(BOOK_ROOT, "Planificación/Cronología.md");
   if (!fs.existsSync(fp)) return [];
   const text = fs.readFileSync(fp, "utf-8");
   const events = [];
@@ -204,7 +258,7 @@ function getTimeline() {
 
 // ── Foreshadowing ──
 function getForeshadowing() {
-  const fp = path.join(ROOT, "vault/Referencias/Foreshadowing.md");
+  const fp = path.join(BOOK_ROOT, "Planificación/Foreshadowing.md");
   if (!fs.existsSync(fp)) return [];
   const text = fs.readFileSync(fp, "utf-8");
   const threads = [];
@@ -223,7 +277,7 @@ function getForeshadowing() {
 
 // ── Trama ──
 function getTrama() {
-  const fp = path.join(ROOT, "vault/Referencias/Trama.md");
+  const fp = path.join(BOOK_ROOT, "Planificación/Trama.md");
   if (!fs.existsSync(fp)) return { premisa: "", conflicto: "", temas: [], conflictoReal: "", paradoja: "", content: "" };
   const text = fs.readFileSync(fp, "utf-8");
   const sections = {};
@@ -245,7 +299,7 @@ function getTrama() {
 
 // ── Léxico ──
 function getLexico() {
-  const fp = path.join(ROOT, "vault/Referencias/Léxico.md");
+  const fp = path.join(BOOK_ROOT, "Planificación/Léxico.md");
   if (!fs.existsSync(fp)) return [];
   const text = fs.readFileSync(fp, "utf-8");
   const entries = [];
@@ -266,7 +320,7 @@ function getLexico() {
 
 // ── Estado ──
 function getEstado() {
-  const fp = path.join(ROOT, "vault/Referencias/Estado.md");
+  const fp = path.join(BOOK_ROOT, "Planificación/Estado.md");
   if (!fs.existsSync(fp)) return { updated: "", palabras: 0, capitulos: 0, chars: 0, lugares: 0, lore: 0 };
   const text = fs.readFileSync(fp, "utf-8");
   const um = text.match(/\*\*Última actualización\*\*:\s*(.+)/);
@@ -285,19 +339,14 @@ function getEstado() {
   return { updated: um ? um[1].trim() : "", palabras, capitulos, chars, lugares, lore };
 }
 
-// ── Config ──
+// ── Metadatos del manifiesto Markdown seleccionado ──
 function getConfig() {
-  const fp = path.join(ROOT, ".fiction/config.json");
-  try {
-    return JSON.parse(fs.readFileSync(fp, "utf-8"));
-  } catch {
-    return { title: "Fiction Vault", subtitle: "" };
-  }
+  return { title: book.get("titulo"), subtitle: "" };
 }
 
 // ── Fundamentos ──
 function getFundamentos() {
-  const fp = path.join(ROOT, "vault/Referencias/Fundamentos.md");
+  const fp = path.join(BOOK_ROOT, "Planificación/Fundamentos.md");
   if (!fs.existsSync(fp)) return "";
   const text = fs.readFileSync(fp, "utf-8");
   return text.replace(/^#\s+.+\n/, "").trim();

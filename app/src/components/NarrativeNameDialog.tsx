@@ -10,6 +10,7 @@ interface NarrativeNameDialogProps {
   isSubmitting: boolean
   error: string | null
   onCancel: () => void
+  exitLabel?: string
   onSubmit: (title: string) => void
 }
 
@@ -21,6 +22,7 @@ export function NarrativeNameDialog({
   isSubmitting,
   error,
   onCancel,
+  exitLabel,
   onSubmit,
 }: NarrativeNameDialogProps) {
   const { t } = useTranslation()
@@ -101,7 +103,7 @@ export function NarrativeNameDialog({
             disabled={isSubmitting}
             onClick={onCancel}
           >
-            {t('common.cancel')}
+            {exitLabel ?? t('common.cancel')}
           </button>
           <button
             className="dialog-button project-dialog-create"

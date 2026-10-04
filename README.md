@@ -18,7 +18,7 @@ La aplicación de escritorio ya permite:
 - conservar el borrador cuando la ruta original desaparece o se renombra fuera de Inkforge;
 - actualizar el árbol del vault mediante un watcher;
 - gestionar una Biblioteca con novelas independientes y sagas de varios libros;
-- crear obras, añadir libros, cambiar el libro activo y renombrar novelas, sagas y libros;
+- crear obras y gestionar desde un único diálogo el renombrado de novelas, sagas y libros, los géneros y la incorporación de libros a sagas;
 - asignar varios perfiles editoriales de género a obras y libros, con herencia configurable en sagas;
 - utilizar la interfaz en español, inglés, catalán o coreano;
 - abrir una Ayuda integrada y localizada con documentación de las funciones disponibles;
@@ -32,7 +32,7 @@ La aplicación de escritorio ya permite:
 - arrancar con una Biblioteca vacía, sin crear ni seleccionar una obra automáticamente;
 - reintentar en la misma sesión cuando el modelo elegido resulta incompatible.
 
-Las solicitudes de permisos, las preguntas interactivas y las variantes de modelo están implementadas, pero todavía no se han validado por completo en interacciones reales.
+Las solicitudes de permisos y las preguntas interactivas están implementadas y validadas manualmente, incluida su recuperación tras recargar el renderer y el tratamiento de una interacción interrumpida tras reiniciar OpenCode. También se comprobó manualmente el envío de una variante compatible en un mensaje real; quedan escenarios secundarios por comprobar.
 
 ## Idiomas de interfaz
 
@@ -54,11 +54,11 @@ Estas preferencias son globales y se conservan entre obras y reinicios. Los mode
 
 Si no hay una selección de modelo guardada, Ajustes puede abrirse para solicitarla. Durante una reconexión, la selección se mantiene visible aunque el control esté temporalmente deshabilitado. La carga pendiente del catálogo no significa que se haya perdido la preferencia. La lectura y la edición manual siguen disponibles sin IA.
 
-El indicador del encabezado muestra verde cuando OpenCode está conectado, naranja mientras inicia o reconecta y rojo ante error o desconexión. Incluye una descripción accesible y localizada; los errores funcionales siguen mostrándose cuando corresponde. El Director ya no contiene selectores permanentes ni un encabezado técnico de conexión.
+La cabecera muestra Inkforge y su lema, un punto de estado con texto localizado (Conectado, Conectando… o Error), Ayuda y Ajustes. El punto es verde cuando OpenCode está conectado, naranja mientras inicia o reconecta y rojo ante error o desconexión; conserva una descripción accesible del contexto. El Director no contiene selectores permanentes ni un encabezado técnico de conexión.
 
 ## Ayuda integrada
 
-El botón `?` del encabezado abre una Ayuda localizada en los cuatro idiomas de la interfaz. Resume el uso de la Biblioteca, novelas y sagas, lectura y edición Markdown, guardado explícito, protección ante cambios externos, OpenCode y localización. Abrirla o cerrarla no altera el documento, el borrador, la obra ni el libro activos.
+El botón de Ayuda del encabezado abre una guía localizada en los cuatro idiomas de la interfaz. Explica Biblioteca, `Gestionar obra`, géneros y herencia, lectura y edición Markdown, guardado explícito, protección ante cambios externos, Ajustes de IA, OpenCode y localización. Abrirla o cerrarla no altera el documento, el borrador, la obra ni el libro activos.
 
 La Ayuda incluye una guía de preparación que muestra las estructuras físicas de referencia para una novela independiente y una saga. Es únicamente documentación: la importación real, la selección y validación de proyectos externos y la copia a la Biblioteca todavía no están implementadas.
 
@@ -76,7 +76,9 @@ subagentes / skills / MCP
 Markdown reales de la obra
 ~~~
 
-Markdown es la fuente de verdad. Inkforge no mantiene una base de datos paralela para el canon ni una memoria alternativa del manuscrito.
+Markdown es la fuente de verdad. Inkforge no mantiene una base de datos paralela para el canon ni una memoria alternativa del manuscrito. `.fiction`, `session_log.json` y `manifiesto.json` no forman parte del estado operativo: la estructura, los manifiestos y la planificación se leen de los Markdown reales.
+
+Las herramientas editoriales Python leen `Proyecto.md`, `Libro.md` y el frontmatter de cada capítulo. `VAULT_PATH` indica la raíz exacta de la obra; en una saga, cada llamada de contenido recibe además `book_scope: Libros/<id>` del libro seleccionado explícitamente. Cambiar de libro no crea otra conversación ni reinicia OpenCode. El servidor MCP se llama `inkforge-context`; se ejecuta desde la infraestructura de Inkforge aunque el workspace sea la obra activa y relee el contenido al atender cada llamada. Los capítulos se ordenan por `capítulo:` en sus Markdown, sin manifiesto JSON ni sincronización aparte. Los análisis de tres actos, Save the Cat y consejos de King o Sanderson son opcionales según la obra y el encargo.
 
 OpenCode es el backend de integración con IA. Inkforge no implementa una abstracción propia de proveedores, no guarda claves de API y no se conecta directamente a servicios de modelos. El usuario puede utilizar los proveedores y modelos configurados en OpenCode, incluidos modelos locales como Ollama.
 
@@ -106,11 +108,11 @@ Ese directorio contiene manuscritos y datos locales, está incluido en `.gitigno
 
 La raíz global contiene recursos reutilizables. Cada obra y saga conserva sus Markdown propios bajo `Proyectos/`; `Estilo/` dentro de una obra es específico de esa obra y no equivale a los perfiles globales de `Generos/`.
 
-Los perfiles son archivos `vault/Generos/<nombre>.md`, descubiertos al abrir los diálogos y por las herramientas MCP en cada consulta. Puedes añadirlos manualmente sin reiniciar. Una obra puede usar ninguno o varios. En una saga, cada libro hereda los perfiles de la saga por defecto y puede añadir los suyos; al desactivar la herencia usa solo sus propios perfiles. Las asignaciones viven en `Proyecto.md` y `Libro.md`; los géneros efectivos se calculan, no se almacenan. Si falta un perfil asignado, la configuración conserva su nombre y lo muestra como no disponible. Los manifiestos antiguos sin estos campos siguen abriéndose sin migración automática.
+Los perfiles son archivos `vault/Generos/<nombre>.md`, descubiertos al abrir los diálogos y por las herramientas MCP en cada consulta. Puedes añadirlos manualmente sin reiniciar. Una obra puede usar ninguno o varios, sin pesos ni jerarquía. En una saga, cada libro hereda los perfiles de la saga por defecto y puede añadir los suyos; al desactivar la herencia usa solo sus propios perfiles. Las asignaciones viven en `Proyecto.md` y `Libro.md`; los géneros efectivos se calculan, no se almacenan. Si falta un perfil asignado, la configuración conserva su nombre y lo muestra como no disponible. Los manifiestos antiguos sin estos campos siguen abriéndose sin migración automática.
 
-Estos perfiles orientan la edición, no establecen canon ni sustituyen el Markdown de la obra. El mecanismo está implementado; el contenido editorial extenso de perfiles concretos se añadirá más adelante.
+Ya existen once perfiles base aprobados: Fantasía, Ciencia ficción, Misterio, Thriller, Romance, Terror, Histórica, Aventura, Distopía, Ficción política y Ficción social. `vault/Plantillas/perfil-genero.md` guía la creación de otros perfiles. Orientan la edición, sin establecer canon ni sustituir el Markdown de la obra. El Director puede leerlos mediante MCP y crear o actualizar un perfil cuando se le pide expresamente; no hay borrado de perfiles desde Inkforge.
 
-La retirada de las carpetas heredadas que aún permanecen directamente en `vault/` está pendiente de autorización adicional: el entorno rechazó automáticamente su eliminación por contener archivos. Esas carpetas no son obras activas de la Biblioteca.
+Las carpetas heredadas directamente en la raíz de `vault/` ya se retiraron. La raíz conserva `Generos/`, `Plantillas/` y `Proyectos/`; las estructuras internas de cada obra se mantienen en su propio directorio.
 
 Una Biblioteca vacía es un estado válido. Sin obra seleccionada se puede crear una novela o saga, seleccionar una existente y utilizar Ajustes y Ayuda. El Director requiere una obra; no trabaja narrativamente sobre el vault general ni sobre la raíz del repositorio.
 
@@ -134,11 +136,11 @@ Saga/
         └── ...
 ~~~
 
-En una saga, el explorador muestra `Proyecto.md`, las áreas compartidas y solo el libro activo. Abrir un documento nunca cambia de libro: la selección se realiza mediante una acción explícita. Cambiar de libro conserva el workspace OpenCode de la saga; cambiar de obra cambia ese workspace.
+La barra lateral presenta la obra activa y su tipo, `Nueva obra`, `Gestionar obra`, el selector `Obra activa` y, en una saga, `Libro activo`; el árbol documental ocupa el resto. `Gestionar obra` agrupa renombrado y géneros; en sagas, también añadir libro y renombrar el libro activo. En el explorador de una saga aparecen `Proyecto.md`, las áreas compartidas y solo el libro activo. Abrir un documento nunca cambia de libro: la selección se realiza mediante una acción explícita. Cambiar de libro conserva el workspace OpenCode de la saga; cambiar de obra cambia ese workspace.
 
-Inkforge recuerda la última obra y el último libro activos mediante una preferencia local de Electron fuera del vault. Si la obra guardada ya no existe, arranca sin obra seleccionada y mantiene visibles las demás, sin elegir otra automáticamente. Si falta el libro guardado de una saga, selecciona el primero válido; si no hay libros, conserva la saga activa y permite añadirlos.
+Inkforge recuerda la última obra y, en una saga, el último libro activo mediante una preferencia local de Electron fuera del vault. La restauración usa sus identificadores persistidos y validados. Si la obra guardada ya no existe, arranca sin obra seleccionada y mantiene visibles las demás, sin elegir otra automáticamente. Si falta el libro guardado o la saga ya no contiene libros, conserva la saga activa con `activeBook = null`: no usa `books[0]`, no infiere otro libro y exige una selección o creación explícita antes del trabajo de libro.
 
-Los títulos, manifiestos, rutas y ámbitos se validan en el proceso principal. La Biblioteca rechaza symlinks y colisiones, no sobrescribe contenido existente y conserva el resto del manifiesto al renombrar.
+Los títulos, manifiestos, rutas y ámbitos se validan en el proceso principal. La Biblioteca rechaza symlinks y colisiones y no sobrescribe contenido existente. Al renombrar una novela, saga o libro, actualiza `titulo:` y el H1 inicial gestionado solo si este coincide con el título anterior esperado; ante una discrepancia, rechaza el cambio antes de mover la carpeta. Los tres casos se comprobaron manualmente, incluido el rechazo seguro de una saga con H1 inconsistente y su posterior renombrado tras corregirlo.
 
 ## Edición y seguridad del vault
 
@@ -164,8 +166,10 @@ Inkforge inicia un servidor OpenCode local enlazado a `127.0.0.1` y descubre sus
 - exige exactamente un agente con `mode: "primary"`;
 - conserva los subagentes, skills y MCP configurados en el proyecto;
 - transmite respuestas mediante SSE;
+- envía en cada turno el contexto operativo privado y autoritativo como una parte de texto `synthetic`, separada del mensaje visible;
 - filtra partes internas de tipo reasoning, synthetic e ignored para mostrar únicamente texto visible de respuesta;
 - mantiene la sesión al cambiar de modelo;
+- envía la variante seleccionada en el campo `variant` del siguiente mensaje, sin reiniciar la conversación; la variante vacía usa el comportamiento predeterminado de OpenCode;
 - permite reintentar tras un error de modelo incompatible;
 - detiene el proceso local al cerrar Inkforge.
 
@@ -173,11 +177,13 @@ El agente primary actual es `editor`. Los subagentes definidos en `opencode.json
 
 La integración se validó inicialmente con OpenCode 1.18.31. La compatibilidad depende de las capacidades disponibles, no de una versión rígida.
 
-La raíz técnica de Inkforge mantiene agentes, skills y MCP; el directorio de trabajo narrativo es la obra activa. El MCP recibe esa obra mediante `VAULT_PATH`; `INKFORGE_LIBRARY_ROOT` indica la Biblioteca global para recursos reutilizables. En cada turno, Inkforge proporciona al Director el libro activo y los nombres de sus géneros efectivos de forma autoritativa, sin deducirlos a partir de fechas o archivos modificados. El Director puede leer perfiles pertinentes mediante MCP sin cargar todos sus textos en cada mensaje. Ese contexto técnico se usa silenciosamente.
+La raíz técnica de Inkforge mantiene agentes, skills y MCP; el directorio de trabajo narrativo es la obra activa. OpenCode recibe `INKFORGE_INFRASTRUCTURE_ROOT` para ejecutar `inkforge-context` desde esa infraestructura, mientras `VAULT_PATH` sigue señalando la obra e `INKFORGE_LIBRARY_ROOT` la Biblioteca global. En cada turno, Inkforge proporciona al Director el libro activo, su ruta operativa y los nombres de sus géneros efectivos de forma privada y autoritativa; la selección del turno sustituye cualquier selección antigua del historial. El Director no deduce libros ni simula el MCP mediante procesos o scripts temporales: si `inkforge-context` no está disponible, comunica el fallo. Los perfiles pertinentes se leen mediante MCP sin cargar todos sus textos en cada mensaje.
 
 El chat visible se guarda en `.inkforge/director-chat.json` dentro de cada obra. Cambiar de libro en una saga no crea otra conversación, y las fronteras técnicas de las sesiones OpenCode no dividen el historial visible. Esta continuidad del chat **no es canon ni memoria narrativa**: los Markdown siguen siendo la fuente de verdad.
 
 Sin obra activa, OpenCode puede ofrecer el catálogo de modelos para Ajustes, pero no crear sesiones ni enviar mensajes narrativos contra una raíz genérica.
+
+Algunos modelos del catálogo pueden fallar por restricciones del proveedor, la cuenta o la región. Inkforge todavía puede sustituir el motivo útil devuelto por OpenCode o el proveedor por un error genérico; mejorar esa presentación está pendiente.
 
 ## Estructura del repositorio
 
@@ -194,25 +200,24 @@ Inkforge/
 │   └── Proyectos/               Obras locales creadas por la Biblioteca
 ├── .opencode/                   Skills editoriales
 ├── .tools/                      Herramientas Python y servidor MCP
-├── .fiction/                    Configuración y estado local heredado
 ├── web/                         Dashboard Astro heredado y secundario
 ├── AGENTS.md                    Contexto y flujo editorial
-├── Makefile                     Atajos para herramientas heredadas
+├── Makefile                     Atajos para herramientas editoriales
 └── opencode.json                Agentes y servidor MCP de OpenCode
 ~~~
 
-`web/` continúa presente como dashboard heredado para métricas, búsqueda y navegación. No es la aplicación principal de Inkforge.
+`web/` continúa presente como dashboard secundario para métricas, búsqueda y navegación. Su generador requiere `VAULT_PATH` y, en saga, `INKFORGE_BOOK_SCOPE=Libros/<id>` por invocación; el JSON resultante es un artefacto de presentación. La UI todavía conserva decisiones visuales heredadas y no es la aplicación principal de Inkforge.
 
 ## Requisitos
 
 - Windows como plataforma principal actual;
 - Node.js y npm;
-- Python 3 para las herramientas heredadas y el servidor MCP;
+- Python 3 para las herramientas editoriales y el servidor MCP;
 - OpenCode disponible en el `PATH`.
 
 El desarrollo se ha probado con Node.js 22. Esto describe el entorno utilizado, no establece una versión mínima garantizada.
 
-En Windows, `opencode.json` ya utiliza `python` para iniciar `.tools/fiction_mcp.py`.
+En Windows, `opencode.json` utiliza `python` para iniciar `.tools/inkforge_mcp.py`. Para invocar scripts editoriales desde la consola, define `VAULT_PATH` con la raíz de una obra válida e `INKFORGE_LIBRARY_ROOT` con la Biblioteca global cuando el script necesite plantillas o perfiles. En sagas, pasa `--book-scope Libros/<id>`; con Makefile puede usarse `ARGS="--book-scope Libros/<id>"`.
 
 ## Desarrollo de la aplicación
 
@@ -255,7 +260,9 @@ También están disponibles los scripts `build` y `preview` de Astro.
 
 ## Validado y pendiente
 
-Las funciones principales de edición, Biblioteca, persistencia, Ajustes y Director cuentan con validación manual anterior. El mecanismo de perfiles de género aún no se ha validado. El detalle y los límites de la validación se mantienen en [DEVELOPMENT_STATUS.md](docs/DEVELOPMENT_STATUS.md). No hay una suite automática propia confirmada.
+Las funciones principales de edición, Biblioteca, persistencia, Ajustes y Director cuentan con validación manual anterior. También se comprobaron el mecanismo de perfiles de género, los flujos principales de la nueva interfaz, el renombrado con H1 gestionado en novela, saga y libro, y el envío real de una variante compatible. El responsable del proyecto comunicó lint limpio y build TypeScript/Vite limpio tras la corrección de TS18047. Quedan casos adicionales de formato, variantes y presentación adaptable; el detalle se mantiene en [DEVELOPMENT_STATUS.md](docs/DEVELOPMENT_STATUS.md). No hay una suite automática propia confirmada.
+
+La migración actual de herramientas editoriales y MCP, la restauración de `activeBookId`, el transporte sintético del contexto privado y el `cwd` portable de `inkforge-context` están implementados pero requieren comprobación manual y automatizada; las validaciones anteriores de la aplicación no cubren estos cambios.
 
 ### Estructura localizada e importación futura
 
@@ -265,16 +272,17 @@ La guía informativa de preparación ya está disponible en la Ayuda integrada. 
 
 Pendientes reales:
 
-- validar completamente permisos, preguntas y variantes de OpenCode en interacciones reales;
+- mejorar la presentación de errores útiles de OpenCode y proveedores y completar validaciones secundarias de renombrado y variantes;
 - definir la estrategia de motores IA y su integración prevista;
 - desarrollar y validar la portabilidad Windows/Linux;
 - preparar packaging para Windows y revisar `projectRoot` en la aplicación empaquetada;
 - después, implementar la importación compatible, validada y no destructiva;
-- redactar posteriormente perfiles editoriales concretos y ampliar la personalización de estilo;
+- ampliar posteriormente la personalización de estilo por obra;
 - mejorar la resolución de conflictos con diff, elección de versión y merge;
-- desarrollar el borrado de obras/libros y la evolución posterior de Biblioteca y del flujo IA.
+- desarrollar el borrado seguro de obras/libros y la evolución posterior de Biblioteca y Director;
+- incorporar tests automatizados cuando se planifique esa infraestructura.
 
-Existe una discrepancia conocida al renombrar una saga: el frontmatter de `Proyecto.md` puede contener el título nuevo mientras el H1 conserva el anterior. Todavía no está corregida. El borrado de obras/libros y la importación real tampoco están implementados.
+El borrado de obras/libros y la importación real todavía no están implementados.
 
 ## Créditos
 

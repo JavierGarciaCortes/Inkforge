@@ -13,13 +13,12 @@ Uso:
 
 import re
 import sys
-import json
 import datetime
 from pathlib import Path
 from zipfile import ZipFile, ZIP_DEFLATED
 from xml.sax.saxutils import escape as xml_escape
 
-from vault import VAULT, CHAPTERS_DIR, get_chapter_number, get_chapter_title, get_chapter_files, chapter_summary, strip_yaml, strip_comments
+from vault import current_book, chapter_dir, project_field, book_field, scoped_book, get_chapter_number, get_chapter_title, get_chapter_files, chapter_summary, strip_yaml, strip_comments
 
 # ---------------------------------------------------------------------------
 # Markdown → XHTML
@@ -431,14 +430,14 @@ def generate_pdf(chapters: list[dict], output_path: Path, title: str, author: st
 
 def load_chapters_for_beta() -> list[dict]:
     """Carga capítulos con números de línea, sin metadata ni notas internas."""
-    if not CHAPTERS_DIR.exists():
+    if not chapter_dir().exists():
         return []
 
     files = get_chapter_files()
     chapters = []
     for f in files:
         num = get_chapter_number(f.name)
-        if num is None or num > 99:
+        if num is None:
             continue
         text = f.read_text("utf-8")
         title = get_chapter_title(text)
@@ -570,13 +569,13 @@ def load_chapters() -> list[dict]:
     """Carga y parsea todos los capítulos del vault."""
     files = get_chapter_files()
     if not files:
-        print(f"⚠ No se encontraron capítulos en: {CHAPTERS_DIR}")
+        print(f"⚠ No se encontraron capítulos en: {chapter_dir()}")
         return []
 
     chapters = []
     for f in files:
         num = get_chapter_number(f.name)
-        if num is None or num > 99:
+        if num is None:
             continue
         text = f.read_text("utf-8")
         title = get_chapter_title(text)
@@ -603,30 +602,29 @@ def main():
     ap.add_argument("--output", "-o", default=None,
                     help="Ruta del archivo de salida (sin extensión)")
     ap.add_argument("--title", default=None,
-                    help="Título del libro (default: project.json → nombre del directorio)")
+                    help="Título del libro (default: Libro.md o Proyecto.md)")
     ap.add_argument("--author", default=None,
-                    help="Autor del libro (default: project.json → 'Autor')")
+                    help="Autor del libro (default: frontmatter o 'Autor')")
+    ap.add_argument("--book-scope", help="Libros/<id> autoritativo; obligatorio en saga")
     ap.add_argument("--beta", action="store_true",
                     help="Exportar para beta readers: HTML con números de línea, sin metadatos internos")
     args = ap.parse_args()
 
-    # Cargar metadatos primero (necesario tanto para beta como para formatos normales)
-    project_config = {}
-    config_file = VAULT / ".fiction" / "config.json"
-    if config_file.exists():
-        try:
-            project_config = json.loads(config_file.read_text("utf-8"))
-        except json.JSONDecodeError:
-            pass
+    with scoped_book(args.book_scope):
+        run_publish(args)
+
+
+def run_publish(args):
+
+    title = args.title or current_book().title
+    author = args.author or book_field("autor") or project_field("autor") or "Autor"
 
     if args.beta:
         chapters = load_chapters_for_beta()
         if not chapters:
             print("✗ No se encontraron capítulos.")
             sys.exit(1)
-        title = args.title or project_config.get("title") or VAULT.name
-        author = args.author or project_config.get("author") or "Autor"
-        output_base = args.output or str(VAULT / "output" / title.lower().replace(" ", "-") + "-beta")
+        output_base = args.output or str(current_book().root / "output" / (title.lower().replace(" ", "-") + "-beta"))
         output_path = Path(output_base).with_suffix(".html")
         output_path.parent.mkdir(parents=True, exist_ok=True)
         result = generate_beta(chapters, output_path, title, author)
@@ -640,14 +638,12 @@ def main():
         print("✗ No se encontraron capítulos.")
         sys.exit(1)
 
-    title = args.title or project_config.get("title") or VAULT.name
-    author = args.author or project_config.get("author") or "Autor"
     output_base = args.output
 
     if output_base:
         output_path = Path(output_base)
     else:
-        output_dir = VAULT / "output"
+        output_dir = current_book().root / "output"
         output_dir.mkdir(parents=True, exist_ok=True)
         output_path = output_dir / title.lower().replace(" ", "-")
 

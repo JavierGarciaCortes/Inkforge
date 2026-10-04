@@ -10,9 +10,10 @@ interface Props {
   projectType: InkforgeProjectType
   bookId: string | null
   onCancel: () => void
+  exitLabel?: string
 }
 
-export function GenreConfigurationDialog({ projectId, projectType, bookId, onCancel }: Props) {
+export function GenreConfigurationDialog({ projectId, projectType, bookId, onCancel, exitLabel }: Props) {
   const { t } = useTranslation()
   const { profiles, state: genreState, reload: reloadGenres } = useGenreProfiles()
   const [configuration, setConfiguration] = useState<Pick<GenreConfiguration, 'projectGenres' | 'bookGenres' | 'inheritProjectGenres'> | null>(null)
@@ -142,7 +143,7 @@ export function GenreConfigurationDialog({ projectId, projectType, bookId, onCan
         {saved && <p role="status">{t('genres.saved')}</p>}
         <div className="confirm-dialog-actions">
           <button className="dialog-button dialog-button-secondary" type="button" disabled={busy}
-            onClick={onCancel}>{t('common.cancel')}</button>
+            onClick={onCancel}>{exitLabel ?? t('common.close')}</button>
         </div>
       </div>
     </div>

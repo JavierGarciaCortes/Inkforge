@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """
-Fiction Context MCP Server — agnóstico.
+Inkforge Context MCP Server.
 
 Sirve contexto de escritura a asistentes AI vía protocolo MCP (JSON-RPC 2.0
 sobre stdin/stdout). Sin dependencias externas.
 
-Usa variable de entorno VAULT_PATH para localizar la bóveda de Obsidian.
-Configuración opcional en .fiction/config.yaml dentro de la bóveda.
+Usa VAULT_PATH para la obra y book_scope explícito para los libros de saga.
 
 Tools expuestas:
   search_bible(query)        — búsqueda en documentos de referencia
@@ -17,17 +16,19 @@ Tools expuestas:
   get_foreshadowing(thread?) — consulta ledger de siembras/pagos
 """
 
+import os
 import re
 import sys
 import json
 import traceback
+from contextvars import ContextVar
 from pathlib import Path
 from typing import Any
 
 from vault import (
-    VAULT, CHAPTERS_DIR, REFERENCES_DIRS, CHARACTERS_DIRS, WORLD_DIRS,
-    STYLE_DIR, FORESHADOWING_FILE,
-    strip_comments, get_chapter_number, get_chapter_title, get_manifiesto,
+    project_root, current_book, scoped_book, character_dirs, world_dirs,
+    reference_dirs, style_dir, planning_file, get_chapter_files,
+    strip_comments, get_chapter_number, get_chapter_title,
 )
 from genre_profiles import list_profiles, read_profile, create_profile, update_profile
 
@@ -58,6 +59,7 @@ except ImportError:
 
 MCP_VERSION = "2024-11-05"
 JSONRPC_VERSION = "2.0"
+GLOBAL_TOOLS = {"list_genre_profiles", "read_genre_profile", "create_genre_profile", "update_genre_profile"}
 
 
 class MCPError(Exception):
@@ -83,6 +85,12 @@ class MCPServer:
     def tool(self, name: str, description: str, properties: dict, required: list[str] | None = None):
         """Decorador para registrar un tool handler."""
         def decorator(func):
+            tool_properties = dict(properties)
+            if name not in GLOBAL_TOOLS:
+                tool_properties["book_scope"] = {
+                    "type": "string",
+                    "description": "Libros/<id> recibido de Inkforge; obligatorio en saga. En novela se usa la raíz.",
+                }
             self.tools[name] = {
                 "handler": func,
                 "definition": {
@@ -90,7 +98,7 @@ class MCPServer:
                     "description": description,
                     "inputSchema": {
                         "type": "object",
-                        "properties": properties,
+                        "properties": tool_properties,
                         "required": required or [],
                     },
                 },
@@ -133,7 +141,7 @@ class MCPServer:
                     "tools": {},
                 },
                 "serverInfo": {
-                    "name": "fiction-context",
+                    "name": "inkforge-context",
                     "version": "1.0.0",
                 },
             })
@@ -166,11 +174,23 @@ class MCPServer:
 
             tool_info = self.tools[name]
             try:
-                result_text = tool_info["handler"](**arguments)
+                arguments = dict(arguments)
+                book_scope = arguments.pop("book_scope", None)
+                if name in GLOBAL_TOOLS:
+                    result_text = tool_info["handler"](**arguments)
+                else:
+                    with scoped_book(book_scope):
+                        token = _current_store.set(DataStore())
+                        try:
+                            result_text = tool_info["handler"](**arguments)
+                        finally:
+                            _current_store.reset(token)
                 self._result(req_id, {
                     "content": [{"type": "text", "text": result_text}],
                 })
             except TypeError as e:
+                self._error(req_id, INVALID_PARAMS, str(e))
+            except (ValueError, FileNotFoundError) as e:
                 self._error(req_id, INVALID_PARAMS, str(e))
             except Exception as e:
                 self._error(req_id, INTERNAL_ERROR, str(e), traceback.format_exc())
@@ -199,28 +219,34 @@ class MCPServer:
 
 
 # ---------------------------------------------------------------------------
-# Vault Discovery (desde vault config, con fallback)
-# ---------------------------------------------------------------------------
-
-CHARACTERS_DIR = CHARACTERS_DIRS[0] if CHARACTERS_DIRS else None
-REF_DIRS_LIST = REFERENCES_DIRS or []
-WORLD_DIR_LIST = WORLD_DIRS or []
-ESTILO_DIR = STYLE_DIR
-
-
-# ---------------------------------------------------------------------------
-# Data loading
+# Lectura vigente de Markdown en el scope solicitado
 # ---------------------------------------------------------------------------
 
 def list_markdown_files(directory: Path) -> list[Path]:
-    """Lista archivos .md en un directorio."""
-    if not directory or not directory.exists():
+    """Lista Markdown del área indicada sin seguir enlaces o junctions."""
+    if not directory.exists():
         return []
-    return sorted(directory.glob("*.md"))
+    if directory.is_symlink() or getattr(directory, "is_junction", lambda: False)():
+        raise ValueError(f"Directorio no seguro: {directory}")
+    root = directory.resolve(strict=True)
+    result = []
+    for current, dirs, files in os.walk(directory, followlinks=False):
+        parent = Path(current)
+        dirs[:] = [name for name in dirs if not (parent / name).is_symlink()
+                   and not getattr(parent / name, "is_junction", lambda: False)()
+                   and (parent / name).resolve(strict=True).is_relative_to(root)]
+        for name in files:
+            path = parent / name
+            if (path.suffix.lower() != ".md" or path.is_symlink()
+                    or getattr(path, "is_junction", lambda: False)()
+                    or not path.is_file() or not path.resolve(strict=True).is_relative_to(root)):
+                continue
+            result.append(path)
+    return sorted(result)
 
 
 class DataStore:
-    """Carga y referencia todos los documentos de la bóveda."""
+    """Índice efímero de los Markdown actuales, con identidad por ruta relativa."""
 
     def __init__(self):
         self.sections: list[dict] = []
@@ -228,20 +254,22 @@ class DataStore:
         self._load_all()
 
     def _load_all(self):
-        for ref_dir in REF_DIRS_LIST:
-            for f in list_markdown_files(ref_dir):
-                self._load_file(f.name, f)
-        for world_dir in WORLD_DIR_LIST:
-            for f in list_markdown_files(world_dir):
-                self._load_file(f.name, f)
-        if CHARACTERS_DIR:
-            for f in list_markdown_files(CHARACTERS_DIR):
-                self._load_file(f.name, f)
-        if ESTILO_DIR:
-            for f in list_markdown_files(ESTILO_DIR):
-                self._load_file(f.name, f)
+        book = current_book()
+        directories = [*world_dirs(), *reference_dirs(), style_dir(),
+                       book.root / "Planificación", book.root / "Canon", book.root / "Notas"]
+        for directory in directories:
+            for path in list_markdown_files(directory):
+                self._load_file(path)
+        self._load_file(project_root() / "Proyecto.md")
+        if book.scope != ".":
+            self._load_file(book.root / "Libro.md")
 
-    def _load_file(self, name: str, path: Path):
+    def _load_file(self, path: Path):
+        if not path.is_file() or path.is_symlink():
+            return
+        name = path.relative_to(project_root()).as_posix()
+        if name in self.documents:
+            return
         text = path.read_text("utf-8")
         text = strip_comments(text)
         self.documents[name] = text
@@ -283,6 +311,8 @@ class DataStore:
 
     def search(self, query: str, max_results: int = 10) -> list[dict]:
         query_lower = query.lower().strip()
+        if not query_lower:
+            return []
         terms = [t for t in query_lower.split() if len(t) > 2]
         if not terms:
             terms = query_lower.split()
@@ -309,7 +339,21 @@ class DataStore:
         return [s[1] for s in scored[:max_results]]
 
     def get_source_text(self, name: str) -> str:
-        return self.documents.get(name, "")
+        return self.documents.get(name.replace("\\", "/"), "")
+
+
+_current_store: ContextVar[DataStore | None] = ContextVar("inkforge_mcp_store", default=None)
+
+
+class _StoreProxy:
+    def __getattr__(self, name: str):
+        current = _current_store.get()
+        if current is None:
+            raise RuntimeError("El índice de la llamada MCP no está disponible.")
+        return getattr(current, name)
+
+
+store = _StoreProxy()
 
 
 # ---------------------------------------------------------------------------
@@ -318,10 +362,10 @@ class DataStore:
 
 def _get_character_arc(name: str) -> str:
     """Extrae la sección 'Arco narrativo' de la ficha del personaje."""
-    profile_text = store.get_source_text(f"{name}.md")
+    profile_text = store.get_source_text(f"Mundo/Personajes/{name}.md")
     if not profile_text:
         for alt in (f"{name.replace(' ', '_')}.md", f"{name.lower()}.md"):
-            profile_text = store.get_source_text(alt)
+            profile_text = store.get_source_text(f"Mundo/Personajes/{alt}")
             if profile_text:
                 break
     if not profile_text:
@@ -358,13 +402,6 @@ def get_character_state_hints(chapter: int) -> list[str]:
         if arc:
             hints.append(f"{char_name}: {arc}")
     return hints
-
-
-# ---------------------------------------------------------------------------
-# Inicializar store
-# ---------------------------------------------------------------------------
-
-store = DataStore()
 
 
 # ---------------------------------------------------------------------------
@@ -510,8 +547,8 @@ def _find_chapters_with_location(name: str) -> list[int]:
     """Busca en qué capítulos aparece mencionada una ubicación."""
     name_lower = name.lower().strip()
     found = []
-    for f in get_manifiesto().archivos_existentes():
-        num = get_manifiesto().get_numero(f.name)
+    for f in get_chapter_files():
+        num = get_chapter_number(f)
         if num is None:
             continue
         text = f.read_text("utf-8").lower()
@@ -533,18 +570,15 @@ def _find_chapters_with_location(name: str) -> list[int]:
 )
 def get_location(name: str) -> str:
     name_lower = name.lower().strip()
+    if not name_lower:
+        return "Indica el nombre de la ubicación."
 
-    # Buscar archivo de ubicación en directorios de world/lugares
+    # Buscar el perfil únicamente en Mundo/Lugares de la obra.
     location_file = None
-    for d in WORLD_DIRS:
-        search_dirs = list(d.iterdir()) if d.is_dir() else [d]
-        for sd in [d] + [p for p in search_dirs if p.is_dir()]:
-            if sd.exists():
-                for f in sorted(sd.glob("*.md")):
-                    if name_lower in f.stem.lower():
-                        location_file = f
-                        break
-            if location_file:
+    for world in world_dirs():
+        for location in list_markdown_files(world / "Lugares"):
+            if name_lower in location.stem.lower():
+                location_file = location
                 break
         if location_file:
             break
@@ -606,18 +640,17 @@ def get_location(name: str) -> str:
     required=["chapter_number"],
 )
 def get_chapter_context(chapter_number: int) -> str:
-    # Usar el orden del manifiesto
-    chapters = get_manifiesto().archivos_existentes()
+    chapters = get_chapter_files()
     idx = -1
     target = None
     for i, ch in enumerate(chapters):
-        if get_manifiesto().get_numero(ch.name) == chapter_number:
+        if get_chapter_number(ch) == chapter_number:
             idx = i
             target = ch
             break
 
     if target is None:
-        return f"Capítulo {chapter_number} no encontrado en el manifiesto."
+        return f"Capítulo {chapter_number} no encontrado en los Markdown."
 
     text = strip_comments(target.read_text("utf-8"))
     title = get_chapter_title(text)
@@ -642,7 +675,7 @@ def get_chapter_context(chapter_number: int) -> str:
         prev_ending = "\n".join(prev_lines[-5:])
         out.append(
             f"\n## Cierre del capítulo anterior "
-            f"(Cap {get_manifiesto().get_numero(prev.name)}: {prev_title})"
+            f"(Cap {get_chapter_number(prev)}: {prev_title})"
             f"\n```\n{prev_ending}\n```"
         )
 
@@ -654,7 +687,7 @@ def get_chapter_context(chapter_number: int) -> str:
         nxt_opening = "\n".join(nxt_lines[:5])
         out.append(
             f"\n## Apertura del capítulo siguiente "
-            f"(Cap {get_manifiesto().get_numero(nxt.name)}: {nxt_title})"
+            f"(Cap {get_chapter_number(nxt)}: {nxt_title})"
             f"\n```\n{nxt_opening}\n```"
         )
 
@@ -681,7 +714,7 @@ def check_continuity(text: str, chapter: int) -> str:
     warnings: list[str] = []
 
     # Leer foreshadowing para buscar muertes y revelaciones conocidas
-    foreshadow_text = store.get_source_text("Foreshadowing.md") or ""
+    foreshadow_text = store.get_source_text(planning_file("Foreshadowing.md").relative_to(project_root()).as_posix())
     foreshadow_lower = foreshadow_text.lower()
 
     # Detectar personajes mencionados como fallecidos en foreshadowing
@@ -727,12 +760,11 @@ def check_continuity(text: str, chapter: int) -> str:
     },
 )
 def get_foreshadowing(thread: str | None = None) -> str:
-    foreshadow_file = FORESHADOWING_FILE
-    foreshadow_text = store.get_source_text(foreshadow_file.name) if foreshadow_file else None
+    foreshadow_file = planning_file("Foreshadowing.md")
+    source = foreshadow_file.relative_to(project_root()).as_posix()
+    foreshadow_text = store.get_source_text(source)
     if not foreshadow_text:
-        foreshadow_text = store.get_source_text("Foreshadowing.md")
-    if not foreshadow_text:
-        return "No se encontró archivo de foreshadowing en los documentos de referencia."
+        return "No se encontró Planificación/Foreshadowing.md en el libro seleccionado."
 
     if not thread:
         return foreshadow_text
@@ -741,8 +773,7 @@ def get_foreshadowing(thread: str | None = None) -> str:
     thread_lower = thread.lower()
     results = store.search(thread_lower, max_results=8)
     # Filtrar resultados del archivo de foreshadowing por nombre o contenido
-    fs_name = foreshadow_file.stem.lower() if foreshadow_file else "foreshadowing"
-    relevant = [r for r in results if fs_name in r["source"].lower() or "siembra" in r["source"].lower()]
+    relevant = [r for r in results if r["source"] == source]
 
     if not relevant:
         # Devolver secciones que coincidan del propio texto
@@ -779,11 +810,9 @@ def check_consistency(chapter_number: int) -> str:
     issues: list[str] = []
     ch_title = c["title"]
 
-    # 1. Objetos: leer desde vault/Mundo/Historia/
-    for d in WORLD_DIRS:
-        if not d.is_dir():
-            continue
-        for hf in d.glob("*.md"):
+    # 1. Objetos: leer desde Mundo/Historia/ de la obra.
+    for world in world_dirs():
+        for hf in list_markdown_files(world / "Historia"):
             if hf.stem.startswith("_") or hf.stem.startswith("."):
                 continue
             htext = hf.read_text("utf-8")
@@ -836,8 +865,8 @@ def check_consistency(chapter_number: int) -> str:
 def mcp_check_transitions() -> str:
     # Leer tiempo y clima del YAML de cada capítulo
     chapter_data = []
-    for f in sorted(get_manifiesto().archivos_existentes(), key=lambda x: get_manifiesto().get_numero(x.name) or 0):
-        num = get_manifiesto().get_numero(f.name)
+    for f in get_chapter_files():
+        num = get_chapter_number(f)
         if num is None:
             continue
         text = f.read_text("utf-8")
@@ -978,7 +1007,7 @@ def _format_scan_global(all_data: list[dict]) -> str:
     name="editorial_letter",
     description="Genera carta editorial automatizada con análisis profundo: estructura, función de escenas, "
                 "arco emocional, inmersión sensorial, foreshadowing, show vs tell, hooks, y plan de revisión. "
-                "Usa beta=true para informe completo; insights=true para estilo/diálogo/Save the Cat.",
+                "Usa beta=true para informe completo; insights=true para estilo y diálogo.",
     properties={
         "chapter": {
             "type": "number",
@@ -998,7 +1027,7 @@ def _format_scan_global(all_data: list[dict]) -> str:
         },
         "insights": {
             "type": "boolean",
-            "description": "Análisis avanzado: estilo, diálogo, Save the Cat, Chekhov, arco Vonnegut (default: false)",
+            "description": "Análisis avanzado general de estilo y diálogo (default: false)",
         },
         "output_format": {
             "type": "string",
@@ -1017,6 +1046,8 @@ def mcp_editorial_letter(
 ) -> str:
     files = editorial_letter.get_chapter_files()
     chapters = [editorial_letter.read_chapter(f) for f in files]
+    if not chapters:
+        return "No hay capítulos Markdown en el libro seleccionado."
 
     if output_format == "json":
         return editorial_letter.generate_json(chapters, chapter)
@@ -1026,7 +1057,6 @@ def mcp_editorial_letter(
             return "Error: módulo editorial_insights no disponible."
         try:
             advanced = editorial_letter.analyze_advanced_all(chapters)
-            advanced["story_arc"] = classify_story_arc(None, chapters)
             return format_markdown(advanced)
         except Exception as e:
             return f"Error en insights: {e}"
@@ -1089,10 +1119,10 @@ def _fmt_table(headers: list[str], rows: list[list[str]]) -> str:
 # Perfiles de voz para check_voice_consistency (lee desde la ficha .md de cada personaje)
 def _get_character_voice(name: str) -> str:
     """Extrae la sección 'Voz' de la ficha del personaje."""
-    profile_text = store.get_source_text(f"{name}.md")
+    profile_text = store.get_source_text(f"Mundo/Personajes/{name}.md")
     if not profile_text:
         for alt in (f"{name.replace(' ', '_')}.md", f"{name.lower()}.md"):
-            profile_text = store.get_source_text(alt)
+            profile_text = store.get_source_text(f"Mundo/Personajes/{alt}")
             if profile_text:
                 break
     if not profile_text:
@@ -1115,7 +1145,7 @@ def _get_character_voice(name: str) -> str:
 def _get_available_characters() -> list[str]:
     """Lista personajes con ficha disponible."""
     names = []
-    for d in CHARACTERS_DIRS:
+    for d in character_dirs():
         if d.is_dir():
             for f in d.glob("*.md"):
                 if not f.name.startswith("_") and not f.name.startswith("."):
@@ -1123,17 +1153,13 @@ def _get_available_characters() -> list[str]:
     return sorted(names)
 
 
-def _get_character_names_str() -> str:
-    """Devuelve lista de personajes para usar en descripciones de tool."""
-    return ", ".join(_get_available_characters())
-
 
 def _append_nunca_diria(out: list[str], character: str, text: str) -> None:
     """Busca patrones 'NUNCA diría' en la ficha del personaje y los cruza con el texto."""
-    profile_text = store.get_source_text(f"{character}.md")
+    profile_text = store.get_source_text(f"Mundo/Personajes/{character}.md")
     if not profile_text:
         for alt in (f"{character.replace(' ', '_')}.md", f"{character.lower()}.md"):
-            profile_text = store.get_source_text(alt)
+            profile_text = store.get_source_text(f"Mundo/Personajes/{alt}")
             if profile_text:
                 break
     if not profile_text:
@@ -1164,7 +1190,7 @@ def _append_nunca_diria(out: list[str], character: str, text: str) -> None:
         },
         "character": {
             "type": "string",
-            "description": f"Nombre del personaje con perfil de voz registrado ({_get_character_names_str()})",
+            "description": "Nombre del personaje con perfil de voz registrado en la obra activa",
         },
     },
     required=["chapter", "character"],
@@ -1369,11 +1395,13 @@ def mcp_show_dont_tell(chapter: int | None = None) -> str:
 
 @server.tool(
     name="get_pacing",
-    description="Analiza el ritmo: outliers, balance de actos, distribución de palabras.",
+    description="Analiza el ritmo y la distribución de palabras; muestra actos solo si están declarados.",
     properties={},
 )
 def mcp_pacing() -> str:
     chapters = _get_chapters(None)
+    if not chapters:
+        return "No hay capítulos Markdown en el libro seleccionado."
     struct = editorial_letter.analyze_structure(chapters)
     pacing = editorial_letter.analyze_pacing(chapters)
 
@@ -1389,15 +1417,14 @@ def mcp_pacing() -> str:
             out.append(f"- Cap {o['chapter']:02d} ({o['words']} pal) {dir_str}")
         out.append("")
 
-    out.append("**Balance por acto:**")
-    rows = []
-    for act_num in sorted(pacing["act_words"]):
-        a = pacing["act_words"][act_num]
-        expected = round(100 / 3, 1)
-        actual = round(a["total"] / struct["total_words"] * 100, 1)
-        diff = round(actual - expected, 1)
-        rows.append([str(act_num), a["label"], f"{a['total']} pal", f"{actual}%", f"{'+' if diff > 0 else ''}{diff}%"])
-    out.append(_fmt_table(["Acto", "Nombre", "Palabras", "%", "vs equilibrio"], rows))
+    if pacing["act_words"]:
+        out.append("**Actos declarados:**")
+        rows = []
+        for act_num in sorted(pacing["act_words"]):
+            act = pacing["act_words"][act_num]
+            actual = round(act["total"] / struct["total_words"] * 100, 1) if struct["total_words"] else 0
+            rows.append([str(act_num), f"{act['total']} pal", f"{actual}%"])
+        out.append(_fmt_table(["Acto", "Palabras", "%"], rows))
     return "\n".join(out)
 
 
@@ -1558,7 +1585,7 @@ def mcp_style_diagnostics(chapter: int | None = None) -> str:
 
 @server.tool(
     name="get_save_the_cat",
-    description="Detecta los 15 beats de Save the Cat en el manuscrito.",
+    description="Análisis opt-in de los 15 beats de Save the Cat cuando la obra o el usuario eligen ese marco.",
     properties={},
 )
 def mcp_save_the_cat() -> str:
@@ -1665,7 +1692,7 @@ def mcp_check_pacing_handler(chapter: int | None = None) -> str:
 
 @server.tool(
     name="check_king",
-    description="Análisis Stephen King: adverbios en diálogo, voz pasiva, kill your darlings. Sin capítulo, todos.",
+    description="Análisis opt-in según Stephen King: adverbios en diálogo y voz pasiva. Sin capítulo, todos.",
     properties={
         "chapter": {
             "type": "number",
@@ -1726,7 +1753,7 @@ def mcp_check_king(chapter: int | None = None) -> str:
 
 @server.tool(
     name="check_sanderson",
-    description="Análisis Brandon Sanderson: magia sin coste, proactividad del POV, escalación. Sin capítulo, todos.",
+    description="Análisis opt-in según Brandon Sanderson: magia, proactividad y escalación. Sin capítulo, todos.",
     properties={
         "chapter": {
             "type": "number",

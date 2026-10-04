@@ -2,7 +2,7 @@
 """
 sort_lexico.py — Ordena alfabéticamente las entradas del léxico.
 
-Lee Referencias/Léxico.md y reordena las filas de cada tabla
+Lee Planificación/Léxico.md del libro y reordena las filas de cada tabla
 (Lugares, Lore, Personajes, Conceptos) por orden alfabético del término.
 
 Uso:
@@ -12,13 +12,7 @@ Uso:
 
 import argparse
 import re
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from vault import CONTENT_ROOT
-
-LEXICO_PATH = CONTENT_ROOT / "Referencias/Léxico.md"
+from vault import planning_file, scoped_book
 
 
 def sort_table_lines(lines: list[str]) -> list[str]:
@@ -33,11 +27,12 @@ def sort_table_lines(lines: list[str]) -> list[str]:
 
 
 def sort_lexico(dry: bool = False) -> int:
-    if not LEXICO_PATH.exists():
-        print(f"❌ No se encontró {LEXICO_PATH}")
+    lexicon = planning_file("Léxico.md")
+    if not lexicon.exists():
+        print(f"❌ No se encontró {lexicon}")
         return 1
 
-    text = LEXICO_PATH.read_text(encoding="utf-8")
+    text = lexicon.read_text(encoding="utf-8")
     lines = text.split("\n")
 
     # Find table sections: a ## header followed by a blank line, then a table
@@ -94,26 +89,19 @@ def sort_lexico(dry: bool = False) -> int:
         print(f"🔍 Simulación: {modifications} tabla(s) ordenada(s).")
         print(new_text)
     else:
-        LEXICO_PATH.write_text(new_text, encoding="utf-8")
-        print(f"✅ {modifications} tabla(s) ordenada(s) y guardada(s) en {LEXICO_PATH}.")
+        lexicon.write_text(new_text, encoding="utf-8")
+        print(f"✅ {modifications} tabla(s) ordenada(s) y guardada(s) en {lexicon}.")
 
     return 0
 
 
 def main():
-    global LEXICO_PATH
     parser = argparse.ArgumentParser(description="Ordena las tablas del léxico alfabéticamente")
     parser.add_argument("--dry", action="store_true", help="Simular sin escribir")
+    parser.add_argument("--book-scope", help="Libros/<id> autoritativo; obligatorio en saga")
     args = parser.parse_args()
-
-    root = Path(__file__).resolve().parent.parent
-    lex = root / LEXICO_PATH
-    # Override path if running from tools dir
-    if not lex.exists():
-        lex = LEXICO_PATH
-    LEXICO_PATH = lex
-
-    return sort_lexico(dry=args.dry)
+    with scoped_book(args.book_scope):
+        return sort_lexico(dry=args.dry)
 
 
 if __name__ == "__main__":

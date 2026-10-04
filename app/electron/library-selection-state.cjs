@@ -2,7 +2,7 @@ const path = require('node:path')
 const fs = require('node:fs/promises')
 const { randomUUID } = require('node:crypto')
 
-const STATE_VERSION = 1
+const STATE_VERSION = 3
 const STATE_FILE_NAME = 'library-selection.json'
 const MAX_STATE_BYTES = 4096
 
@@ -14,6 +14,8 @@ function validateState(value) {
   if (
     value === null || typeof value !== 'object' || Array.isArray(value) ||
     value.version !== STATE_VERSION ||
+    !Object.hasOwn(value, 'activeProjectId') ||
+    !Object.hasOwn(value, 'activeBookId') ||
     (value.activeProjectId !== null && !isIdentifier(value.activeProjectId)) ||
     (value.activeBookId !== null && !isIdentifier(value.activeBookId)) ||
     (value.activeProjectId === null && value.activeBookId !== null)
@@ -25,6 +27,27 @@ function validateState(value) {
     version: STATE_VERSION,
     activeProjectId: value.activeProjectId,
     activeBookId: value.activeBookId,
+  }
+}
+
+function migrateLegacyState(value) {
+  if (
+    value === null || typeof value !== 'object' || Array.isArray(value) ||
+    (value.version !== 1 && value.version !== 2) ||
+    !Object.hasOwn(value, 'activeProjectId') ||
+    (value.activeProjectId !== null && !isIdentifier(value.activeProjectId)) ||
+    (Object.hasOwn(value, 'activeBookId') &&
+      value.activeBookId !== null && !isIdentifier(value.activeBookId)) ||
+    (value.activeProjectId === null &&
+      Object.hasOwn(value, 'activeBookId') && value.activeBookId !== null)
+  ) {
+    return null
+  }
+
+  return {
+    version: STATE_VERSION,
+    activeProjectId: value.activeProjectId,
+    activeBookId: Object.hasOwn(value, 'activeBookId') ? value.activeBookId : null,
   }
 }
 
@@ -40,7 +63,8 @@ function createLibrarySelectionStateStore(userDataPath) {
         return null
       }
 
-      return validateState(JSON.parse(await fs.readFile(statePath, 'utf8')))
+      const storedState = JSON.parse(await fs.readFile(statePath, 'utf8'))
+      return validateState(storedState) ?? migrateLegacyState(storedState)
     } catch {
       return null
     }

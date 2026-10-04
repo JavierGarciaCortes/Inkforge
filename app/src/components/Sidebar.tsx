@@ -26,10 +26,7 @@ interface SidebarProps {
   onProjectChange: (projectId: string | null) => void
   onBookChange: (bookId: string) => void
   onNewProject: () => void
-  onAddBook: () => void
-  onRenameProject: () => void
-  onRenameBook: () => void
-  onConfigureGenres: () => void
+  onManageWork: () => void
   onReload: () => void
 }
 
@@ -43,12 +40,6 @@ interface DirectoryNodeProps {
   node: VaultDirectoryNode
   selectedPath: string | null
   onSelectDocument: (relativePath: string) => void
-}
-
-function countDocuments(nodes: VaultTreeNode[]): number {
-  return nodes.reduce((total, node) => {
-    return total + (node.type === 'document' ? 1 : countDocuments(node.children))
-  }, 0)
 }
 
 function DirectoryNode({ node, selectedPath, onSelectDocument }: DirectoryNodeProps) {
@@ -141,33 +132,35 @@ export function Sidebar({
   onProjectChange,
   onBookChange,
   onNewProject,
-  onAddBook,
-  onRenameProject,
-  onRenameBook,
-  onConfigureGenres,
+  onManageWork,
   onReload,
 }: SidebarProps) {
   const { t } = useTranslation()
-  const documentCount = countDocuments(tree)
   const activeProjectIsDiscovered = activeProject === null || projects.some(
     (project) => project.id === activeProject.id,
   )
   const activeBookIsDiscovered = activeBook === null || books.some(
     (book) => book.id === activeBook.id,
   )
+  const currentWorkTitle = activeProject?.title ?? t('library.noActiveWork')
 
   return (
     <aside className="sidebar" aria-label={t('sidebar.ariaLabel')}>
-      <div className="panel-heading">
-        <span className="eyebrow">{t('common.library')}</span>
-        <span className="panel-note">
-          {state === 'ready' ? t('sidebar.documentCount', { count: documentCount }) : t('sidebar.workVault')}
-        </span>
+      <div className="panel-heading sidebar-heading">
+        <div className="sidebar-current-work">
+          <h2 title={currentWorkTitle}>{currentWorkTitle}</h2>
+          {activeProject && (
+            <span>{activeProject.type === 'saga' ? t('sidebar.saga') : t('sidebar.novel')}</span>
+          )}
+        </div>
       </div>
 
       <div className="project-switcher">
         <button type="button" disabled={isProjectBusy} onClick={onNewProject}>
           {t('sidebar.newWork')}
+        </button>
+        <button type="button" disabled={!activeProject || isProjectBusy} onClick={onManageWork} aria-haspopup="dialog">
+          {t('sidebar.manageWork')}
         </button>
         <label>
           <span>{t('sidebar.activeWork')}</span>
@@ -191,21 +184,8 @@ export function Sidebar({
             ))}
           </select>
         </label>
-        {activeProject && (
-          <button type="button" disabled={isProjectBusy} onClick={onRenameProject}>
-            {activeProject.type === 'saga' ? t('sidebar.renameSaga') : t('sidebar.renameBook')}
-          </button>
-        )}
-        {activeProject && (
-          <button type="button" disabled={isProjectBusy} onClick={onConfigureGenres}>
-            {t('genres.title')}
-          </button>
-        )}
         {activeProject?.type === 'saga' && (
           <>
-            <button type="button" disabled={isProjectBusy} onClick={onAddBook}>
-              {t('sidebar.addBook')}
-            </button>
             <label>
               <span>{t('sidebar.activeBook')}</span>
               <select
@@ -232,15 +212,6 @@ export function Sidebar({
                 ))}
               </select>
             </label>
-            {activeBook !== null && (
-              <button
-                type="button"
-                disabled={isProjectBusy || !activeBookIsDiscovered}
-                onClick={onRenameBook}
-              >
-                {t('sidebar.renameBook')}
-              </button>
-            )}
           </>
         )}
         {projectError && (
@@ -279,18 +250,6 @@ export function Sidebar({
         )}
       </nav>
 
-      <div className="sidebar-footer">
-        <span className="sidebar-footer-label">
-          {activeProject?.title ?? t('library.noActiveWork')}
-        </span>
-        <span>
-          {activeProject === null
-            ? t('common.library')
-            : activeProject.type === 'saga'
-              ? t('sidebar.saga')
-              : t('sidebar.novel')}
-        </span>
-      </div>
     </aside>
   )
 }

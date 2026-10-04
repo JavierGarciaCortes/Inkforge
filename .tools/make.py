@@ -81,7 +81,7 @@ def _check(args: list[str]) -> int:
 
 @task("check-transitions", "Verificar transiciones entre capítulos")
 def _check_transitions(args: list[str]) -> int:
-    return _call("consistency_check.py", "--cap", "all")
+    return _call("consistency_check.py", "--cap", "all", *args)
 
 
 def _publish(extra: list[str], format_: str, title: str | None, author: str | None) -> int:
@@ -132,17 +132,17 @@ def _parse_publish(args: list[str], default: str) -> tuple[list[str], str, str |
     return extra, format_, title, author
 
 
-@task("session", "Resumen de cambios desde última sesión")
+@task("session", "Estado actual derivado de los Markdown")
 def _session(args: list[str]) -> int:
     return _call("session_check.py", *args)
 
 
-@task("session-full", "Resumen + Estado.md + checklist del ritual")
+@task("session-full", "Estado actual con documentos de planificación")
 def _session_full(args: list[str]) -> int:
     return _call("session_check.py", "--full", *args)
 
 
-@task("session-quick", "Solo diff + scores")
+@task("session-quick", "Resumen actual de capítulos")
 def _session_quick(args: list[str]) -> int:
     return _call("session_check.py", "--quick", *args)
 
@@ -167,7 +167,7 @@ def _letter_cap(args: list[str]) -> int:
     return _call("editorial_letter.py", *args)
 
 
-@task("letter-insights", "Análisis avanzado (estilo, diálogo, Save the Cat, ...)")
+@task("letter-insights", "Análisis avanzado general; marcos específicos son opt-in")
 def _letter_insights(args: list[str]) -> int:
     return _call("editorial_letter.py", "--insights", *args)
 
@@ -190,16 +190,6 @@ def _dialogue(args: list[str]) -> int:
     return _call("editorial_insights.py", "--module", "dialogue", *args)
 
 
-@task("sync", "Sincronizar YAML de capítulos desde el manifiesto")
-def _sync(args: list[str]) -> int:
-    return _call("sync_manifiesto.py", *args)
-
-
-@task("sync-dry", "Simular sincronización")
-def _sync_dry(args: list[str]) -> int:
-    return _call("sync_manifiesto.py", "--dry", *args)
-
-
 @task("sort-lexico", "Ordenar alfabéticamente el léxico")
 def _sort_lexico(args: list[str]) -> int:
     return _call("sort_lexico.py", *args)
@@ -213,52 +203,15 @@ def _lint(args: list[str]) -> int:
     return 0
 
 
-@task("ritual", "Ritual de inicio de sesión: session + letter + foreshadowing")
+@task("ritual", "Consultar el estado actual del libro")
 def _ritual(args: list[str]) -> int:
-    rc = _call("session_check.py", "--full")
-    _echo("Siguiente: cat .fiction/session_log.json")
-    _echo("Siguiente: editorial_letter(beta=true)")
-    rc = _call("editorial_letter.py", "--beta") or rc
-    _echo("Siguiente: get_foreshadowing()")
-    print("  -> Consultar Referencias/Foreshadowing.md de la obra activa")
-    print("")
-    return rc
+    return _call("session_check.py", "--full", *args)
 
 
 @task("ready", "Resumen ejecutivo rápido antes de escribir")
 def _ready(args: list[str]) -> int:
     _echo("READY - Resumen rápido")
-    rc = _call("session_check.py", "--quick")
-
-    _echo("--- .fiction/session_log.json ---")
-    log = REPO / ".fiction" / "session_log.json"
-    if log.exists():
-        print(log.read_text("utf-8"))
-    else:
-        print("(vacío)")
-
-    _echo("--- Referencias/Pendientes.md de la obra activa (top 3) ---")
-    from vault import CONTENT_ROOT
-    pendientes = CONTENT_ROOT / "Referencias" / "Pendientes.md"
-    if pendientes.exists():
-        _print_pendientes(pendientes)
-    else:
-        print("(sin Pendientes.md)")
-
-    print("")
-    print("  Próximo paso recomendado:")
-    print("    python .tools/make.py ritual  - chequeo completo")
-    print("    python .tools/make.py scan    - escanear prosa global")
-    return rc
-
-
-def _print_pendientes(path: Path) -> None:
-    lines = path.read_text("utf-8").split("\n")
-    for i, line in enumerate(lines):
-        if line.startswith("## Alta"):
-            block = lines[i + 1:i + 6]
-            print("\n".join(l for l in block if l.strip()))
-            break
+    return _call("session_check.py", "--quick", *args)
 
 
 def print_help() -> None:

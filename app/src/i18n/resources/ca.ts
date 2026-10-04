@@ -5,6 +5,7 @@ const ca = {
     library: 'Biblioteca',
     currentVault: 'Vault actual',
     cancel: 'Cancel·la',
+    back: 'Enrere',
     close: 'Tanca',
     retry: 'Torna-ho a provar',
     unavailable: '{{title}} (no disponible)',
@@ -22,10 +23,11 @@ const ca = {
   },
   header: {
     connection: {
-      connected: 'OpenCode connectat',
-      connecting: 'Connectant amb OpenCode…',
-      error: 'Error de connexió amb OpenCode',
+      connected: 'Connectat',
+      connecting: 'Connectant…',
+      error: 'Error',
     },
+    connectionContext: 'Connexió d’OpenCode: {{status}}',
     tagline: "Espai d'escriptura",
     desktopVersion: '{{name}} Desktop v{{version}}',
     language: 'Idioma de la interfície',
@@ -50,6 +52,7 @@ const ca = {
     documentCount_other: '{{count}} documents',
     workVault: "Vault de l'obra",
     newWork: 'Obra nova',
+    manageWork: 'Gestiona l’obra',
     activeWork: 'Obra activa',
     renameSaga: 'Canvia el nom de la saga',
     renameBook: 'Canvia el nom del llibre',
@@ -146,7 +149,7 @@ const ca = {
     intro: 'Consulta les funcions disponibles i la guia per preparar un projecte compatible amb una futura importació.',
     library: {
       title: 'Primers passos i Biblioteca',
-      works: 'Inkforge treballa amb novel·les independents i sagues. Obra nova crea una obra i Obra activa canvia entre les existents.',
+      works: 'La barra lateral mostra l’obra activa i el seu tipus, Obra nova, Gestiona l’obra, el selector Obra activa i l’arbre de documents.',
       active: 'Una saga pot contenir diversos llibres. Llibre actiu selecciona el llibre de treball; obrir un element de l’explorador no canvia de llibre.',
     },
     projectTypes: {
@@ -154,6 +157,18 @@ const ca = {
       standalone: 'En una novel·la independent, el contingut penja directament del projecte.',
       saga: 'En una saga, Món, Estil i Referències són compartits. Cada llibre té els seus propis Capítols, Planificació, Cànon, Notes i Recursos.',
       visibility: 'Els altres llibres d’una saga no es barregen visualment amb el llibre actiu.',
+    },
+    manage: {
+      title: 'Gestiona l’obra',
+      standalone: 'En una novel·la, Gestiona l’obra permet canviar-ne el nom i configurar-ne els gèneres.',
+      saga: 'En una saga, agrupa Canvia el nom de la saga, Gèneres i Afegeix un llibre; si hi ha un llibre actiu, també permet canviar-ne el nom.',
+      navigation: 'Enrere torna de cada acció a Gestiona l’obra i Tanca surt. Desar els gèneres manté el diàleg obert; després de canviar un nom o afegir un llibre, tornes a Gestiona l’obra si l’obra continua activa.',
+    },
+    genres: {
+      title: 'Gèneres editorials',
+      selection: 'Pots assignar zero, un o diversos perfils a l’obra. En una saga, el mateix diàleg permet configurar els gèneres de la saga i els del llibre actiu.',
+      inheritance: 'Amb l’herència activada, el llibre combina els gèneres de la saga i els propis; si la desactives, només utilitza els propis.',
+      guidance: 'Els perfils orienten l’edició, però no són cànon. El Director els pot consultar i crear-ne o actualitzar-ne un si li ho demanes explícitament.',
     },
     editing: {
       title: 'Explorar i editar',
@@ -171,8 +186,9 @@ const ca = {
     ai: {
       title: 'Xat i IA',
       openCode: 'Inkforge utilitza OpenCode local per a la integració d’IA.',
-      models: 'Els proveïdors i models provenen d’OpenCode. Inkforge no obliga a utilitzar un proveïdor concret i permet triar model quan correspon.',
-      retry: 'Si una resposta falla pel model o proveïdor, es pot oferir un nou intent amb el model seleccionat.',
+      models: 'Tria el model i la variant a Configuració → IA / Director. Provenen d’OpenCode; la variant predeterminada utilitza el comportament per defecte d’OpenCode.',
+      retry: 'Si falla un model incompatible, pots canviar de model i tornar a provar el missatge.',
+      scope: 'El Director necessita una obra activa. Cada obra conserva la seva conversa i els llibres d’una saga la comparteixen; respon al xat les preguntes i els permisos quan apareguin.',
       identity: 'Les respostes de l’assistent es mostren amb la identitat Inkforge.',
     },
     language: {

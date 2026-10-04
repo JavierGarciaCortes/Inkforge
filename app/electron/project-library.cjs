@@ -194,12 +194,13 @@ function parseBookManifest(content) {
   return { title, number, genres, inheritGenres }
 }
 
-function replaceFrontmatterTitle(content, title) {
+function replaceFrontmatterTitle(content, previousTitle, title) {
   const bomLength = content.startsWith('\uFEFF') ? 1 : 0
   const source = content.slice(bomLength)
   let lineStart = 0
   let lineNumber = 0
   let foundClosingDelimiter = false
+  let closingNewlineIndex = -1
   const titleLines = []
 
   while (lineStart <= source.length) {
@@ -216,6 +217,7 @@ function replaceFrontmatterTitle(content, title) {
       }
     } else if (line === '---') {
       foundClosingDelimiter = true
+      closingNewlineIndex = newlineIndex
       break
     } else {
       const separatorIndex = line.indexOf(':')
@@ -241,11 +243,24 @@ function replaceFrontmatterTitle(content, title) {
   }
 
   const [titleLine] = titleLines
+  if (closingNewlineIndex === -1) {
+    throw new Error('No se pudo identificar el encabezado principal del manifiesto.')
+  }
+
+  const bodyStart = closingNewlineIndex + 1
+  const headingMatch = /^(?:\r?\n)?# ([^\r\n]*)(?=\r?\n|$)/u.exec(source.slice(bodyStart))
+  if (!headingMatch || headingMatch[1] !== previousTitle) {
+    throw new Error('El encabezado principal del manifiesto ya no coincide con el título anterior.')
+  }
+  const headingStart = bomLength + bodyStart + headingMatch[0].indexOf('#')
+  const headingEnd = headingStart + 2 + previousTitle.length
 
   return (
     content.slice(0, titleLine.start) +
     'titulo: ' + JSON.stringify(title) +
-    content.slice(titleLine.end)
+    content.slice(titleLine.end, headingStart) +
+    '# ' + title +
+    content.slice(headingEnd)
   )
 }
 
@@ -861,6 +876,7 @@ function createProjectLibrary(libraryRoot) {
     const realProjectsRoot = await resolveProjectsRoot(true)
     const projectDirectory = path.join(realProjectsRoot, title)
     let projectDirectoryCreated = false
+    let createdBook = null
 
     try {
       await fs.mkdir(projectDirectory)
@@ -897,7 +913,7 @@ function createProjectLibrary(libraryRoot) {
           ['Libros'],
         ])
 
-        await createBookStructure(
+        createdBook = await createBookStructure(
           path.join(projectDirectory, 'Libros'),
           firstBookTitle,
           1,
@@ -912,7 +928,10 @@ function createProjectLibrary(libraryRoot) {
       )
       const createdProject = await getProject(title)
       if (!createdProject) throw new Error('La obra se creó, pero no pudo validarse.')
-      return createdProject
+      return {
+        project: createdProject,
+        createdBook,
+      }
     } catch (error) {
       if (!projectDirectoryCreated && error?.code === 'EEXIST') {
         throw new Error('Ya existe una obra llamada "' + title + '".')
@@ -986,7 +1005,7 @@ function createProjectLibrary(libraryRoot) {
       throw new Error('Proyecto.md ya no coincide con la obra activa.')
     }
 
-    const nextContent = replaceFrontmatterTitle(originalContent, nextTitle)
+    const nextContent = replaceFrontmatterTitle(originalContent, manifest.title, nextTitle)
     await fs.rename(currentProject.directoryPath, destinationPath)
 
     try {
@@ -1052,7 +1071,7 @@ function createProjectLibrary(libraryRoot) {
       throw new Error('Libro.md ya no coincide con el libro activo.')
     }
 
-    const nextContent = replaceFrontmatterTitle(originalContent, nextTitle)
+    const nextContent = replaceFrontmatterTitle(originalContent, manifest.title, nextTitle)
     await fs.rename(currentBook.directoryPath, destinationPath)
 
     try {

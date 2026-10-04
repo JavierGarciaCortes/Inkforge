@@ -3,6 +3,7 @@ const es = {
     library: 'Biblioteca',
     currentVault: 'Vault actual',
     cancel: 'Cancelar',
+    back: 'Atrás',
     close: 'Cerrar',
     retry: 'Reintentar',
     unavailable: '{{title}} (no disponible)',
@@ -20,10 +21,11 @@ const es = {
   },
   header: {
     connection: {
-      connected: 'OpenCode conectado',
-      connecting: 'Conectando con OpenCode…',
-      error: 'Error de conexión con OpenCode',
+      connected: 'Conectado',
+      connecting: 'Conectando…',
+      error: 'Error',
     },
+    connectionContext: 'Conexión de OpenCode: {{status}}',
     tagline: 'Espacio de escritura',
     desktopVersion: '{{name}} Desktop v{{version}}',
     language: 'Idioma de la interfaz',
@@ -48,6 +50,7 @@ const es = {
     documentCount_other: '{{count}} documentos',
     workVault: 'Vault de la obra',
     newWork: 'Nueva obra',
+    manageWork: 'Gestionar obra',
     activeWork: 'Obra activa',
     renameSaga: 'Renombrar saga',
     renameBook: 'Renombrar libro',
@@ -144,7 +147,7 @@ const es = {
     intro: 'Consulta las funciones disponibles y la guía para preparar un proyecto compatible con una futura importación.',
     library: {
       title: 'Primeros pasos y Biblioteca',
-      works: 'Inkforge trabaja con novelas independientes y sagas. Nueva obra crea una obra y Obra activa cambia entre las existentes.',
+      works: 'La barra lateral muestra la obra activa y su tipo, Nueva obra, Gestionar obra, el selector Obra activa y el árbol de documentos.',
       active: 'Una saga puede contener varios libros. Libro activo elige el libro de trabajo; abrir un elemento del explorador no cambia de libro.',
     },
     projectTypes: {
@@ -152,6 +155,18 @@ const es = {
       standalone: 'En una novela independiente, el contenido cuelga directamente del proyecto.',
       saga: 'En una saga, Mundo, Estilo y Referencias son compartidos. Cada libro tiene sus propios Capítulos, Planificación, Canon, Notas y Recursos.',
       visibility: 'Los demás libros de una saga no se mezclan visualmente con el libro activo.',
+    },
+    manage: {
+      title: 'Gestionar obra',
+      standalone: 'En una novela, Gestionar obra permite renombrarla y configurar sus géneros.',
+      saga: 'En una saga, reúne Renombrar saga, Géneros y Añadir libro; si hay un libro activo, también permite renombrarlo.',
+      navigation: 'Atrás vuelve de una acción a Gestionar obra y Cerrar sale. Guardar géneros mantiene abierto el diálogo; tras renombrar o añadir un libro, vuelves a Gestionar obra si la obra sigue activa.',
+    },
+    genres: {
+      title: 'Géneros editoriales',
+      selection: 'Puedes asignar cero, uno o varios perfiles a la obra. En una saga, el mismo diálogo permite configurar los géneros de la saga y los del libro activo.',
+      inheritance: 'Con la herencia activada, el libro combina géneros de la saga y propios; al desactivarla usa solo los propios.',
+      guidance: 'Los perfiles orientan la edición, pero no son canon. El Director puede consultarlos y crear o actualizar uno si se lo pides expresamente.',
     },
     editing: {
       title: 'Explorar y editar',
@@ -169,8 +184,9 @@ const es = {
     ai: {
       title: 'Chat e IA',
       openCode: 'Inkforge usa OpenCode local para la integración de IA.',
-      models: 'El proveedor y los modelos proceden de OpenCode. Inkforge no obliga a usar un proveedor concreto y, cuando corresponde, permite elegir modelo.',
-      retry: 'Si una respuesta falla por el modelo o proveedor, puede ofrecerse un reintento con el modelo seleccionado.',
+      models: 'Elige modelo y variante en Ajustes → IA / Director. Proceden de OpenCode; la variante predeterminada usa el comportamiento por defecto de OpenCode.',
+      retry: 'Si falla un modelo incompatible, puedes cambiar de modelo y reintentar el mensaje.',
+      scope: 'El Director necesita una obra activa. Cada obra conserva su conversación y los libros de una saga la comparten; responde en el chat a las preguntas y permisos cuando aparezcan.',
       identity: 'Las respuestas del asistente se muestran con la identidad Inkforge.',
     },
     language: {

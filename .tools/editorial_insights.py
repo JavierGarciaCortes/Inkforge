@@ -1258,7 +1258,6 @@ def analyze_all(chapters: list[dict]) -> dict:
         return {
             "style_diagnostics": {},
             "dialogue_quality": {},
-            "save_the_cat": {},
             "first_pages_test": {},
             "backstory_dumps": {},
             "scene_summary_ratio": {},
@@ -1268,7 +1267,6 @@ def analyze_all(chapters: list[dict]) -> dict:
 
     style = analyze_style_diagnostics(chapters)
     dialogue = analyze_dialogue_quality(chapters)
-    save_cat = analyze_save_the_cat(chapters)
     first_pages = analyze_first_pages(chapters)
     backstory = analyze_backstory_dumps(chapters)
     scene_summary = analyze_scene_summary_ratio(chapters)
@@ -1277,7 +1275,6 @@ def analyze_all(chapters: list[dict]) -> dict:
     return {
         "style_diagnostics": style,
         "dialogue_quality": dialogue,
-        "save_the_cat": save_cat,
         "first_pages_test": first_pages,
         "backstory_dumps": backstory,
         "scene_summary_ratio": scene_summary,
@@ -1451,24 +1448,25 @@ def format_markdown(data: dict) -> str:
 #  CLI
 # ──────────────────────────────────────────────
 
-if __name__ == "__main__":
+def main():
     import argparse
-    import sys
-    from pathlib import Path
-    try:
-        from tools.editorial_letter import get_chapter_files, read_chapter
-    except ImportError:
-        sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-        sys.path.insert(0, str(Path(__file__).resolve().parent))
-        from editorial_letter import get_chapter_files, read_chapter
 
     parser = argparse.ArgumentParser(description="Insights editoriales avanzados")
     parser.add_argument("--json", action="store_true", help="Salida JSON")
+    parser.add_argument("--book-scope", help="Libros/<id> autoritativo; obligatorio en saga")
     parser.add_argument("--module", type=str, choices=[
         "style", "dialogue", "save_cat",
         "first_pages", "backstory", "scene_summary", "arc", "hotspots", "all",
     ], default="all", help="Módulo específico (default: all)")
     args = parser.parse_args()
+
+    from vault import scoped_book
+    with scoped_book(args.book_scope):
+        run_insights(args)
+
+
+def run_insights(args):
+    from editorial_letter import get_chapter_files, read_chapter
 
     files = get_chapter_files()
     chapters = [read_chapter(f) for f in files]
@@ -1484,7 +1482,6 @@ if __name__ == "__main__":
         "hotspots": lambda: analyze_revision_hotspots(chapters),
         "all": lambda: {
             **analyze_all(chapters),
-            "story_arc": classify_story_arc(None, chapters),
         },
     }
 
@@ -1493,6 +1490,8 @@ if __name__ == "__main__":
     if args.json:
         print(json.dumps(result, ensure_ascii=False, indent=2))
     else:
-        if args.module == "all":
-            result["story_arc"] = classify_story_arc(None, chapters)
         print(format_markdown(result))
+
+
+if __name__ == "__main__":
+    main()

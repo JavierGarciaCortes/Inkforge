@@ -20,59 +20,59 @@ check:  ## Verificar consistencia global. ARGS=--cap 5-8
 	$(PYTHON) $(TOOLS)/consistency_check.py $(ARGS)
 
 check-transitions:  ## Verificar transiciones entre capítulos
-	$(PYTHON) $(TOOLS)/consistency_check.py --cap all
+	$(PYTHON) $(TOOLS)/consistency_check.py --cap all $(ARGS)
 
 # ── Publicación ─────────────────────────────────────────────────────────────
 
 publish:  ## Generar EPUB. FORMAT=html|pdf|all  TITLE=... AUTHOR=...
 	$(PYTHON) $(TOOLS)/publish.py --format $(or $(FORMAT),epub) \
 		$(if $(TITLE),--title "$(TITLE)") \
-		$(if $(AUTHOR),--author "$(AUTHOR)")
+		$(if $(AUTHOR),--author "$(AUTHOR)") $(ARGS)
 
 publish-all:  ## EPUB + HTML + PDF
 	$(PYTHON) $(TOOLS)/publish.py --format all \
 		$(if $(TITLE),--title "$(TITLE)") \
-		$(if $(AUTHOR),--author "$(AUTHOR)")
+		$(if $(AUTHOR),--author "$(AUTHOR)") $(ARGS)
 
 publish-beta:  ## HTML con números de línea para beta readers
 	$(PYTHON) $(TOOLS)/publish.py --beta \
 		$(if $(TITLE),--title "$(TITLE)") \
-		$(if $(AUTHOR),--author "$(AUTHOR)")
+		$(if $(AUTHOR),--author "$(AUTHOR)") $(ARGS)
 
 # ── Sesión ──────────────────────────────────────────────────────────────────
 
-session:  ## Resumen de cambios desde última sesión
-	$(PYTHON) $(TOOLS)/session_check.py
+session:  ## Estado actual derivado de los Markdown
+	$(PYTHON) $(TOOLS)/session_check.py $(ARGS)
 
-session-full:  ## Resumen + Estado.md + checklist del ritual
-	$(PYTHON) $(TOOLS)/session_check.py --full
+session-full:  ## Estado actual y textos de planificación
+	$(PYTHON) $(TOOLS)/session_check.py --full $(ARGS)
 
-session-quick:  ## Solo diff + scores
-	$(PYTHON) $(TOOLS)/session_check.py --quick
+session-quick:  ## Resumen actual de capítulos
+	$(PYTHON) $(TOOLS)/session_check.py --quick $(ARGS)
 
 # ── Carta editorial ─────────────────────────────────────────────────────────
 
 letter:  ## Carta editorial completa
-	$(PYTHON) $(TOOLS)/editorial_letter.py
+	$(PYTHON) $(TOOLS)/editorial_letter.py $(ARGS)
 
 letter-beta:  ## Informe profesional sintético
-	$(PYTHON) $(TOOLS)/editorial_letter.py --beta
+	$(PYTHON) $(TOOLS)/editorial_letter.py --beta $(ARGS)
 
 letter-plan:  ## Plan de revisión faseado
-	$(PYTHON) $(TOOLS)/editorial_letter.py --plan
+	$(PYTHON) $(TOOLS)/editorial_letter.py --plan $(ARGS)
 
 letter-cap:  ## Carta de un capítulo. ARGS=--cap 07
 	$(PYTHON) $(TOOLS)/editorial_letter.py $(ARGS)
 
-letter-insights:  ## Análisis avanzado (estilo, diálogo, Save the Cat, ...)
-	$(PYTHON) $(TOOLS)/editorial_letter.py --insights
+letter-insights:  ## Análisis avanzado general
+	$(PYTHON) $(TOOLS)/editorial_letter.py --insights $(ARGS)
 
 # ── Diagnóstico ─────────────────────────────────────────────────────────────
 
-diagnose:  ## Todos los diagnósticos de un capítulo. ARGS=07
-	$(PYTHON) $(TOOLS)/editorial_insights.py --module style ARGS=$(ARGS)
-	$(PYTHON) $(TOOLS)/editorial_insights.py --module dialogue ARGS=$(ARGS)
-	$(PYTHON) $(TOOLS)/editorial_insights.py --module scene_summary ARGS=$(ARGS)
+diagnose:  ## Diagnósticos del libro seleccionado
+	$(PYTHON) $(TOOLS)/editorial_insights.py --module style $(ARGS)
+	$(PYTHON) $(TOOLS)/editorial_insights.py --module dialogue $(ARGS)
+	$(PYTHON) $(TOOLS)/editorial_insights.py --module scene_summary $(ARGS)
 
 style:  ## Diagnóstico de estilo. ARGS=--cap 07
 	$(PYTHON) $(TOOLS)/editorial_insights.py --module style $(ARGS)
@@ -82,54 +82,19 @@ dialogue:  ## Diagnóstico de diálogo. ARGS=--cap 07
 
 # ── Mantenimiento ───────────────────────────────────────────────────────────
 
-sync:  ## Sincronizar YAML de capítulos desde el manifiesto
-	$(PYTHON) $(TOOLS)/sync_manifiesto.py
-
-sync-dry:  ## Simular sincronización
-	$(PYTHON) $(TOOLS)/sync_manifiesto.py --dry
-
 sort-lexico:  ## Ordenar alfabéticamente el léxico
-	$(PYTHON) $(TOOLS)/sort_lexico.py
+	$(PYTHON) $(TOOLS)/sort_lexico.py $(ARGS)
 
 lint:  ## Lint de las tools Python
 	@which ruff >/dev/null 2>&1 && ruff check $(TOOLS)/*.py || echo "ruff no instalado. Omite."
 
 # ── Ritual completo de inicio ──────────────────────────────────────────────
 
-ritual:  ## Ritual de inicio de sesión: session + letter + foreshadowing + session_log
-	$(PYTHON) $(TOOLS)/session_check.py --full
-	@echo ""
-	@echo "═══════════════════════════════════════════════"
-	@echo "  Siguiente: cat .fiction/session_log.json"
-	@echo "═══════════════════════════════════════════════"
-	@echo ""
-	@echo "═══════════════════════════════════════════════"
-	@echo "  Siguiente: editorial_letter(beta=true)"
-	@echo "═══════════════════════════════════════════════"
-	@echo ""
-	$(PYTHON) $(TOOLS)/editorial_letter.py --beta
-	@echo ""
-	@echo "═══════════════════════════════════════════════"
-	@echo "  Siguiente: get_foreshadowing()"
-	@echo "  → Consultar vault/Referencias/Foreshadowing.md"
-	@echo "═══════════════════════════════════════════════"
+ritual:  ## Consultar el estado actual del libro
+	$(PYTHON) $(TOOLS)/session_check.py --full $(ARGS)
 
-ready:  ## Resumen ejecutivo rápido antes de escribir
-	@echo "═══════════════════════════════════════════════"
-	@echo "  READY — Resumen rápido"
-	@echo "═══════════════════════════════════════════════"
-	$(PYTHON) $(TOOLS)/session_check.py --quick
-	@echo ""
-	@echo "--- .fiction/session_log.json ---"
-	@cat .fiction/session_log.json 2>/dev/null || echo "(vacío)"
-	@echo ""
-	@echo "--- vault/Referencias/Pendientes.md (top 3) ---"
-	@grep -A 5 "^## Alta" vault/Referencias/Pendientes.md | head -8
-	@echo ""
-	@echo "--- Próximo paso recomendado ---"
-	@echo "  make ritual  — chequeo completo"
-	@echo "  make scan    — escanear prosa global"
-	@echo "═══════════════════════════════════════════════"
+ready:  ## Resumen breve del libro
+	$(PYTHON) $(TOOLS)/session_check.py --quick $(ARGS)
 
 # ── Ayuda ──────────────────────────────────────────────────────────────────
 
@@ -142,8 +107,8 @@ help:  ## Muestra esta ayuda
 	@echo ""
 	@echo "Variables:"
 	@echo "  ARGS=...     Argumentos extra (ej. ARGS=\"--cap 07\")"
+	@echo "  VAULT_PATH=...   Raíz física de la obra Inkforge"
+	@echo "  Para saga: ARGS=\"--book-scope Libros/<id> ...\""
 	@echo "  FORMAT=...   Formato de publicación (html|pdf|all)"
 	@echo "  TITLE=...    Título del libro para publicación"
 	@echo "  AUTHOR=...   Autor del libro para publicación"
-	@echo "  MODEL=...    Modelo LLM (ej. deepseek-v4-flash)"
-	@echo "  AGENT=...    Nombre del agente (ej. writer)"
