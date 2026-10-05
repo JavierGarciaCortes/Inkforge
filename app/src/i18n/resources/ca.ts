@@ -259,6 +259,8 @@ const ca = {
     you: 'Tu',
     sendFailed: 'No s’ha pogut completar aquest enviament.',
     operationFailed: 'No s’ha pogut completar l’operació',
+    externalError: 'OpenCode o el proveïdor ha retornat un error.',
+    errorDetail: 'Detall',
     retryModel: 'Torna-ho a provar amb el model seleccionat',
     composerPlaceholder: 'Escriu a l’editor…',
     composerAria: 'Missatge per a OpenCode',

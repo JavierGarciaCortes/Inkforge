@@ -259,6 +259,8 @@ const en = {
     you: 'You',
     sendFailed: 'This message could not be completed.',
     operationFailed: 'The operation could not be completed',
+    externalError: 'OpenCode or the provider returned an error.',
+    errorDetail: 'Detail',
     retryModel: 'Retry with the selected model',
     composerPlaceholder: 'Write to the editor…',
     composerAria: 'Message for OpenCode',

@@ -406,7 +406,7 @@ Resultados comunicados por el responsable del proyecto, correspondientes a valid
 
 | Área | Resultado confirmado |
 |---|---|
-| Comprobaciones de desarrollo | Para el hito anterior se comunicaron `git diff --check`, `git diff --cached --check`, `node --check` de Electron, JSON de `opencode.json`, build, lint y `python -m compileall .tools` satisfactorios. En `feature/library-advanced-management` se ejecutaron satisfactoriamente, después de la implementación y de nuevo tras corregir el conflicto exacto de géneros, `git diff --check` —sin errores, solo avisos LF → CRLF—, `node --check` de los módulos Electron modificados, incluido `app/electron/content-revision.cjs`, lint y build; no se repitieron las demás comprobaciones históricas ni se ejecutaron tests automáticos o comprobaciones técnicas automatizadas de OpenCode/MCP |
+| Comprobaciones de desarrollo | Para el hito anterior se comunicaron `git diff --check`, `git diff --cached --check`, `node --check` de Electron, JSON de `opencode.json`, build, lint y `python -m compileall .tools` satisfactorios. En `feature/library-advanced-management` se ejecutaron satisfactoriamente, después de la implementación y de nuevo tras corregir el conflicto exacto de géneros, `git diff --check` —sin errores, solo avisos LF → CRLF—, `node --check` de los módulos Electron modificados, incluido `app/electron/content-revision.cjs`, lint y build; no se repitieron las demás comprobaciones históricas ni se ejecutaron tests automáticos o comprobaciones técnicas automatizadas de OpenCode/MCP. Para el hito de preservación de errores se comunicaron como satisfactorios `node --check app/electron/opencode-client.cjs`, `npm --prefix .\app run lint`, `npm --prefix .\app run build` y `git diff --check`, este último sin errores y únicamente con avisos LF → CRLF |
 | Chat | Persistencia tras reinicio; aislamiento entre obras; misma conversación entre libros de una saga |
 | Preferencias IA | Modelo y variante persistentes; grupos Gratis / Otros modelos; envío real comprobado con GPT 5.6 luna y variante `medium` |
 | Interacciones OpenCode | Preguntas y permisos visibles y respondidos en UI; rechazo de preguntas; recuperación tras recarga del renderer; interacción interrumpida no accionable, sin tarjeta obsoleta accionable ni reintento automático tras reinicio completo; escritura según intención y enrutado correcto para obra independiente, saga, libro activo y áreas compartidas |
@@ -435,6 +435,7 @@ Resultados comunicados por el responsable del proyecto, correspondientes a valid
 | IPC semántico de borrado | La llamada desde DevTools `window.inkforge.library.deleteProject({ projectId: 'D:\\Proyectos\\Inkforge\\docs' })` fue rechazada con «La obra solicitada ya no está activa o no está disponible.»; esta prueba confirma que ese IPC semántico no convierte una ruta externa arbitraria en objetivo de borrado |
 | Confirmación destructiva | Escape canceló la eliminación de libro sin borrar. El foco inicial fue funcionalmente `Cancelar`: Enter inmediato canceló; una pulsación de Tab llevó a `Eliminar definitivamente`. Falta un indicador visual claro del foco inicial en `Cancelar`, registrado como mejora menor de accesibilidad/UX y no como bloqueo funcional |
 | Ayuda y localización de gestión | Se revisó manualmente la Ayuda de gestión de obra en español, inglés, catalán y coreano. Las cuatro versiones describen reordenación, renombrado, extracción, borrado irreversible sin papelera, ausencia de fallback o autoactivación, comportamiento al extraer el libro activo y guardado único de géneros |
+| Errores OpenCode/proveedor | Inkforge arrancó, OpenCode conectó y un mensaje normal respondió con un modelo funcional. Con la interfaz en inglés, un modelo que producía un error mostró el resumen localizado `OpenCode or the provider returned an error.` y, debajo, el motivo externo literal recibido. El caso concreto empleado para esta validación no establece una restricción general de Inkforge |
 
 El registro previo también recoge navegación y edición Markdown, guardado seguro, conflictos, `missing`, cierre protegido, navegación entre libros, localización en cuatro idiomas y Ayuda integrada.
 
@@ -468,6 +469,8 @@ El indicador del encabezado sustituye el encabezado técnico y los textos perman
 
 La cabecera presenta también Inkforge y su lema, Ayuda y Ajustes. El indicador tiene descripción accesible y localizada con contexto OpenCode. Los errores funcionales y reintentos existentes siguen visibles cuando corresponden. Modelo y variante están en Ajustes; no se muestra una etiqueta técnica permanente de OpenCode.
 
+Los errores recibidos de OpenCode o del proveedor conservan por separado el resumen controlado por Inkforge y un `detail` textual opcional. Ese detalle se extrae únicamente de campos explícitos y estructuras conocidas, se limita a 500 caracteres, elimina caracteres de control peligrosos y no serializa objetos arbitrarios ni expone stacks, headers, cuerpos de solicitud o excepciones JavaScript internas. La UI lo presenta literalmente y sin traducir bajo una etiqueta localizada, lo omite si está vacío y evita duplicarlo respecto al resumen. Para errores externos `unknown` con detalle, el resumen genérico se localiza en español, inglés, catalán y coreano; los mensajes específicos existentes se conservan.
+
 ### Localización
 
 La interfaz usa `i18next` y `react-i18next` con español, inglés, catalán y coreano. El idioma se cambia desde Ajustes, se persiste como `inkforge:locale` y actualiza `document.documentElement.lang`. La detección inicial se limita a idiomas compatibles; español es el respaldo.
@@ -492,9 +495,9 @@ La primera importación sigue definida como:
 
 ## 16. Problemas conocidos y pendientes
 
-### Problema conocido
+### Hito resuelto
 
-El catálogo de OpenCode puede incluir modelos que fallen por restricciones de proveedor, cuenta o región. Inkforge no codifica esas restricciones ni filtra manualmente el catálogo y no debe hacer fallback silencioso. Actualmente puede sustituir un motivo útil devuelto por OpenCode o el proveedor por `OpenCode devolvió un error inesperado.`. Está pendiente conservar y presentar ese motivo al usuario, con localización cuando corresponda.
+Inkforge preserva y presenta el motivo textual útil recibido desde OpenCode o el proveedor cuando está disponible, separado del resumen controlado. Cubre respuestas HTTP JSON con `message`, `detail` o `error` textual, respuestas HTTP de texto, errores embebidos del assistant, eventos `session.error` y `session.next.step.failed`, y estructuras conocidas bajo `error`, `data` y `data.error`. `classifyEmbeddedError()` conserva el `statusCode` interno y entrega el error embebido completo para no perder textos situados fuera de `data`. No se han alterado clasificación, retry, sesiones, fallback, modelos/proveedores ni arquitectura OpenCode.
 
 ### Implementado; validaciones específicas adicionales pendientes
 
@@ -506,12 +509,12 @@ El catálogo de OpenCode puede incluir modelos que fallen por restricciones de p
 - El renombrado de novela, saga y libro con H1 gestionado ya se comprobó manualmente, incluido el rechazo seguro de un H1 de saga inconsistente. Quedan casos de formato como BOM, CRLF/LF y metadatos adicionales.
 - Un envío real con variante compatible ya se comprobó. Quedan la opción predeterminada, cambios repetidos de modelo/variante, persistencia en todos los escenarios, reconexión y desaparición de modelo o variante del catálogo en distintos estados. No hay retry automático de variante basado en texto de error; el reintento existente permite conservar el mensaje tras un fallo.
 - Quedan comprobaciones adicionales de presentación adaptable.
+- En la preservación de errores quedan comprobaciones secundarias con otros formatos HTTP JSON/texto, variantes de errores embebidos, ambos eventos SSE en más casos reales, payload sin detalle, truncado, caracteres de control, ausencia de exposición de errores JavaScript internos, duplicados, presentación en catalán y coreano, y categorías como cuota, credenciales, `session_missing` y otros casos reales de retry.
 
 Cualquier comprobación no enumerada como confirmada en este documento debe seguir considerándose pendiente.
 
 ### Desarrollo pendiente
 
-- Mejor presentación del motivo real de errores OpenCode/proveedor.
 - Evolución posterior de estilo por obra.
 - Estrategia de motores IA e integración prevista.
 - Portabilidad Windows/Linux.
@@ -533,12 +536,11 @@ Para continuar en otra conversación: leer las instrucciones del proyecto y este
 
 ## 18. Roadmap y siguientes líneas de trabajo
 
-Los once perfiles base y la guía global están terminados. El renombrado con H1 se comprobó en novela, saga y libro; se probó el envío de una variante compatible en un mensaje real; la reorganización de cabecera, barra lateral y `Gestionar obra`, el guardado único de géneros y los flujos principales de la gestión avanzada de Biblioteca cuentan con validación manual. Las comprobaciones específicas pendientes están en la sección 16 y no constituyen una repetición general de esos hitos.
+Los once perfiles base y la guía global están terminados. El renombrado con H1 se comprobó en novela, saga y libro; se probó el envío de una variante compatible en un mensaje real; la reorganización de cabecera, barra lateral y `Gestionar obra`, el guardado único de géneros y los flujos principales de la gestión avanzada de Biblioteca cuentan con validación manual. La preservación y presentación del motivo real de errores OpenCode/proveedor también está implementada y validada en el caso real descrito en la sección 14. Las comprobaciones específicas pendientes están en la sección 16 y no constituyen una repetición general de esos hitos.
 
 Líneas funcionales pendientes, sin fijar aquí un orden arquitectónico nuevo:
 
 - Completar los casos inducidos de resultado parcial y rollback, la prueba con symlink real, los formatos de archivo pendientes y la presentación adaptable descritos en la sección 16.
-- Preservar y presentar mejor los errores reales de OpenCode y proveedores.
 - Definir la estrategia futura de motores IA.
 - Abordar portabilidad Windows/Linux y packaging Windows, incluidas las rutas del ejecutable.
 - Implementar importación compatible y no destructiva.

@@ -257,6 +257,8 @@ const es = {
     you: 'Tú',
     sendFailed: 'No se pudo completar este envío.',
     operationFailed: 'No se pudo completar la operación',
+    externalError: 'OpenCode o el proveedor devolvió un error.',
+    errorDetail: 'Detalle',
     retryModel: 'Reintentar con el modelo seleccionado',
     composerPlaceholder: 'Escribe al editor…',
     composerAria: 'Mensaje para OpenCode',
