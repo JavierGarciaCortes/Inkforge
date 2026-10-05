@@ -13,6 +13,7 @@ class OpenCodeError extends Error {
     this.name = 'OpenCodeError'
     this.code = code
     this.httpStatus = options.httpStatus
+    this.detail = options.detail
     this.retryable = options.retryable ?? false
   }
 }
@@ -47,14 +48,49 @@ function compactText(value, fallback = '') {
   return fallback
 }
 
+function normalizeExternalDetail(value) {
+  if (typeof value !== 'string') return undefined
+
+  const detail = value
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\u202A-\u202E\u2066-\u2069]/g, ' ')
+    .trim()
+    .slice(0, 500)
+    .trimEnd()
+
+  return detail || undefined
+}
+
+function extractExternalDetail(payload) {
+  const direct = normalizeExternalDetail(payload)
+  if (direct) return direct
+  if (!isRecord(payload)) return undefined
+
+  const records = [payload]
+  if (isRecord(payload.error)) records.push(payload.error)
+  if (isRecord(payload.data)) {
+    records.push(payload.data)
+    if (isRecord(payload.data.error)) records.push(payload.data.error)
+  }
+
+  for (const record of records) {
+    for (const key of ['message', 'detail', 'error']) {
+      const detail = normalizeExternalDetail(record[key])
+      if (detail) return detail
+    }
+  }
+
+  return undefined
+}
+
 function classifyHttpError(status, payload) {
   const technicalMessage = compactText(payload).toLowerCase()
+  const detail = extractExternalDetail(payload)
 
   if (status === 401 || status === 403 || technicalMessage.includes('credential')) {
     return new OpenCodeError(
       'invalid_credential',
       'El proveedor rechazó sus credenciales. Revisa la conexión del proveedor en OpenCode.',
-      { httpStatus: status },
+      { httpStatus: status, detail },
     )
   }
 
@@ -62,7 +98,7 @@ function classifyHttpError(status, payload) {
     return new OpenCodeError(
       'quota',
       'El modelo o proveedor alcanzó su límite o cuota.',
-      { httpStatus: status, retryable: true },
+      { httpStatus: status, detail, retryable: true },
     )
   }
 
@@ -70,7 +106,7 @@ function classifyHttpError(status, payload) {
     return new OpenCodeError(
       'session_missing',
       'La sesión de OpenCode ya no está disponible.',
-      { httpStatus: status, retryable: true },
+      { httpStatus: status, detail, retryable: true },
     )
   }
 
@@ -82,7 +118,7 @@ function classifyHttpError(status, payload) {
     return new OpenCodeError(
       'model_unavailable',
       'El modelo o proveedor seleccionado no está disponible.',
-      { httpStatus: status, retryable: true },
+      { httpStatus: status, detail, retryable: true },
     )
   }
 
@@ -91,7 +127,7 @@ function classifyHttpError(status, payload) {
     status === 404 || status === 405
       ? 'Esta versión de OpenCode no ofrece una capacidad necesaria.'
       : 'OpenCode devolvió un error inesperado.',
-    { httpStatus: status, retryable: status >= 500 },
+    { httpStatus: status, detail, retryable: status >= 500 },
   )
 }
 
@@ -105,7 +141,7 @@ function classifyEmbeddedError(embeddedError, fallbackStatus = 500) {
       ? embeddedError.statusCode
       : fallbackStatus
 
-  return classifyHttpError(internalStatus, embeddedData ?? embeddedError)
+  return classifyHttpError(internalStatus, embeddedError)
 }
 
 function normalizeError(error) {
@@ -144,6 +180,7 @@ function serializeError(error) {
   return {
     code: normalized.code,
     message: normalized.message,
+    ...(normalized.detail ? { detail: normalized.detail } : {}),
     retryable: normalized.retryable,
   }
 }
@@ -1370,7 +1407,7 @@ class OpenCodeClient {
     }
 
     if (!response.ok || !response.body) {
-      throw classifyHttpError(response.status, { message: 'Event stream unavailable' })
+      throw classifyHttpError(response.status, null)
     }
 
     const contentType = response.headers.get('content-type') ?? ''

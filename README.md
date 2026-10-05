@@ -268,6 +268,8 @@ El responsable del proyecto confirmó manualmente la restauración exacta de `ac
 
 La gestión avanzada de Biblioteca —borrado irreversible, reordenación y conversión de libro de saga a novela independiente— y el guardado único de géneros están implementados y validados manualmente en sus flujos principales, incluidos conflictos externos exactos, ausencia de fallback, protección de borradores, rechazo de un junction externo y revisión de la Ayuda en los cuatro idiomas. Quedan casos inducidos de resultado parcial y rollback, una prueba con symlink real y otras comprobaciones específicas; el detalle está en [DEVELOPMENT_STATUS.md](docs/DEVELOPMENT_STATUS.md).
 
+Inkforge conserva por separado el resumen controlado y el detalle textual útil recibido desde OpenCode o el proveedor cuando está disponible. La interfaz muestra el detalle externo literal sin traducirlo bajo una etiqueta localizada, sin presentar objetos arbitrarios ni excepciones JavaScript internas. Cuando el error es `unknown` y existe ese detalle, el resumen genérico propio de Inkforge también se localiza; los mensajes específicos existentes conservan su comportamiento actual. Se validó manualmente una respuesta normal con un modelo funcional y, posteriormente, un error real de proveedor con la interfaz en inglés; en este último caso el resumen propio de Inkforge apareció localizado y el detalle externo permaneció literal. Otros formatos y categorías permanecen como comprobaciones secundarias en [DEVELOPMENT_STATUS.md](docs/DEVELOPMENT_STATUS.md).
+
 ### Estructura localizada e importación futura
 
 La localización de etiquetas estructurales está implementada y validada mediante claves explícitas que el proceso principal añade exclusivamente a nodos reconocidos de proyectos gestionados. El renderer conserva siempre `name` y `path` reales y usa el nombre físico como fallback.
@@ -276,7 +278,7 @@ La guía informativa de preparación ya está disponible en la Ayuda integrada. 
 
 Pendientes reales:
 
-- mejorar la presentación de errores útiles de OpenCode y proveedores y completar validaciones secundarias de renombrado y variantes;
+- completar validaciones secundarias de renombrado y variantes;
 - definir la estrategia de motores IA y su integración prevista;
 - desarrollar y validar la portabilidad Windows/Linux;
 - preparar packaging para Windows y revisar `projectRoot` en la aplicación empaquetada;

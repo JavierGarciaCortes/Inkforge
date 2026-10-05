@@ -1087,6 +1087,19 @@ dialog.settings-dialog {
   line-height: 1.5;
 }
 
+.opencode-error .opencode-error-detail {
+  padding-left: 8px;
+  border-left: 2px solid var(--error-border);
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.opencode-error-detail span {
+  color: var(--error-text);
+  font-weight: 700;
+}
+
 .opencode-request {
   border-color: var(--request-border);
   background: var(--request-bg);

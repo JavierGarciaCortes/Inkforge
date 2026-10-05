@@ -259,6 +259,8 @@ const ko = {
     you: '나',
     sendFailed: '이번 전송을 완료하지 못했습니다.',
     operationFailed: '작업을 완료하지 못했습니다',
+    externalError: 'OpenCode 또는 제공업체에서 오류를 반환했습니다.',
+    errorDetail: '세부 정보',
     retryModel: '선택한 모델로 다시 시도',
     composerPlaceholder: '편집자에게 메시지 쓰기…',
     composerAria: 'OpenCode에 보낼 메시지',

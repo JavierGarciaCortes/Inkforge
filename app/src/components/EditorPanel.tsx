@@ -182,7 +182,20 @@ export function EditorPanel({ projectId, isSettingsOpen, onCloseSettings, onConn
         {chat.error && (
           <div className="opencode-error" role="alert">
             <strong>{t('editor.operationFailed')}</strong>
-            <p>{chat.error.message}</p>
+            <p>
+              {chat.error.code === 'unknown' && chat.error.detail
+                ? t('editor.externalError')
+                : chat.error.message}
+            </p>
+            {chat.error.detail && chat.error.detail.trim() !== (
+              chat.error.code === 'unknown'
+                ? t('editor.externalError')
+                : chat.error.message
+            ).trim() && (
+              <p className="opencode-error-detail">
+                <span>{t('editor.errorDetail')}:</span> {chat.error.detail}
+              </p>
+            )}
             {chat.error.retryable && (
               <button type="button" onClick={() => void chat.retryLastMessage()}>
                 {t('editor.retryModel')}

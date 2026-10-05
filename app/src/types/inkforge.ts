@@ -175,6 +175,7 @@ export type OpenCodeErrorCode =
 export interface OpenCodeError {
   code: OpenCodeErrorCode
   message: string
+  detail?: string
   retryable: boolean
 }
 
