@@ -114,6 +114,9 @@ export function HelpDialog({ onClose }: HelpDialogProps) {
             <ul className="help-list">
               <li>{t('help.manage.standalone')}</li>
               <li>{t('help.manage.saga')}</li>
+              <li>{t('help.manage.advanced')}</li>
+              <li>{t('help.manage.destructive')}</li>
+              <li>{t('help.manage.extraction')}</li>
               <li>{t('help.manage.navigation')}</li>
             </ul>
           </section>

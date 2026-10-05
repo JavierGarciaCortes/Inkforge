@@ -20,8 +20,7 @@ contextBridge.exposeInMainWorld('inkforge', {
     getScope: () => ipcRenderer.invoke('library:get-scope'),
     listGenreProfiles: () => ipcRenderer.invoke('library:list-genre-profiles'),
     getGenreConfiguration: () => ipcRenderer.invoke('library:get-genre-configuration'),
-    updateProjectGenres: (input) => ipcRenderer.invoke('library:update-project-genres', input),
-    updateBookGenres: (input) => ipcRenderer.invoke('library:update-book-genres', input),
+    updateGenreConfiguration: (input) => ipcRenderer.invoke('library:update-genre-configuration', input),
     onScopeChanged: (callback) => subscribe('library:scope-changed', callback),
     activateProject: (projectId) => ipcRenderer.invoke('library:activate-project', projectId),
     activateBook: (bookId) => ipcRenderer.invoke('library:activate-book', bookId),
@@ -31,6 +30,10 @@ contextBridge.exposeInMainWorld('inkforge', {
     renameActiveBook: (nextTitle) => (
       ipcRenderer.invoke('library:rename-active-book', nextTitle)
     ),
+    deleteProject: (input) => ipcRenderer.invoke('library:delete-project', input),
+    deleteBook: (input) => ipcRenderer.invoke('library:delete-book', input),
+    reorderBooks: (input) => ipcRenderer.invoke('library:reorder-books', input),
+    extractBookToStandalone: (input) => ipcRenderer.invoke('library:extract-book', input),
     onChanged: (callback) => subscribe('library:changed', callback),
   },
   vault: {
