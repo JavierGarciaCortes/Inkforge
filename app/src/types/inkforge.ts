@@ -29,10 +29,16 @@ export interface GenreProfileSummary {
 
 export interface GenreConfiguration {
   projectGenres: string[]
+  projectRevision: string
   bookGenres: string[] | null
+  bookRevision: string | null
   inheritProjectGenres: boolean | null
   effectiveGenres: string[]
 }
+
+export type GenreConfigurationUpdateResult =
+  | { ok: true; configuration: GenreConfiguration }
+  | { ok: false; reason: 'conflict' }
 
 export type CreateProjectInput =
   | {
@@ -61,6 +67,12 @@ export interface LibraryActivationResult {
 
 export interface CreateProjectResult extends LibraryActivationResult {
   project: LibraryProjectSummary
+}
+
+export interface ExtractBookResult extends LibraryActivationResult {
+  project: LibraryProjectSummary
+  originalRemoved: boolean
+  removalError: string | null
 }
 
 export type SaveState = 'idle' | 'saving' | 'error' | 'conflict' | 'missing'
@@ -297,8 +309,18 @@ export interface InkforgeBridge {
     getScope: () => Promise<LibraryActivationResult>
     listGenreProfiles: () => Promise<GenreProfileSummary[]>
     getGenreConfiguration: () => Promise<GenreConfiguration>
-    updateProjectGenres: (input: { projectId: string; genres: string[]; expectedGenres: string[] }) => Promise<string[]>
-    updateBookGenres: (input: { projectId: string; bookId: string; inheritGenres: boolean; genres: string[]; expectedInheritGenres: boolean; expectedGenres: string[] }) => Promise<{ inheritGenres: boolean; genres: string[] }>
+    updateGenreConfiguration: (input: {
+      projectId: string
+      bookId: string | null
+      projectGenres: string[]
+      expectedProjectGenres: string[]
+      expectedProjectRevision: string
+      bookGenres: string[] | null
+      expectedBookGenres: string[] | null
+      expectedBookRevision: string | null
+      inheritProjectGenres: boolean | null
+      expectedInheritProjectGenres: boolean | null
+    }) => Promise<GenreConfigurationUpdateResult>
     onScopeChanged: (callback: (scope: LibraryActivationResult) => void) => () => void
     activateProject: (projectId: string | null) => Promise<LibraryActivationResult>
     activateBook: (bookId: string) => Promise<LibraryBookSummary>
@@ -306,6 +328,10 @@ export interface InkforgeBridge {
     createBook: (input: CreateBookInput) => Promise<LibraryBookSummary>
     renameProject: (nextTitle: string) => Promise<ActiveProject>
     renameActiveBook: (nextTitle: string) => Promise<LibraryBookSummary>
+    deleteProject: (input: { projectId: string }) => Promise<LibraryActivationResult>
+    deleteBook: (input: { projectId: string; bookId: string }) => Promise<LibraryActivationResult>
+    reorderBooks: (input: { projectId: string; bookIds: string[] }) => Promise<LibraryActivationResult>
+    extractBookToStandalone: (input: { projectId: string; bookId: string }) => Promise<ExtractBookResult>
     onChanged: (callback: () => void) => () => void
   }
   vault: {

@@ -1292,6 +1292,11 @@ dialog.settings-dialog {
   width: min(440px, 100%);
 }
 
+.work-management-dialog {
+  width: min(720px, 100%);
+  overflow-y: auto;
+}
+
 .work-management-section {
   display: grid;
   gap: 10px;
@@ -1323,6 +1328,79 @@ dialog.settings-dialog {
 .work-management-actions .dialog-button:disabled {
   cursor: not-allowed;
   opacity: 0.58;
+}
+
+.work-management-notice {
+  padding: 9px 11px;
+  border-left: 2px solid var(--accent);
+  background: var(--surface-selected);
+}
+
+.work-management-empty {
+  color: var(--text-muted);
+}
+
+.work-management-book-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.work-management-book-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface-deep);
+}
+
+.work-management-book-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.work-management-book-title span {
+  color: var(--accent);
+  font-size: 10px;
+}
+
+.work-management-book-actions,
+.work-management-book-deletions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.dialog-button-compact {
+  min-height: 30px;
+  padding: 0 10px;
+}
+
+.work-management-danger-zone {
+  padding: 16px;
+  border: 1px solid var(--danger-border);
+  border-radius: 4px;
+  background: var(--danger-bg);
+}
+
+.work-management-section + .work-management-danger-zone {
+  border-top: 1px solid var(--danger-border);
+}
+
+.work-management-danger-zone > p {
+  color: var(--danger-text);
+}
+
+.work-management-book-deletions {
+  padding-top: 10px;
+  border-top: 1px solid var(--danger-border);
 }
 
 .help-dialog {
@@ -1662,6 +1740,10 @@ dialog.settings-dialog {
 
   .confirm-dialog {
     max-height: calc(100svh - 28px);
+  }
+
+  .work-management-book-row {
+    grid-template-columns: 1fr;
   }
 
   .help-structure-grid {

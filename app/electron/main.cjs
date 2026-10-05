@@ -1,8 +1,8 @@
 const path = require('node:path')
 const nativeFs = require('node:fs')
 const fs = require('node:fs/promises')
-const { createHash } = require('node:crypto')
 const { app, BrowserWindow, ipcMain, session } = require('electron')
+const { createContentRevision } = require('./content-revision.cjs')
 const { createDirectorStateStore } = require('./director-state.cjs')
 const { createLibrarySelectionStateStore } = require('./library-selection-state.cjs')
 const { createOpenCodeClient, serializeError } = require('./opencode-client.cjs')
@@ -77,10 +77,6 @@ function isHidden(name) {
 
 function toVaultPath(...segments) {
   return segments.filter(Boolean).join('/')
-}
-
-function createContentRevision(content) {
-  return createHash('sha256').update(content, 'utf8').digest('hex')
 }
 
 async function listMarkdownTree(
@@ -875,19 +871,19 @@ app.whenReady().then(async () => {
     if (!activeProjectRecord) throw new Error('No hay ninguna obra activa.')
     return projectLibrary.getGenreConfiguration(activeProjectRecord, activeBook?.id ?? null)
   })
-  handleLibrary('library:update-project-genres', async (_event, input) => {
+  handleLibrary('library:update-genre-configuration', async (_event, input) => {
     requireActiveProject(input?.projectId)
-    const genres = await projectLibrary.updateProjectGenres(activeProjectRecord, input?.genres, input?.expectedGenres)
-    scheduleLibraryChanged()
-    return genres
-  })
-  handleLibrary('library:update-book-genres', async (_event, input) => {
-    requireActiveProject(input?.projectId)
-    if (!activeBook || activeBook.id !== input?.bookId) {
-      throw new Error('El libro solicitado ya no está activo.')
+    const requestedBookId = input?.bookId ?? null
+    const activeBookId = activeBook?.id ?? null
+    if (requestedBookId !== activeBookId) {
+      throw new Error('El ámbito de géneros ya no coincide con el libro activo.')
     }
-    const result = await projectLibrary.updateBookGenres(activeProjectRecord, activeBook.id, input?.inheritGenres, input?.genres, input?.expectedInheritGenres, input?.expectedGenres)
-    scheduleLibraryChanged()
+    const result = await projectLibrary.updateGenreConfiguration(
+      activeProjectRecord,
+      requestedBookId,
+      input,
+    )
+    if (result.ok) scheduleLibraryChanged()
     return result
   })
   ipcMain.handle('director-state:load', (_event, payload) => (
@@ -999,6 +995,85 @@ app.whenReady().then(async () => {
     scheduleLibraryChanged()
 
     return getActiveBookSummary()
+  })
+
+  handleLibrary('library:delete-project', async (_event, input) => {
+    requireActiveProject(input?.projectId)
+    await projectLibrary.deleteProject(activeProjectRecord)
+    const scope = await setActiveProject(null)
+    broadcast('vault:changed')
+    scheduleLibraryChanged()
+    return scope
+  })
+
+  handleLibrary('library:delete-book', async (_event, input) => {
+    requireActiveProject(input?.projectId)
+    if (activeProject.type !== 'saga' || typeof input?.bookId !== 'string') {
+      throw new Error('El libro solicitado no pertenece a una saga activa válida.')
+    }
+    const removedActiveBook = activeBook?.id === input.bookId
+    await projectLibrary.deleteBook(activeProjectRecord, input.bookId)
+    if (removedActiveBook) {
+      activeBook = null
+      await persistLibrarySelection()
+      broadcast('vault:changed')
+    }
+    const scope = await getLibraryScope()
+    scheduleLibraryChanged()
+    return scope
+  })
+
+  handleLibrary('library:reorder-books', async (_event, input) => {
+    requireActiveProject(input?.projectId)
+    if (activeProject.type !== 'saga') throw new Error('No hay una saga activa que reordenar.')
+    const previousActiveBookId = activeBook?.id ?? null
+    const result = await projectLibrary.reorderBooks(activeProjectRecord, input?.bookIds)
+    if (previousActiveBookId) {
+      const activeIdChange = result.idChanges.find((change) => change.previousId === previousActiveBookId)
+      const nextActiveBook = activeIdChange
+        ? result.books.find((book) => book.id === activeIdChange.nextId)
+        : null
+      if (!nextActiveBook) throw new Error('No se pudo conservar la identidad del libro activo.')
+      activeBook = toBookSummary(nextActiveBook)
+      await persistLibrarySelection()
+    }
+    const scope = {
+      activeProject: getActiveProjectSummary(),
+      activeBook: getActiveBookSummary(),
+      books: result.books.map(toBookSummary),
+    }
+    broadcast('vault:changed')
+    scheduleLibraryChanged()
+    return scope
+  })
+
+  handleLibrary('library:extract-book', async (_event, input) => {
+    requireActiveProject(input?.projectId)
+    if (activeProject.type !== 'saga' || typeof input?.bookId !== 'string') {
+      throw new Error('El libro solicitado no pertenece a una saga activa válida.')
+    }
+    const removedActiveBook = activeBook?.id === input.bookId
+    const result = await projectLibrary.extractBookToStandalone(activeProjectRecord, input.bookId)
+    if (result.originalRemoved && removedActiveBook) {
+      activeBook = null
+      await persistLibrarySelection()
+      broadcast('vault:changed')
+    } else if (!result.originalRemoved && removedActiveBook) {
+      const survivingBook = await projectLibrary.getBook(activeProjectRecord, input.bookId)
+      if (!survivingBook) {
+        activeBook = null
+        await persistLibrarySelection()
+        broadcast('vault:changed')
+      }
+    }
+    const scope = await getLibraryScope()
+    scheduleLibraryChanged()
+    return {
+      ...scope,
+      project: toProjectSummary(result.project),
+      originalRemoved: result.originalRemoved,
+      removalError: result.removalError,
+    }
   })
 
   handleLibrary('vault:list', async () => {

@@ -18,7 +18,9 @@ La aplicación de escritorio ya permite:
 - conservar el borrador cuando la ruta original desaparece o se renombra fuera de Inkforge;
 - actualizar el árbol del vault mediante un watcher;
 - gestionar una Biblioteca con novelas independientes y sagas de varios libros;
-- crear obras y gestionar desde un único diálogo el renombrado de novelas, sagas y libros, los géneros y la incorporación de libros a sagas;
+- crear obras y gestionar desde un único diálogo el renombrado de novelas, sagas y libros, un guardado conjunto de géneros y la incorporación de libros a sagas;
+- eliminar definitivamente novelas, sagas completas o libros individuales mediante una confirmación explícita y sin papelera;
+- reordenar los libros de una saga conservando su identidad activa y convertir un libro en novela independiente sin activarla automáticamente;
 - asignar varios perfiles editoriales de género a obras y libros, con herencia configurable en sagas;
 - utilizar la interfaz en español, inglés, catalán o coreano;
 - abrir una Ayuda integrada y localizada con documentación de las funciones disponibles;
@@ -58,7 +60,7 @@ La cabecera muestra Inkforge y su lema, un punto de estado con texto localizado 
 
 ## Ayuda integrada
 
-El botón de Ayuda del encabezado abre una guía localizada en los cuatro idiomas de la interfaz. Explica Biblioteca, `Gestionar obra`, géneros y herencia, lectura y edición Markdown, guardado explícito, protección ante cambios externos, Ajustes de IA, OpenCode y localización. Abrirla o cerrarla no altera el documento, el borrador, la obra ni el libro activos.
+El botón de Ayuda del encabezado abre una guía localizada en los cuatro idiomas de la interfaz. Explica Biblioteca, `Gestionar obra`, el guardado conjunto de géneros y herencia, borrado sin papelera, reordenación y extracción sin autoactivación ni fallback, lectura y edición Markdown, protección ante cambios externos, Ajustes de IA, OpenCode y localización. Abrirla o cerrarla no altera el documento, el borrador, la obra ni el libro activos.
 
 La Ayuda incluye una guía de preparación que muestra las estructuras físicas de referencia para una novela independiente y una saga. Es únicamente documentación: la importación real, la selección y validación de proyectos externos y la copia a la Biblioteca todavía no están implementadas.
 
@@ -136,7 +138,7 @@ Saga/
         └── ...
 ~~~
 
-La barra lateral presenta la obra activa y su tipo, `Nueva obra`, `Gestionar obra`, el selector `Obra activa` y, en una saga, `Libro activo`; el árbol documental ocupa el resto. `Gestionar obra` agrupa renombrado y géneros; en sagas, también añadir libro y renombrar el libro activo. En el explorador de una saga aparecen `Proyecto.md`, las áreas compartidas y solo el libro activo. Abrir un documento nunca cambia de libro: la selección se realiza mediante una acción explícita. Cambiar de libro conserva el workspace OpenCode de la saga; cambiar de obra cambia ese workspace.
+La barra lateral presenta la obra activa y su tipo, `Nueva obra`, `Gestionar obra`, el selector `Obra activa` y, en una saga, `Libro activo`; el árbol documental ocupa el resto. `Gestionar obra` agrupa renombrado y géneros; en sagas, también añadir, renombrar, reordenar, eliminar y sacar libros como novelas independientes. La zona de peligro separa el borrado irreversible de las acciones normales: Inkforge no tiene papelera y exige una confirmación inequívoca antes de eliminar archivos. En el explorador de una saga aparecen `Proyecto.md`, las áreas compartidas y solo el libro activo. Abrir un documento nunca cambia de libro: la selección se realiza mediante una acción explícita. Cambiar o reordenar libros conserva el workspace OpenCode de la saga; cambiar de obra cambia ese workspace.
 
 Inkforge recuerda la última obra y, en una saga, el último libro activo mediante una preferencia local de Electron fuera del vault. La restauración usa sus identificadores persistidos y validados. Si la obra guardada ya no existe, arranca sin obra seleccionada y mantiene visibles las demás, sin elegir otra automáticamente. Si falta el libro guardado o la saga ya no contiene libros, conserva la saga activa con `activeBook = null`: no usa `books[0]`, no infiere otro libro y exige una selección o creación explícita antes del trabajo de libro.
 
@@ -175,7 +177,7 @@ Inkforge inicia un servidor OpenCode local enlazado a `127.0.0.1` y descubre sus
 
 El agente primary actual es `editor`. Los subagentes definidos en `opencode.json` son `writer`, `structurer`, `lector`, `critico` y `query`.
 
-La integración se validó inicialmente con OpenCode 1.18.31. La compatibilidad depende de las capacidades disponibles, no de una versión rígida.
+La integración se validó inicialmente con OpenCode 1.18.31. El hito posterior de contexto `synthetic`, MCP y `cwd` portable se comprobó con OpenCode 1.18.34. La compatibilidad depende de las capacidades disponibles, no de una versión mínima rígida.
 
 La raíz técnica de Inkforge mantiene agentes, skills y MCP; el directorio de trabajo narrativo es la obra activa. OpenCode recibe `INKFORGE_INFRASTRUCTURE_ROOT` para ejecutar `inkforge-context` desde esa infraestructura, mientras `VAULT_PATH` sigue señalando la obra e `INKFORGE_LIBRARY_ROOT` la Biblioteca global. En cada turno, Inkforge proporciona al Director el libro activo, su ruta operativa y los nombres de sus géneros efectivos de forma privada y autoritativa; la selección del turno sustituye cualquier selección antigua del historial. El Director no deduce libros ni simula el MCP mediante procesos o scripts temporales: si `inkforge-context` no está disponible, comunica el fallo. Los perfiles pertinentes se leen mediante MCP sin cargar todos sus textos en cada mensaje.
 
@@ -262,7 +264,9 @@ También están disponibles los scripts `build` y `preview` de Astro.
 
 Las funciones principales de edición, Biblioteca, persistencia, Ajustes y Director cuentan con validación manual anterior. También se comprobaron el mecanismo de perfiles de género, los flujos principales de la nueva interfaz, el renombrado con H1 gestionado en novela, saga y libro, y el envío real de una variante compatible. El responsable del proyecto comunicó lint limpio y build TypeScript/Vite limpio tras la corrección de TS18047. Quedan casos adicionales de formato, variantes y presentación adaptable; el detalle se mantiene en [DEVELOPMENT_STATUS.md](docs/DEVELOPMENT_STATUS.md). No hay una suite automática propia confirmada.
 
-La migración actual de herramientas editoriales y MCP, la restauración de `activeBookId`, el transporte sintético del contexto privado y el `cwd` portable de `inkforge-context` están implementados pero requieren comprobación manual y automatizada; las validaciones anteriores de la aplicación no cubren estos cambios.
+El responsable del proyecto confirmó manualmente la restauración exacta de `activeBookId`, los estados válidos sin libro y sin fallback, los cambios de libro en caliente, el transporte privado `synthetic` sin exposición en el historial y el funcionamiento de `inkforge-context` con `book_scope` y `cwd` portable. Las comprobaciones de desarrollo comunicadas para ese hito anterior incluyeron `git diff --check`, `git diff --cached --check`, `node --check`, validación de `opencode.json`, build, lint y `compileall`. En `feature/library-advanced-management` se ejecutaron satisfactoriamente, después de la implementación y de nuevo tras corregir el conflicto exacto del guardado unificado de géneros, `git diff --check` —sin errores, solo avisos LF → CRLF—, `node --check` sobre los módulos Electron modificados, incluido `app/electron/content-revision.cjs`, `npm --prefix app run lint` y `npm --prefix app run build`; no se ejecutaron las demás comprobaciones históricas, tests automáticos ni comprobaciones técnicas automatizadas de OpenCode/MCP.
+
+La gestión avanzada de Biblioteca —borrado irreversible, reordenación y conversión de libro de saga a novela independiente— y el guardado único de géneros están implementados y validados manualmente en sus flujos principales, incluidos conflictos externos exactos, ausencia de fallback, protección de borradores, rechazo de un junction externo y revisión de la Ayuda en los cuatro idiomas. Quedan casos inducidos de resultado parcial y rollback, una prueba con symlink real y otras comprobaciones específicas; el detalle está en [DEVELOPMENT_STATUS.md](docs/DEVELOPMENT_STATUS.md).
 
 ### Estructura localizada e importación futura
 
@@ -279,10 +283,10 @@ Pendientes reales:
 - después, implementar la importación compatible, validada y no destructiva;
 - ampliar posteriormente la personalización de estilo por obra;
 - mejorar la resolución de conflictos con diff, elección de versión y merge;
-- desarrollar el borrado seguro de obras/libros y la evolución posterior de Biblioteca y Director;
+- continuar la evolución posterior de Biblioteca y Director;
 - incorporar tests automatizados cuando se planifique esa infraestructura.
 
-El borrado de obras/libros y la importación real todavía no están implementados.
+La importación real todavía no está implementada.
 
 ## Créditos
 

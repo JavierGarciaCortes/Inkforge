@@ -144,6 +144,8 @@ El registro documental anterior recoge, entre otros, estos hitos históricos:
 358fd51 feat: prevent external file overwrite conflicts
 cb8f8a6 feat: sync vault tree and protect window close
 57e2c4c feat: localize interface and managed vault labels
+3a39a03 feat: complete markdown vault runtime migration
+78251af merge publicado en main del hito de runtime Markdown
 ```
 
 Son referencias históricas, no una comprobación del checkout actual. No se afirma que los cambios recientes estén commiteados, mergeados, enviados ni que la rama esté limpia.
@@ -156,7 +158,7 @@ El estado funcional incluye Biblioteca exclusiva, chat persistente por obra, con
 
 Las validaciones previas y las comunicadas para perfiles, renombrado, variantes y la nueva interfaz se detallan en la sección 14. Esta actualización no implica nuevas comprobaciones de ejecución.
 
-### Corregido en este cambio; pendiente de validación manual
+### Validado en el hito anterior
 
 - La selección persistida vuelve a incluir `activeProjectId` y `activeBookId`, con migración defensiva de formatos anteriores y restauración del ID exacto cuando todavía existe.
 - Biblioteca, Director y MCP comparten el mismo `activeBook`; activar, crear o renombrar el libro activo persiste su ID, y su desaparición externa deja `activeBook = null` sin seleccionar otro.
@@ -164,13 +166,25 @@ Las validaciones previas y las comunicadas para perfiles, renombrado, variantes 
 - `inkforge-context` recibe un `cwd` portable mediante `INKFORGE_INFRASTRUCTURE_ROOT`, aunque el workspace narrativo sea una novela o saga.
 - Las instrucciones prohíben arrancar manualmente el servidor MCP, recrear su protocolo, usar scripts temporales para emularlo o deducir y hardcodear `book_scope`.
 
-No se han ejecutado Git, tests, lint, build, Electron, OpenCode, MCP ni pruebas manuales para validar este bloque.
+El responsable confirmó manualmente la restauración y persistencia exactas del libro, los estados sin libro y sin fallback, el cambio en caliente Endless Two → Endless One sin reiniciar OpenCode, el contexto `synthetic` invisible, `inkforge-context`, los `book_scope` de ambos libros, el arranque MCP en sesiones nuevas, la selección puntual de ámbito sin persistirla y el `cwd` portable normalizado en Windows. Para ese hito anterior también comunicó como satisfactorios `git diff --check`, `git diff --cached --check`, `node --check` de los módulos Electron modificados, validación JSON de `opencode.json`, build, lint y `python -m compileall .tools`. En el hito actual `feature/library-advanced-management` se ejecutaron satisfactoriamente `git diff --check` —sin errores y únicamente con avisos de conversión LF → CRLF—, `node --check` sobre los módulos Electron modificados, incluido `app/electron/content-revision.cjs`, `npm --prefix app run lint` y `npm --prefix app run build`; se realizaron después de la implementación y se repitieron después de corregir el conflicto exacto del guardado unificado de géneros. En este hito no se ejecutaron `git diff --cached --check`, `python -m compileall`, una nueva validación de `opencode.json`, tests automáticos ni una comprobación técnica automatizada de OpenCode/MCP.
+
+### Implementado en este hito; validado manualmente en sus flujos principales
+
+- Borrado irreversible y confirmado de novelas, sagas completas y libros individuales, sin papelera ni fallback de selección.
+- Reordenación contigua de libros mediante `numero:` y directorios físicos, con nombres temporales internos, rollback best-effort e identidad activa persistida.
+- Conversión de libro de saga a novela independiente mediante copia validada antes de retirar el original; los fallos de retirada conservan la copia nueva y se presentan como resultado parcial.
+- Protección selectiva de borradores, IPC semántico estrecho, refresco determinista y cadenas nuevas en español, inglés, catalán y coreano.
+- Guardado único de géneros: una sola acción persiste la obra y, cuando hay libro activo en una saga, coordina `Proyecto.md`, `Libro.md` y `hereda_generos` después de validar ambos manifiestos; si falla la segunda escritura intenta restaurar la primera. Las revisiones son el mismo SHA-256 del contenido UTF-8 exacto usado por el editor del vault.
+
+Durante la validación manual del guardado unificado se confirmó el caso normal y se detectó que la primera implementación comparaba solo los campos de género: un cambio externo en otra parte del manifest no producía conflicto. Se corrigió añadiendo revisiones exactas de `Proyecto.md` y `Libro.md`, comparadas para ambos antes de la primera escritura. La corrección se validó manualmente en novela, saga sin libro activo y saga con libro activo, incluidos conflictos externos ajenos a los géneros y un segundo guardado sin cerrar el diálogo.
+
+El responsable del proyecto comunicó validaciones manuales de los flujos principales de borrado, reordenación, extracción, selección, protección de borradores, seguridad, confirmaciones y localización, detalladas en la sección 14. Los casos concretos restantes se delimitan en la sección 16. En esta actualización documental no se han ejecutado Git, tests, lint, build, Electron ni OpenCode.
 
 ## 7. OpenCode — estado conocido
 
 La integración se probó inicialmente con OpenCode 1.18.31; no es una versión mínima rígida ni una afirmación sobre la versión instalada actualmente.
 
-El transporte del contexto por una parte `synthetic` y el `cwd` configurable del MCP se implementan conforme al comportamiento diagnosticado de OpenCode 1.18.34; su funcionamiento real queda pendiente de validación manual.
+El transporte del contexto por una parte `synthetic` y el `cwd` configurable del MCP se comprobaron realmente con OpenCode 1.18.34; esta referencia no establece una versión mínima rígida.
 
 Arranque gestionado por Electron main:
 
@@ -231,7 +245,7 @@ El selector y la persistencia de variante están implementados y cuentan con val
 
 El flujo de presentación filtra partes `reasoning`, `synthetic` e `ignored`. Solo se muestra texto visible de respuesta. La prueba manual confirmó que no aparecen trazas temporales de razonamiento durante el streaming.
 
-El contexto operativo privado se vuelve a construir desde el estado Electron y se envía en cada turno como primera parte de texto con `synthetic: true`; la segunda parte contiene el mensaje real del usuario. No se crea una sesión nueva ni se reinicia OpenCode al cambiar de libro. Este transporte concreto está implementado y pendiente de validación manual.
+El contexto operativo privado se vuelve a construir desde el estado Electron y se envía en cada turno como primera parte de texto con `synthetic: true`; la segunda parte contiene el mensaje real del usuario. No se crea una sesión nueva ni se reinicia OpenCode al cambiar de libro. Se confirmó manualmente el cambio de libro en caliente, el libro correcto recibido por el Director y la ausencia de la parte `synthetic` en el historial visible.
 
 Se conserva la reconciliación SSE por mensaje, rol y parte para evitar duplicados. El asistente se presenta como `Inkforge`. El retry de modelo incompatible está validado.
 
@@ -312,7 +326,12 @@ El cierre protegido se resuelve en Electron mediante `appWindow.onCloseRequested
 
 ## 12. Biblioteca — selección y persistencia
 
-La Biblioteca permite crear novelas y sagas, añadir libros, seleccionarlos explícitamente y renombrar obras/libros. El borrado desde Inkforge sigue pendiente.
+La Biblioteca permite crear novelas y sagas, añadir libros, seleccionarlos explícitamente, renombrar obras/libros y ejecutar gestión avanzada. Las mutaciones de filesystem permanecen en Electron main y el renderer solo envía IDs semánticos validados, nunca rutas arbitrarias.
+
+- El borrado es definitivo y no existe papelera. Solo actúa sobre obras o libros que vuelven a validarse mediante contención, `realpath`, manifest y rechazo de symlinks; la UI exige una confirmación específica con el título exacto.
+- La reordenación persiste exclusivamente en `numero:` y en el prefijo físico `NN - Título`. Todos los libros se aíslan primero bajo nombres temporales únicos dentro de `Libros/`, se actualizan sus manifests y se publican con rollback best-effort ante fallo. No existe índice paralelo.
+- Sacar un libro crea primero una novela completa en staging, copia `Mundo`, `Estilo` y `Referencias` de la saga, incorpora los ámbitos del libro y transforma `Libro.md` en `Proyecto.md` con los géneros efectivos. Solo tras publicar y validar la nueva obra intenta retirar el original; si esto último falla, conserva ambas copias e informa del resultado parcial.
+- Eliminar o extraer el libro activo deja la saga con `activeBook = null`; eliminar otro libro conserva la selección. Reordenar actualiza y persiste el ID físico nuevo del mismo libro lógico. Ninguna de estas rutas elige otro libro ni activa automáticamente la novela extraída.
 
 ### Perfiles editoriales globales
 
@@ -375,7 +394,9 @@ Abrir un documento no cambia el libro activo. Cambiar de libro con un borrador r
 - La cabecera muestra Inkforge y su lema, punto de conexión con texto localizado (`Conectado`, `Conectando…`, `Error`), Ayuda y Ajustes. El contexto OpenCode sigue disponible de forma accesible en el indicador; no se muestran permanentemente el icono cuadrado `I`, `Biblioteca`, la versión ni la palabra `OpenCode` junto al estado.
 - La barra lateral presenta el título y tipo de obra activa (`Saga` o `Novela`), `Nueva obra`, `Gestionar obra`, el selector `Obra activa` y, si es saga, `Libro activo`. El árbol documental ocupa el espacio restante. Ya no presenta encabezado `Biblioteca`, contador de documentos, pie redundante ni botones permanentes separados para renombrar, géneros o añadir libro.
 - Sin selección, el selector muestra `Selecciona una obra`; es un placeholder, no un proyecto. Se ocultan o deshabilitan acciones que requieren obra o libro activos.
-- `Gestionar obra` agrupa para novela renombrado y `Géneros`; para saga, renombrado de saga, `Géneros` y añadir libro. Con libro activo, ofrece además renombrarlo. Un único diálogo de `Géneros` permite configurar conjuntamente la saga y los géneros propios y la herencia del libro activo.
+- `Gestionar obra` agrupa para novela renombrado y `Géneros`; para saga, renombrado, géneros, alta, listado ordenado, subida/bajada, extracción y gestión de todos sus libros. Un único diálogo de `Géneros` permite configurar conjuntamente la saga y los géneros propios y la herencia del libro activo.
+- La `Zona de peligro` aparece al final y separa visualmente `Eliminar novela`, `Eliminar saga completa` y `Eliminar libro «Título»` de las acciones normales. La confirmación enfoca `Cancelar`, se cancela con Escape, advierte que se borran archivos del disco y que Inkforge no tiene papelera, y exige pulsar `Eliminar definitivamente`.
+- `Sacar de la saga` no usa estilo destructivo: preserva el contenido convirtiéndolo en novela independiente. `Subir` y `Bajar` son controles explícitos y se deshabilitan en los extremos.
 - La navegación es jerárquica: una acción secundaria abierta desde `Gestionar obra` muestra `Atrás` para volver allí; `Gestionar obra` muestra `Cerrar`. Guardar géneros mantiene abierto su diálogo y permite regresar con `Atrás`. Tras renombrar o añadir un libro, se vuelve a `Gestionar obra` si el contexto sigue válido; el libro nuevo queda activo.
 - El explorador muestra `Proyecto.md`, las áreas compartidas y solo el libro activo; el selector de libro no representa una carpeta artificial y las rutas siguen bajo `Libros/<id>/...`. En una novela se mantiene el árbol directo y no aparece selector de libro.
 
@@ -385,20 +406,35 @@ Resultados comunicados por el responsable del proyecto, correspondientes a valid
 
 | Área | Resultado confirmado |
 |---|---|
-| Comprobaciones de desarrollo | Lint limpio y build TypeScript/Vite limpio tras corregir TS18047; apertura de Electron comunicada en validaciones anteriores |
+| Comprobaciones de desarrollo | Para el hito anterior se comunicaron `git diff --check`, `git diff --cached --check`, `node --check` de Electron, JSON de `opencode.json`, build, lint y `python -m compileall .tools` satisfactorios. En `feature/library-advanced-management` se ejecutaron satisfactoriamente, después de la implementación y de nuevo tras corregir el conflicto exacto de géneros, `git diff --check` —sin errores, solo avisos LF → CRLF—, `node --check` de los módulos Electron modificados, incluido `app/electron/content-revision.cjs`, lint y build; no se repitieron las demás comprobaciones históricas ni se ejecutaron tests automáticos o comprobaciones técnicas automatizadas de OpenCode/MCP |
 | Chat | Persistencia tras reinicio; aislamiento entre obras; misma conversación entre libros de una saga |
 | Preferencias IA | Modelo y variante persistentes; grupos Gratis / Otros modelos; envío real comprobado con GPT 5.6 luna y variante `medium` |
 | Interacciones OpenCode | Preguntas y permisos visibles y respondidos en UI; rechazo de preguntas; recuperación tras recarga del renderer; interacción interrumpida no accionable, sin tarjeta obsoleta accionable ni reintento automático tras reinicio completo; escritura según intención y enrutado correcto para obra independiente, saga, libro activo y áreas compartidas |
 | Perfiles de género | Descubrimiento dinámico, asignación múltiple y herencia, perfiles no disponibles conservados, cambio externo detectado y lectura real por Director/MCP; creación explícita de `Ficción social.md` con la guía global y revisión posterior |
 | Renombrado con H1 | Novela y libro: título y H1 actualizados; saga: rechazo seguro ante H1 inconsistente y renombrado correcto tras corregirlo |
 | Interfaz de Biblioteca | Cabecera y barra lateral reorganizadas; `Gestionar obra`; `Géneros` → `Atrás` antes y después de guardar; renombrado → `Gestionar obra`; añadir libro → libro nuevo activo y `Gestionar obra` |
-| Restauración anterior | Última obra y último libro recuperados en la implementación previa; la restauración actual de `activeBookId` requiere nueva validación |
-| Contexto y salida anteriores | Libro activo correcto y razonamiento interno no visible en pruebas previas; el transporte `synthetic` actual requiere nueva validación |
+| Selección y `activeBookId` | Restauración exacta de obra/libro; reinicio con el libro correcto; ID ausente y saga sin libro dejan `null`; sin fallback aunque existan otros libros; desaparición y restauración física no reactivan; crear y renombrar actualizan y persisten el ID |
+| Contexto `synthetic` | El Director recibe el libro correcto; Endless Two → Endless One funciona en caliente sin reiniciar OpenCode; el estado sin libro se comunica correctamente y la parte privada no aparece en el historial visible |
+| MCP y ámbito | `inkforge-context` conectado; `book_scope` correcto para Endless One y tras cambiar a Endless Two; disponible desde el inicio de saga/sesión; un ámbito puntual no cambia `activeBook = null`; ese null sobrevive al reinicio; el agente no simula MCP; `cwd` portable funciona en Windows |
 | Apariencia | Claro, Oscuro y Sistema; Sistema reacciona en caliente |
 | Conexión | Indicador de conexión y errores funcionales |
 | Biblioteca vacía | Arranque sin obra y acceso a las funciones globales |
 | Eliminación entre reinicios | Última obra ausente deja la selección vacía |
 | Eliminación durante ejecución | Obra desvinculada; borrador sin guardar protegido |
+| Libro no activo y último libro activo | Eliminar un libro no activo preservó el libro activo sin fallback. Eliminar el último libro activo dejó la saga con cero libros, la mantuvo activa con `activeBook = null`, mostró `Sin libro activo` y conservó ese estado tras reiniciar |
+| Reordenación de tres libros | Con Alpha, Beta y Gamma y Gamma activa, subir Gamma produjo `01 Alpha`, `02 Gamma`, `03 Beta` y `numero: 1/2/3`; Gamma siguió activa con su ID nuevo, también tras reiniciar |
+| Extracción con herencia | Sacar Beta no activa de Endless Saga la retiró de la saga y creó una novela independiente sin alterar Gamma activa. La novela contiene `Canon/`, `Capítulos/`, `Estilo/`, `Mundo/`, `Notas/`, `Planificación/`, `Recursos/`, `Referencias/` y `Proyecto.md`; este quedó como novela titulada Beta con `generos: ["Aventura"]`, materializando el género efectivo heredado |
+| Extracción de libro activo | Sacar Gamma creó la novela independiente, dejó la saga con `activeBook = null`, no activó Alpha ni la novela nueva y conservó el estado tras reiniciar |
+| Colisión de extracción | Con una obra Alpha ya existente, la operación mostró el error localizado equivalente, no sobrescribió el destino y mantuvo intacto el libro original |
+| Eliminación de obras activas | Eliminar Endless Saga activa cerró el diálogo, retiró la saga y dejó `activeProject = null` sin autoactivar otra obra, también tras reiniciar. Eliminar una novela activa produjo el mismo estado vacío y persistente |
+| Borradores y operaciones destructivas | Un borrador afectado de `Beta/Proyecto.md` mostró primero el aviso de cambios sin guardar; cancelar conservó el estado dirty y, tras descartar, apareció la confirmación destructiva y se pudo eliminar sin pérdida silenciosa. Un borrador no afectado de Test Two Renamed no bloqueó eliminar Test One y permaneció activo y dirty |
+| Extracción sin herencia | En MCP Test, con saga Aventura y Test Two Renamed con herencia desactivada y Romance propio, la novela extraída quedó con `generos: ["Romance"]`, sin Aventura |
+| Manifest inválido | Cambiar Security Test de `tipo: libro` a un valor inválido lo ocultó de la gestión, dejó la saga sin libro activo y preservó físicamente el directorio; al restaurar el manifest volvió a aparecer, sin borrado |
+| Guardado único de géneros | Una sola acción guardó conjuntamente saga y libro activo y persistió `Proyecto.md` y `Libro.md`; en saga sin libro activo y en novela independiente persistió tras cerrar y reabrir. Un cambio externo ajeno a géneros en `Proyecto.md` provocó conflicto sin escribir el diálogo y preservó el cambio; el mismo caso en `Libro.md` evitó toda escritura parcial, dejó intacto `Proyecto.md` y preservó el libro externo. Un segundo guardado sin cerrar funcionó sin conflicto falso y con las revisiones renovadas |
+| Seguridad de extracción | La creación de un symlink real en Windows no pudo probarse por falta de privilegios administrativos. Sí se creó un junction dentro de `MCP Test/Libros/01 - Security Test/Recursos` hacia `D:\Proyectos\Inkforge\docs`: la extracción fue rechazada con el mensaje localizado equivalente a «La operación fue rechazada por las reglas de seguridad de la Biblioteca», no copió contenido externo y, tras retirar el junction, la documentación original seguía intacta |
+| IPC semántico de borrado | La llamada desde DevTools `window.inkforge.library.deleteProject({ projectId: 'D:\\Proyectos\\Inkforge\\docs' })` fue rechazada con «La obra solicitada ya no está activa o no está disponible.»; esta prueba confirma que ese IPC semántico no convierte una ruta externa arbitraria en objetivo de borrado |
+| Confirmación destructiva | Escape canceló la eliminación de libro sin borrar. El foco inicial fue funcionalmente `Cancelar`: Enter inmediato canceló; una pulsación de Tab llevó a `Eliminar definitivamente`. Falta un indicador visual claro del foco inicial en `Cancelar`, registrado como mejora menor de accesibilidad/UX y no como bloqueo funcional |
+| Ayuda y localización de gestión | Se revisó manualmente la Ayuda de gestión de obra en español, inglés, catalán y coreano. Las cuatro versiones describen reordenación, renombrado, extracción, borrado irreversible sin papelera, ausencia de fallback o autoactivación, comportamiento al extraer el libro activo y guardado único de géneros |
 
 El registro previo también recoge navegación y edición Markdown, guardado seguro, conflictos, `missing`, cierre protegido, navegación entre libros, localización en cuatro idiomas y Ayuda integrada.
 
@@ -460,15 +496,18 @@ La primera importación sigue definida como:
 
 El catálogo de OpenCode puede incluir modelos que fallen por restricciones de proveedor, cuenta o región. Inkforge no codifica esas restricciones ni filtra manualmente el catálogo y no debe hacer fallback silencioso. Actualmente puede sustituir un motivo útil devuelto por OpenCode o el proveedor por `OpenCode devolvió un error inesperado.`. Está pendiente conservar y presentar ese motivo al usuario, con localización cuando corresponda.
 
-### Implementado; validación adicional pendiente
+### Implementado; validaciones específicas adicionales pendientes
 
-- Persistencia y migración de `activeBookId`: restauración exacta, activación, creación, renombrado y desaparición externa, sin fallback. Deben comprobarse manualmente el reinicio, un ID ausente y una saga sin libros.
-- Contexto privado por turno mediante parte `synthetic`: debe comprobarse con OpenCode 1.18.34 que el modelo recibe el libro actual tras un cambio en caliente y que el bloque no aparece en la UI.
-- `inkforge-context` con `cwd` de infraestructura portable: debe comprobarse desde workspaces de novela y saga, tanto con `opencode mcp list` como mediante la API del proceso gestionado.
-- Prohibición de emular MCP: debe comprobarse que el agente comunica la indisponibilidad y no arranca scripts manuales, no recrea el protocolo y no inventa `book_scope`.
+- Inducir el fallo de la segunda escritura del guardado único de géneros y comprobar su rollback best-effort.
+- Comprobar el resultado parcial de extracción cuando la novela ya se publicó pero falla la retirada del libro original.
+- Completar una prueba con symlink real, distinta del junction ya validado; Windows impidió crear ese symlink sin privilegios administrativos.
+- Mejorar, sin carácter bloqueante, el indicador visual del foco inicial en `Cancelar` de la confirmación destructiva.
+- Ejercitar casos adicionales de rollback ante fallos del sistema de archivos.
 - El renombrado de novela, saga y libro con H1 gestionado ya se comprobó manualmente, incluido el rechazo seguro de un H1 de saga inconsistente. Quedan casos de formato como BOM, CRLF/LF y metadatos adicionales.
 - Un envío real con variante compatible ya se comprobó. Quedan la opción predeterminada, cambios repetidos de modelo/variante, persistencia en todos los escenarios, reconexión y desaparición de modelo o variante del catálogo en distintos estados. No hay retry automático de variante basado en texto de error; el reintento existente permite conservar el mensaje tras un fallo.
-- Quedan comprobaciones adicionales de presentación adaptable y foco de los nuevos diálogos si todavía no se han confirmado.
+- Quedan comprobaciones adicionales de presentación adaptable.
+
+Cualquier comprobación no enumerada como confirmada en este documento debe seguir considerándose pendiente.
 
 ### Desarrollo pendiente
 
@@ -478,8 +517,9 @@ El catálogo de OpenCode puede incluir modelos que fallen por restricciones de p
 - Portabilidad Windows/Linux.
 - Packaging Windows y validación de `projectRoot` y rutas en el ejecutable.
 - Importación compatible.
+- Publicación y exportación.
+- Herramientas editoriales todavía no cubiertas completamente de extremo a extremo.
 - Conflictos, diff, elección de versión y merge avanzados.
-- Borrado seguro de obras y libros.
 - Evolución posterior de Biblioteca y Director.
 - Tests automatizados; actualmente no hay script `npm test`.
 
@@ -493,17 +533,18 @@ Para continuar en otra conversación: leer las instrucciones del proyecto y este
 
 ## 18. Roadmap y siguientes líneas de trabajo
 
-Los once perfiles base y la guía global están terminados. El renombrado con H1 se comprobó en novela, saga y libro; se probó el envío de una variante compatible en un mensaje real; y la reorganización de cabecera, barra lateral y `Gestionar obra` se validó en sus flujos principales. Las comprobaciones secundarias pendientes están en la sección 16 y no constituyen una repetición general de esos hitos.
+Los once perfiles base y la guía global están terminados. El renombrado con H1 se comprobó en novela, saga y libro; se probó el envío de una variante compatible en un mensaje real; la reorganización de cabecera, barra lateral y `Gestionar obra`, el guardado único de géneros y los flujos principales de la gestión avanzada de Biblioteca cuentan con validación manual. Las comprobaciones específicas pendientes están en la sección 16 y no constituyen una repetición general de esos hitos.
 
 Líneas funcionales pendientes, sin fijar aquí un orden arquitectónico nuevo:
 
-- Validar manualmente persistencia/restauración de libro, cambio en caliente del contexto, visibilidad del bloque sintético y disponibilidad real de `inkforge-context` desde la obra activa.
+- Completar los casos inducidos de resultado parcial y rollback, la prueba con symlink real, los formatos de archivo pendientes y la presentación adaptable descritos en la sección 16.
 - Preservar y presentar mejor los errores reales de OpenCode y proveedores.
 - Definir la estrategia futura de motores IA.
 - Abordar portabilidad Windows/Linux y packaging Windows, incluidas las rutas del ejecutable.
 - Implementar importación compatible y no destructiva.
+- Completar publicación/exportación y la cobertura de extremo a extremo de herramientas editoriales.
 - Ampliar la gestión de conflictos con diff, elección de versión y merge.
-- Desarrollar borrado seguro de obras y libros y evolución posterior de Biblioteca y Director.
+- Continuar la evolución posterior de Biblioteca y Director.
 - Incorporar tests automatizados.
 
-La importación no es el siguiente hito inmediato. Cuando corresponda, debe validar antes de copiar, preservar el proyecto fuente y aceptar únicamente estructuras compatibles, sin importador genérico, renombrado automático ni inferencia de estructura.
+La importación compatible es una de las siguientes líneas lógicas, sin fijar aquí una decisión arquitectónica nueva ni un orden rígido. Cuando corresponda, debe validar antes de copiar, preservar el proyecto fuente y aceptar únicamente estructuras compatibles, sin importador genérico, renombrado automático ni inferencia de estructura.

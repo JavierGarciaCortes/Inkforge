@@ -64,11 +64,21 @@ type PendingAction =
   | { type: 'switch-book'; bookId: string }
   | { type: 'new-project' }
   | { type: 'add-book' }
+  | { type: 'advanced-library'; operation: AdvancedLibraryOperation }
   | { type: NarrativeDialogKind }
 
 type NarrativeDialogKind = 'rename-project' | 'rename-book'
 type WorkManagementAction = NarrativeDialogKind | 'add-book' | 'genres'
 type WorkManagementNavigation = { projectId: string; action: WorkManagementAction | null }
+type AdvancedLibraryOperation =
+  | { kind: 'delete-project'; title: string; projectType: 'novela' | 'saga' }
+  | { kind: 'delete-book'; book: LibraryBookSummary }
+  | { kind: 'reorder-books'; bookIds: string[]; affectedBookIds: string[] }
+  | { kind: 'extract-book'; book: LibraryBookSummary }
+type DestructiveLibraryOperation = Extract<
+  AdvancedLibraryOperation,
+  { kind: 'delete-project' | 'delete-book' }
+>
 
 function getDirectorBounds(workspaceWidth: number, compact: boolean) {
   const minimum = compact ? 260 : 280
@@ -92,6 +102,8 @@ function App() {
   const [projectError, setProjectError] = useState<string | null>(null)
   const [isProjectDialogOpen, setIsProjectDialogOpen] = useState(false)
   const [workManagementNavigation, setWorkManagementNavigation] = useState<WorkManagementNavigation | null>(null)
+  const [destructiveAction, setDestructiveAction] = useState<DestructiveLibraryOperation | null>(null)
+  const [managementNotice, setManagementNotice] = useState<string | null>(null)
   const [isHelpOpen, setIsHelpOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(() => loadOpenCodeModelSelection() === null)
   const unavailableModelPrompts = useRef(new Set<string>())
@@ -675,6 +687,157 @@ function App() {
     }
   }, [finishBookActivation])
 
+  const applyAdvancedLibraryScope = useCallback((
+    scope: LibraryActivationResult,
+    resetOpenDocument: boolean,
+  ) => {
+    booksRequestId.current += 1
+    setActiveProject(scope.activeProject)
+    setActiveBook(scope.activeBook)
+    setBooks(scope.books)
+    if (resetOpenDocument) {
+      resetDocumentForProjectChange()
+      setVaultTree([])
+      setVaultState('loading')
+    }
+    setVaultError(null)
+    void loadVault({ background: !resetOpenDocument })
+  }, [loadVault, resetDocumentForProjectChange])
+
+  const operationAffectsDraft = (operation: AdvancedLibraryOperation) => {
+    if (!isDirty || !document || !activeProject) return false
+    if (operation.kind === 'delete-project') return true
+    const documentBookPrefix = activeProject.type === 'saga' && activeBook
+      ? `Libros/${activeBook.id}/`
+      : null
+    const documentBelongsToActiveBook = documentBookPrefix !== null &&
+      document.path.replaceAll('\\', '/').startsWith(documentBookPrefix)
+    if (!documentBelongsToActiveBook || !activeBook) return false
+    if (operation.kind === 'delete-book' || operation.kind === 'extract-book') {
+      return operation.book.id === activeBook.id
+    }
+    return operation.affectedBookIds.includes(activeBook.id)
+  }
+
+  const performAdvancedLibraryOperation = async (operation: AdvancedLibraryOperation) => {
+    const bridge = window.inkforge
+    const project = activeProject
+    if (!bridge || !project) {
+      setProjectError(i18n.t('errors.libraryDesktop'))
+      return
+    }
+
+    const requestId = libraryRequestId.current + 1
+    libraryRequestId.current = requestId
+    libraryOperationActiveRef.current = true
+    setIsProjectBusy(true)
+    setProjectError(null)
+    setManagementNotice(null)
+
+    try {
+      if (operation.kind === 'delete-project') {
+        const scope = await bridge.library.deleteProject({ projectId: project.id })
+        if (!isMounted.current || libraryRequestId.current !== requestId) return
+        setProjects((current) => current.filter((item) => item.id !== project.id))
+        setWorkManagementNavigation(null)
+        finishProjectActivation(scope)
+        return
+      }
+
+      if (operation.kind === 'delete-book') {
+        const removedActiveBook = activeBook?.id === operation.book.id
+        const scope = await bridge.library.deleteBook({
+          projectId: project.id,
+          bookId: operation.book.id,
+        })
+        if (!isMounted.current || libraryRequestId.current !== requestId) return
+        applyAdvancedLibraryScope(scope, removedActiveBook)
+        return
+      }
+
+      if (operation.kind === 'reorder-books') {
+        const activeBookWasMoved = activeBook !== null &&
+          operation.affectedBookIds.includes(activeBook.id)
+        const scope = await bridge.library.reorderBooks({
+          projectId: project.id,
+          bookIds: operation.bookIds,
+        })
+        if (!isMounted.current || libraryRequestId.current !== requestId) return
+        applyAdvancedLibraryScope(scope, activeBookWasMoved)
+        return
+      }
+
+      const extractedActiveBook = activeBook?.id === operation.book.id
+      const result = await bridge.library.extractBookToStandalone({
+        projectId: project.id,
+        bookId: operation.book.id,
+      })
+      if (!isMounted.current || libraryRequestId.current !== requestId) return
+      setProjects((current) => sortProjects([
+        ...current.filter((item) => item.id !== result.project.id),
+        result.project,
+      ]))
+      applyAdvancedLibraryScope(
+        result,
+        extractedActiveBook && result.activeBook === null,
+      )
+      setManagementNotice(result.originalRemoved
+        ? i18n.t('libraryManagement.extractSuccess', { title: result.project.title })
+        : i18n.t('libraryManagement.extractPartial', {
+            title: result.project.title,
+            detail: i18n.t('errors.deleteBook'),
+          }))
+    } catch (error) {
+      if (!isMounted.current || libraryRequestId.current !== requestId) return
+      const fallback = operation.kind === 'delete-project'
+        ? project.type === 'saga' ? i18n.t('errors.deleteSaga') : i18n.t('errors.deleteNovel')
+        : operation.kind === 'delete-book'
+          ? i18n.t('errors.deleteBook')
+          : operation.kind === 'reorder-books'
+            ? i18n.t('errors.reorderBooks')
+            : i18n.t('errors.extractBook')
+      const detail = getLibraryError(error, fallback)
+      const detailKey = detail.toLocaleLowerCase('es')
+      const localizedDetail = operation.kind === 'extract-book' &&
+        detailKey.includes('ya existe una obra llamada')
+        ? i18n.t('errors.extractDestinationExists')
+        : operation.kind === 'reorder-books' && detailKey.includes('colision')
+          ? i18n.t('errors.reorderCollision')
+          : detailKey.includes('manifiesto') || detailKey.includes('proyecto.md') ||
+              detailKey.includes('libro.md')
+            ? i18n.t('errors.invalidManifest')
+            : detailKey.includes('rechazada') || detailKey.includes('enlace simbólico') ||
+                detailKey.includes('fuera de') || detailKey.includes('no es segura')
+              ? i18n.t('errors.librarySecurity')
+              : detail
+      setProjectError(localizedDetail === fallback ? fallback : `${fallback} ${localizedDetail}`)
+    } finally {
+      if (isMounted.current && libraryRequestId.current === requestId) {
+        libraryOperationActiveRef.current = false
+        setIsProjectBusy(false)
+      }
+    }
+  }
+
+  const prepareAdvancedLibraryOperation = (operation: AdvancedLibraryOperation) => {
+    setProjectError(null)
+    setManagementNotice(null)
+    if (operation.kind === 'delete-project' || operation.kind === 'delete-book') {
+      setDestructiveAction(operation)
+      return
+    }
+    void performAdvancedLibraryOperation(operation)
+  }
+
+  const requestAdvancedLibraryOperation = (operation: AdvancedLibraryOperation) => {
+    if (isProjectBusy || libraryOperationActiveRef.current || saveState === 'saving') return
+    if (operationAffectsDraft(operation)) {
+      setPendingAction({ type: 'advanced-library', operation })
+      return
+    }
+    prepareAdvancedLibraryOperation(operation)
+  }
+
   const returnToWorkManagement = useCallback((action: WorkManagementAction) => {
     setWorkManagementNavigation((current) => {
       if (current?.action !== action) return current
@@ -896,6 +1059,12 @@ function App() {
       resetDocumentForProjectChange()
       setProjectError(null)
       setIsBookDialogOpen(true)
+      return
+    }
+
+    if (action.type === 'advanced-library') {
+      resetDocumentForProjectChange()
+      prepareAdvancedLibraryOperation(action.operation)
       return
     }
 
@@ -1140,6 +1309,7 @@ function App() {
     || pendingAction?.type === 'add-book'
   const isRenamePending = pendingAction?.type === 'rename-project'
     || pendingAction?.type === 'rename-book'
+  const isAdvancedLibraryPending = pendingAction?.type === 'advanced-library'
   const discardMessage = isCloseWindowPending
     ? t('dialogs.closeMessage')
     : isProjectChangePending
@@ -1148,12 +1318,28 @@ function App() {
         ? t('dialogs.bookMessage')
         : isRenamePending
           ? t('dialogs.continueMessage')
+          : isAdvancedLibraryPending
+            ? t('dialogs.libraryOperationMessage')
           : pendingAction?.type === 'read-mode'
             ? t('dialogs.readModeMessage')
             : t('dialogs.documentMessage')
   const discardConfirmLabel = isCloseWindowPending
     ? t('dialogs.exitWithoutSaving')
     : t('dialogs.discardChanges')
+  const destructiveTitle = !destructiveAction
+    ? ''
+    : destructiveAction.kind === 'delete-book'
+      ? t('libraryManagement.deleteBookTitle')
+      : destructiveAction.projectType === 'saga'
+        ? t('libraryManagement.deleteSagaTitle')
+        : t('libraryManagement.deleteNovelTitle')
+  const destructiveMessage = !destructiveAction
+    ? ''
+    : destructiveAction.kind === 'delete-book'
+      ? t('libraryManagement.deleteBookMessage', { title: destructiveAction.book.title })
+      : destructiveAction.projectType === 'saga'
+        ? t('libraryManagement.deleteSagaMessage', { title: destructiveAction.title })
+        : t('libraryManagement.deleteNovelMessage', { title: destructiveAction.title })
 
   return (
     <div className="app-shell">
@@ -1183,7 +1369,11 @@ function App() {
           onBookChange={requestBookChange}
           onNewProject={requestNewProject}
           onManageWork={() => {
-            if (activeProject) setWorkManagementNavigation({ projectId: activeProject.id, action: null })
+            if (activeProject) {
+              setProjectError(null)
+              setManagementNotice(null)
+              setWorkManagementNavigation({ projectId: activeProject.id, action: null })
+            }
           }}
           onReload={retryVault}
         />
@@ -1232,13 +1422,41 @@ function App() {
         <WorkManagementDialog
           project={activeProject}
           activeBook={activeBook}
+          books={books}
           isProjectBusy={isProjectBusy}
           isActiveBookAvailable={activeBook === null || books.some((book) => book.id === activeBook.id)}
-          onCancel={() => setWorkManagementNavigation(null)}
+          error={projectError}
+          notice={managementNotice}
+          onCancel={() => {
+            setWorkManagementNavigation(null)
+            setProjectError(null)
+            setManagementNotice(null)
+          }}
           onRenameProject={() => openManagementAction('rename-project')}
           onConfigureGenres={() => openManagementAction('genres')}
           onAddBook={() => openManagementAction('add-book')}
           onRenameBook={() => openManagementAction('rename-book')}
+          onMoveBook={(bookId, direction) => {
+            const index = books.findIndex((book) => book.id === bookId)
+            const otherIndex = direction === 'up' ? index - 1 : index + 1
+            if (index < 0 || otherIndex < 0 || otherIndex >= books.length) return
+            const nextBooks = [...books]
+            const otherBook = nextBooks[otherIndex]
+            nextBooks[otherIndex] = nextBooks[index]
+            nextBooks[index] = otherBook
+            requestAdvancedLibraryOperation({
+              kind: 'reorder-books',
+              bookIds: nextBooks.map((book) => book.id),
+              affectedBookIds: [bookId, otherBook.id],
+            })
+          }}
+          onExtractBook={(book) => requestAdvancedLibraryOperation({ kind: 'extract-book', book })}
+          onDeleteBook={(book) => requestAdvancedLibraryOperation({ kind: 'delete-book', book })}
+          onDeleteProject={() => requestAdvancedLibraryOperation({
+            kind: 'delete-project',
+            title: activeProject.title,
+            projectType: activeProject.type,
+          })}
         />
       )}
       {isProjectDialogOpen && (
@@ -1291,6 +1509,19 @@ function App() {
       )}
       {isHelpOpen && (
         <HelpDialog onClose={() => setIsHelpOpen(false)} />
+      )}
+      {destructiveAction && (
+        <ConfirmDialog
+          title={destructiveTitle}
+          message={destructiveMessage}
+          confirmLabel={t('libraryManagement.deletePermanently')}
+          onCancel={() => setDestructiveAction(null)}
+          onConfirm={() => {
+            const operation = destructiveAction
+            setDestructiveAction(null)
+            void performAdvancedLibraryOperation(operation)
+          }}
+        />
       )}
       {pendingAction && (
         <ConfirmDialog

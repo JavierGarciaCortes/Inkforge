@@ -16,7 +16,7 @@ interface Props {
 export function GenreConfigurationDialog({ projectId, projectType, bookId, onCancel, exitLabel }: Props) {
   const { t } = useTranslation()
   const { profiles, state: genreState, reload: reloadGenres } = useGenreProfiles()
-  const [configuration, setConfiguration] = useState<Pick<GenreConfiguration, 'projectGenres' | 'bookGenres' | 'inheritProjectGenres'> | null>(null)
+  const [configuration, setConfiguration] = useState<GenreConfiguration | null>(null)
   const [projectGenres, setProjectGenres] = useState<string[]>([])
   const [bookGenres, setBookGenres] = useState<string[]>([])
   const [inheritGenres, setInheritGenres] = useState(true)
@@ -47,40 +47,35 @@ export function GenreConfigurationDialog({ projectId, projectType, bookId, onCan
     return () => { active = false }
   }, [projectId, bookId, t])
 
-  const saveProject = async (event: FormEvent<HTMLFormElement>) => {
+  const save = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!window.inkforge || !configuration || busy) return
     setBusy(true)
     setError(null)
     setSaved(false)
     try {
-      const result = await window.inkforge.library.updateProjectGenres({ projectId, genres: projectGenres, expectedGenres: configuration.projectGenres })
-      setConfiguration((current) => current ? { ...current, projectGenres: result } : current)
-      setProjectGenres(result)
-      setSaved(true)
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : t('genres.saveError'))
-    } finally { setBusy(false) }
-  }
-
-  const saveBook = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    if (!window.inkforge || !bookId || !configuration ||
-        configuration.bookGenres === null || configuration.inheritProjectGenres === null || busy) return
-    setBusy(true)
-    setError(null)
-    setSaved(false)
-    try {
-      const result = await window.inkforge.library.updateBookGenres({
-        projectId, bookId, inheritGenres, genres: bookGenres,
-        expectedInheritGenres: configuration.inheritProjectGenres,
-        expectedGenres: configuration.bookGenres,
+      const hasActiveBook = projectType === 'saga' && bookId !== null &&
+        configuration.bookGenres !== null && configuration.inheritProjectGenres !== null
+      const result = await window.inkforge.library.updateGenreConfiguration({
+        projectId,
+        bookId: hasActiveBook ? bookId : null,
+        projectGenres,
+        expectedProjectGenres: configuration.projectGenres,
+        expectedProjectRevision: configuration.projectRevision,
+        bookGenres: hasActiveBook ? bookGenres : null,
+        expectedBookGenres: hasActiveBook ? configuration.bookGenres : null,
+        expectedBookRevision: hasActiveBook ? configuration.bookRevision : null,
+        inheritProjectGenres: hasActiveBook ? inheritGenres : null,
+        expectedInheritProjectGenres: hasActiveBook ? configuration.inheritProjectGenres : null,
       })
-      setConfiguration((current) => current ? {
-        ...current, bookGenres: result.genres, inheritProjectGenres: result.inheritGenres,
-      } : current)
-      setBookGenres(result.genres)
-      setInheritGenres(result.inheritGenres)
+      if (!result.ok) {
+        setError(t('genres.externalConflict'))
+        return
+      }
+      setConfiguration(result.configuration)
+      setProjectGenres(result.configuration.projectGenres)
+      setBookGenres(result.configuration.bookGenres ?? [])
+      setInheritGenres(result.configuration.inheritProjectGenres ?? true)
       setSaved(true)
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : t('genres.saveError'))
@@ -103,18 +98,14 @@ export function GenreConfigurationDialog({ projectId, projectType, bookId, onCan
         {state === 'error' && <p role="alert">{t('genres.configurationError')}</p>}
         {state === 'ready' && configuration && (
           <>
-            <form onSubmit={(event) => void saveProject(event)}>
+            <form onSubmit={(event) => void save(event)}>
               <GenrePicker profiles={profiles} selected={projectGenres} onChange={(next) => {
                 setProjectGenres(next)
                 setSaved(false)
               }} disabled={busy} catalogReady={genreState === 'ready'}
                 label={projectType === 'saga' ? t('genres.saga') : t('genres.project')} />
-              <button className="dialog-button project-dialog-create" type="submit" disabled={busy}>
-                {t('genres.saveProject')}
-              </button>
-            </form>
-            {projectType === 'saga' && bookId && configuration.bookGenres !== null && (
-              <form onSubmit={(event) => void saveBook(event)}>
+              {projectType === 'saga' && bookId && configuration.bookGenres !== null && (
+                <>
                 <label className="genre-inherit">
                   <input type="checkbox" checked={inheritGenres} disabled={busy}
                     onChange={(event) => { setInheritGenres(event.target.checked); setSaved(false) }} />
@@ -124,11 +115,12 @@ export function GenreConfigurationDialog({ projectId, projectType, bookId, onCan
                   setBookGenres(next)
                   setSaved(false)
                 }} disabled={busy} catalogReady={genreState === 'ready'} label={t('genres.book')} />
-                <button className="dialog-button project-dialog-create" type="submit" disabled={busy}>
-                  {t('genres.saveBook')}
-                </button>
-              </form>
-            )}
+                </>
+              )}
+              <button className="dialog-button project-dialog-create" type="submit" disabled={busy}>
+                {t('genres.save')}
+              </button>
+            </form>
             <p>{t('genres.effective')}: {effective.join(', ') || t('genres.noneAssigned')}</p>
           </>
         )}
