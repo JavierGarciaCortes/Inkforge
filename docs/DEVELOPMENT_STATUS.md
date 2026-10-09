@@ -58,7 +58,7 @@ El primary actual es `editor`; los subagentes heredados son `writer`, `structure
 - `INKFORGE_LIBRARY_ROOT` identifica la Biblioteca global (`vault/`); no cambia el significado de `VAULT_PATH`.
 - `INKFORGE_INFRASTRUCTURE_ROOT` identifica la raíz técnica usada como `cwd` del MCP local; no forma parte del vault ni del canon.
 - Cambiar de obra cambia el workspace y reconecta OpenCode.
-- Cambiar de libro dentro de una saga mantiene el workspace de la saga y no reinicia OpenCode.
+- Cambiar de libro dentro de una saga mantiene la conversación y el workspace de la saga, no reinicia OpenCode y aplica al turno el nuevo `book_scope` autoritativo.
 - Cada turno recibe desde Inkforge una parte de texto `synthetic` con el contexto privado y autoritativo de la obra y el libro activos. La selección de ese turno sustituye cualquier selección anterior conservada en el historial.
 - El libro activo no se deduce mediante fechas, contenido, títulos, números, posición ni otras heurísticas; no existe fallback `books[0]`.
 - El contexto técnico se utiliza silenciosamente y se filtra del historial visible.
@@ -207,6 +207,10 @@ No depender de `/api/session/{id}/wait`: en la versión inicialmente probada dev
 
 El contrato de interacción de OpenCode está implementado y validado manualmente con anterioridad: las preguntas aparecen en la UI, admiten respuesta y rechazo, y se recuperan tras recargar el renderer; los permisos aparecen en la UI, admiten respuesta y también se recuperan tras la recarga. Tras un reinicio completo de OpenCode, una interacción interrumpida se muestra como no accionable, no reaparece una tarjeta obsoleta accionable y no se reintenta automáticamente. Una intención explícita de escritura se ejecuta sin confirmación redundante; una propuesta sin intención de escritura no escribe. Se comprobó el enrutado para obra independiente, saga, libro activo y áreas compartidas.
 
+Antes de reutilizar una sesión OpenCode persistida, Inkforge valida que exista y que su workspace coincida con la obra activa. Los resultados `session_missing` y `session_workspace_mismatch` descartan esa sesión como activa, conservan el historial visible y permiten crear o utilizar después una sesión válida para el workspace actual, sin reenviar automáticamente un mensaje ambiguo. Este flujo está implementado y validado.
+
+También está implementada y validada la corrección de la carrera entre la respuesta HTTP y los eventos SSE al responder preguntas o permisos. Si SSE demuestra que la interacción ya se resolvió, un error HTTP tardío no deja un falso error global; si el error HTTP llega primero, la resolución posterior por SSE lo retira. Completar una interacción anterior no elimina una pregunta nueva abierta mientras tanto y no se realiza retry automático.
+
 Las operaciones narrativas exigen una obra válida y rechazan solicitudes cuyo workspace haya cambiado. No hay chat asociado a `projectId = null`.
 
 El proceso OpenCode conserva como `directory` la obra activa. Para el MCP local, `opencode.json` usa `cwd: "{env:INKFORGE_INFRASTRUCTURE_ROOT}"`, de modo que `.tools/inkforge_mcp.py` se resuelve desde la infraestructura sin copiar herramientas al vault ni hardcodear rutas de desarrollo.
@@ -224,6 +228,16 @@ El historial visible del Director persiste en `.inkforge/director-chat.json` den
 - Las fronteras técnicas de las sesiones OpenCode no dividen la conversación visible.
 - El remontaje de `EditorPanel` por proyecto se conserva.
 - Continuidad del chat, memoria narrativa y canon son conceptos distintos. El historial no convierte una respuesta en canon.
+
+### Desarrollo guiado derivado de los Markdown
+
+El Director dispone de `get_development_state` para iniciar o continuar de forma adaptativa el desarrollo de una obra. La herramienta relee el ámbito vigente y clasifica los documentos gestionados de planificación y `Canon de libro.md` como ausentes, plantilla intacta o con contenido. También incluye un inventario de capítulos y Markdown de `Notas/`, `Mundo/`, `Estilo/` y `Referencias/` mediante rutas relativas seguras y vistas acotadas.
+
+No existe estado persistente de onboarding, porcentaje de completitud ni evaluación semántica de calidad. `blank_scaffold` solo indica que no se ha encontrado contenido narrativo añadido fuera de los encabezados iniciales contemplados. El Director no usa un cuestionario obligatorio: parte de la idea o material disponible, consulta después los Markdown pertinentes y continúa desde el punto real sin reiniciar obras parcialmente desarrolladas.
+
+En una saga, la instantánea exige el `book_scope: Libros/<id>` autoritativo. Planificación, canon, capítulos y notas pertenecen solo al libro activo; mundo, estilo y referencias se muestran como material compartido de la obra. La conversación, el brainstorming y las propuestas siguen sin ser canon. Solo una orden explícita —incluida una autorización continuada para guardar decisiones confirmadas durante una tarea guiada— permite persistir los Markdown afectados.
+
+La capa objetiva de desarrollo vive en `.tools/development_state.py`; `session_check.py` la reutiliza y conserva su salida de textos de planificación cuando se solicita `--full`. El hito no añade memoria narrativa, base de datos, fichero de onboarding ni selección paralela de libro; durante su validación también fue necesario endurecer en Electron y React la recuperación de sesiones OpenCode y la reconciliación de preguntas y permisos.
 
 ### Modelo y variante globales
 
@@ -259,6 +273,8 @@ El acceso documental se limita a Markdown de una obra gestionada activa:
 - Resolución con `realpath` y contención dentro del ámbito activo.
 - Validación de títulos, manifiestos, rutas y colisiones.
 - Lecturas y escrituras vinculadas al ID de la obra, para evitar guardar un documento en otra selección.
+
+En una saga, la exploración directa del filesystem respeta el mismo `book_scope`: puede acceder a `Proyecto.md`, `Mundo/`, `Estilo/`, `Referencias/` y al `Libros/<id>/` activo. No puede recorrer o enumerar globalmente `Libros/`, lanzar búsquedas recursivas desde la raíz que atraviesen otros libros ni consultar siquiera los nombres o la existencia de archivos bajo otro libro. Este aislamiento físico está implementado y validado.
 
 Contrato documental básico, además de metadatos opcionales de presentación:
 
@@ -349,13 +365,13 @@ La raíz global de `vault/` conserva `Generos/`, `Plantillas/` y `Proyectos/`. C
 
 También se retiró la carpeta legacy `.fiction/`, incluidos `config.json` y `session_log.json`, y su regla en `.gitignore`. No hay una configuración sustitutiva en `.inkforge/`; `.inkforge/director-chat.json` de cada obra es solo estado de conversación.
 
-### Migración de herramientas editoriales (pendiente de validación)
+### Herramientas editoriales y desarrollo guiado
 
-Las herramientas Python se han adaptado a la estructura de obras de Inkforge. `Proyecto.md` y `Libro.md` identifican obra y libro; cada capítulo aporta número, título y POV desde su Markdown. `VAULT_PATH` es la raíz exacta de la obra activa y las operaciones de libro en saga requieren `book_scope: Libros/<id>` proporcionado por Inkforge. El servidor `inkforge-context` construye su índice de Markdown para cada llamada y distingue documentos por ruta relativa, de modo que un cambio de libro no reutiliza el índice anterior ni necesita reiniciar OpenCode. `INKFORGE_LIBRARY_ROOT` queda reservado para perfiles y plantillas globales.
+Las herramientas Python se han adaptado a la estructura de obras de Inkforge. `Proyecto.md` y `Libro.md` identifican obra y libro; cada capítulo aporta número, título y POV desde su Markdown. `VAULT_PATH` es la raíz exacta de la obra activa y las operaciones de libro en saga requieren `book_scope: Libros/<id>` proporcionado por Inkforge. El servidor `inkforge-context` construye su índice de Markdown para cada llamada y distingue documentos por ruta relativa, de modo que un cambio de libro no reutiliza el índice anterior ni necesita reiniciar OpenCode. `get_development_state` deriva en cada consulta el estado de planificación, canon, capítulos, notas y material compartido; `session_check.py` usa la misma capa en vez de mantener otra implementación. `INKFORGE_LIBRARY_ROOT` queda reservado para perfiles y plantillas globales.
 
 Se retiraron los módulos de manifiesto JSON de capítulos y sincronización YAML, y se eliminó la dependencia funcional de `.fiction/config.json` y `.fiction/session_log.json` de scripts, MCP y atajos. La instantánea de `session_check.py` describe el estado actual y no pretende reconstruir diferencias entre sesiones. Los análisis basados en Save the Cat, tres actos, midpoint o consejos de King/Sanderson se ofrecen solo cuando el usuario o la obra eligen ese marco.
 
-Este cambio de infraestructura no se ha ejecutado ni comprobado mediante tests, lint, build, Electron o llamadas MCP en esta intervención. Está pendiente revisar en funcionamiento creación e inserción de capítulos, análisis, publicación, herramientas MCP y cambio de libro durante una sesión.
+La capa de desarrollo guiado se validó con scaffold inicial de novela, planificación con contenido, capítulo sin planificación, material compartido de mundo, saga con `book_scope` exacto, cambio de libro en la misma sesión, formatos BOM y CRLF/LF, límites del inventario, junction sin recorrido, `session_check.py` en modos quick/full, flujo Director → Writer y guardado provisional sin contaminar canon. También se comprobó la ausencia de contaminación entre libros. Siguen pendientes las herramientas editoriales no enumeradas como confirmadas de extremo a extremo, entre ellas casos adicionales de creación e inserción de capítulos, análisis y publicación.
 
 El dashboard Astro de `web/` es secundario. Su generador ya recibe una obra mediante `VAULT_PATH` y, para una saga, un scope explícito por invocación; lee metadatos y planificación Markdown sin `.fiction`. La UI del dashboard conserva visualizaciones heredadas y no se ha adaptado visualmente por completo a cualquier novela o saga. El JSON que genera es un artefacto de presentación, no una fuente de canon. Esta adaptación tampoco se ha ejecutado ni validado en esta intervención.
 
@@ -407,15 +423,18 @@ Resultados comunicados por el responsable del proyecto, correspondientes a valid
 | Área | Resultado confirmado |
 |---|---|
 | Comprobaciones de desarrollo | Para el hito anterior se comunicaron `git diff --check`, `git diff --cached --check`, `node --check` de Electron, JSON de `opencode.json`, build, lint y `python -m compileall .tools` satisfactorios. En `feature/library-advanced-management` se ejecutaron satisfactoriamente, después de la implementación y de nuevo tras corregir el conflicto exacto de géneros, `git diff --check` —sin errores, solo avisos LF → CRLF—, `node --check` de los módulos Electron modificados, incluido `app/electron/content-revision.cjs`, lint y build; no se repitieron las demás comprobaciones históricas ni se ejecutaron tests automáticos o comprobaciones técnicas automatizadas de OpenCode/MCP. Para el hito de preservación de errores se comunicaron como satisfactorios `node --check app/electron/opencode-client.cjs`, `npm --prefix .\app run lint`, `npm --prefix .\app run build` y `git diff --check`, este último sin errores y únicamente con avisos LF → CRLF |
+| Comprobaciones de `feature/guided-development` | Lint, build y `git diff --check` comunicados como satisfactorios tras el hito |
+| Desarrollo guiado | Scaffold de novela; saga con `book_scope` exacto; planificación con contenido; capítulo sin planificación; material compartido de mundo; cambio de libro en la misma sesión; ausencia de contaminación entre libros; BOM y CRLF/LF; límites de inventario; junction sin recorrido; `session_check.py` quick/full; flujo Director → Writer; guardado provisional sin contaminar canon |
 | Chat | Persistencia tras reinicio; aislamiento entre obras; misma conversación entre libros de una saga |
+| Recuperación de sesión OpenCode | Sesión persistida validada contra el workspace; recuperación de `session_missing` y `session_workspace_mismatch`; historial visible conservado; sin reenvío automático ambiguo; sesión posterior válida para la obra activa |
 | Preferencias IA | Modelo y variante persistentes; grupos Gratis / Otros modelos; envío real comprobado con GPT 5.6 luna y variante `medium` |
-| Interacciones OpenCode | Preguntas y permisos visibles y respondidos en UI; rechazo de preguntas; recuperación tras recarga del renderer; interacción interrumpida no accionable, sin tarjeta obsoleta accionable ni reintento automático tras reinicio completo; escritura según intención y enrutado correcto para obra independiente, saga, libro activo y áreas compartidas |
+| Interacciones OpenCode | Preguntas y permisos visibles y respondidos en UI; rechazo de preguntas; recuperación tras recarga del renderer; interacción interrumpida no accionable, sin tarjeta obsoleta accionable ni reintento automático tras reinicio completo; carrera HTTP/SSE corregida en ambos órdenes, sin falso error global ni pérdida de una pregunta nueva; escritura según intención y enrutado correcto para obra independiente, saga, libro activo y áreas compartidas |
 | Perfiles de género | Descubrimiento dinámico, asignación múltiple y herencia, perfiles no disponibles conservados, cambio externo detectado y lectura real por Director/MCP; creación explícita de `Ficción social.md` con la guía global y revisión posterior |
 | Renombrado con H1 | Novela y libro: título y H1 actualizados; saga: rechazo seguro ante H1 inconsistente y renombrado correcto tras corregirlo |
 | Interfaz de Biblioteca | Cabecera y barra lateral reorganizadas; `Gestionar obra`; `Géneros` → `Atrás` antes y después de guardar; renombrado → `Gestionar obra`; añadir libro → libro nuevo activo y `Gestionar obra` |
 | Selección y `activeBookId` | Restauración exacta de obra/libro; reinicio con el libro correcto; ID ausente y saga sin libro dejan `null`; sin fallback aunque existan otros libros; desaparición y restauración física no reactivan; crear y renombrar actualizan y persisten el ID |
 | Contexto `synthetic` | El Director recibe el libro correcto; Endless Two → Endless One funciona en caliente sin reiniciar OpenCode; el estado sin libro se comunica correctamente y la parte privada no aparece en el historial visible |
-| MCP y ámbito | `inkforge-context` conectado; `book_scope` correcto para Endless One y tras cambiar a Endless Two; disponible desde el inicio de saga/sesión; un ámbito puntual no cambia `activeBook = null`; ese null sobrevive al reinicio; el agente no simula MCP; `cwd` portable funciona en Windows |
+| MCP y ámbito | `inkforge-context` conectado; `book_scope` correcto para Endless One y tras cambiar a Endless Two; disponible desde el inicio de saga/sesión; un ámbito puntual no cambia `activeBook = null`; ese null sobrevive al reinicio; el agente no simula MCP; `cwd` portable funciona en Windows; la exploración física no enumera globalmente `Libros/` ni atraviesa otros libros |
 | Apariencia | Claro, Oscuro y Sistema; Sistema reacciona en caliente |
 | Conexión | Indicador de conexión y errores funcionales |
 | Biblioteca vacía | Arranque sin obra y acceso a las funciones globales |
@@ -509,7 +528,7 @@ Inkforge preserva y presenta el motivo textual útil recibido desde OpenCode o e
 - El renombrado de novela, saga y libro con H1 gestionado ya se comprobó manualmente, incluido el rechazo seguro de un H1 de saga inconsistente. Quedan casos de formato como BOM, CRLF/LF y metadatos adicionales.
 - Un envío real con variante compatible ya se comprobó. Quedan la opción predeterminada, cambios repetidos de modelo/variante, persistencia en todos los escenarios, reconexión y desaparición de modelo o variante del catálogo en distintos estados. No hay retry automático de variante basado en texto de error; el reintento existente permite conservar el mensaje tras un fallo.
 - Quedan comprobaciones adicionales de presentación adaptable.
-- En la preservación de errores quedan comprobaciones secundarias con otros formatos HTTP JSON/texto, variantes de errores embebidos, ambos eventos SSE en más casos reales, payload sin detalle, truncado, caracteres de control, ausencia de exposición de errores JavaScript internos, duplicados, presentación en catalán y coreano, y categorías como cuota, credenciales, `session_missing` y otros casos reales de retry.
+- En la preservación de errores quedan comprobaciones secundarias con otros formatos HTTP JSON/texto, variantes de errores embebidos, ambos eventos SSE en más casos reales, payload sin detalle, truncado, caracteres de control, ausencia de exposición de errores JavaScript internos, duplicados, presentación en catalán y coreano, y categorías como cuota, credenciales y otros casos reales de retry.
 
 Cualquier comprobación no enumerada como confirmada en este documento debe seguir considerándose pendiente.
 
@@ -536,7 +555,7 @@ Para continuar en otra conversación: leer las instrucciones del proyecto y este
 
 ## 18. Roadmap y siguientes líneas de trabajo
 
-Los once perfiles base y la guía global están terminados. El renombrado con H1 se comprobó en novela, saga y libro; se probó el envío de una variante compatible en un mensaje real; la reorganización de cabecera, barra lateral y `Gestionar obra`, el guardado único de géneros y los flujos principales de la gestión avanzada de Biblioteca cuentan con validación manual. La preservación y presentación del motivo real de errores OpenCode/proveedor también está implementada y validada en el caso real descrito en la sección 14. Las comprobaciones específicas pendientes están en la sección 16 y no constituyen una repetición general de esos hitos.
+El desarrollo guiado derivado de Markdown, el aislamiento estricto por `book_scope`, la recuperación segura de sesiones OpenCode persistidas y la reconciliación HTTP/SSE de preguntas y permisos están implementados y validados en los casos descritos en la sección 14. Los once perfiles base y la guía global están terminados. El renombrado con H1 se comprobó en novela, saga y libro; se probó el envío de una variante compatible en un mensaje real; la reorganización de cabecera, barra lateral y `Gestionar obra`, el guardado único de géneros y los flujos principales de la gestión avanzada de Biblioteca cuentan con validación manual. La preservación y presentación del motivo real de errores OpenCode/proveedor también está implementada y validada en el caso real descrito en la sección 14. Las comprobaciones específicas pendientes están en la sección 16 y no constituyen una repetición general de esos hitos.
 
 Líneas funcionales pendientes, sin fijar aquí un orden arquitectónico nuevo:
 

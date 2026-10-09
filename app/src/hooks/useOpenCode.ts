@@ -24,6 +24,10 @@ function modelKey(model: OpenCodeModel) {
   return JSON.stringify([model.providerID, model.modelID])
 }
 
+function isUnavailableSessionError(error: OpenCodeError) {
+  return error.code === 'session_missing' || error.code === 'session_workspace_mismatch'
+}
+
 type OpenCodeActivityKey =
   | ''
   | 'openCode.activity.writing'
@@ -41,6 +45,13 @@ type MessageUpdater = (
 interface PendingDirectorSave {
   projectId: string
   state: DirectorChatState
+}
+
+interface InteractionErrorMarker {
+  kind: 'permission' | 'question'
+  sessionID: string
+  requestID: string
+  error: OpenCodeError
 }
 
 export function useOpenCode(projectId: string | null) {
@@ -107,6 +118,7 @@ export function useOpenCode(projectId: string | null) {
   const questionRef = useRef<OpenCodeQuestionRequest | null>(null)
   const permissionRevisionRef = useRef(0)
   const questionRevisionRef = useRef(0)
+  const interactionErrorRequestRef = useRef<InteractionErrorMarker | null>(null)
   const pendingRefreshRef = useRef(0)
   const connectedRef = useRef(false)
   const mountedRef = useRef(false)
@@ -145,6 +157,41 @@ export function useOpenCode(projectId: string | null) {
     setQuestion(next)
   }, [])
 
+  const clearInteractionError = useCallback((
+    kind: InteractionErrorMarker['kind'],
+    sessionID: string,
+    requestID: string | undefined,
+  ) => {
+    const marker = interactionErrorRequestRef.current
+    if (
+      !requestID ||
+      !marker ||
+      marker.kind !== kind ||
+      marker.sessionID !== sessionID ||
+      marker.requestID !== requestID
+    ) {
+      return
+    }
+
+    interactionErrorRequestRef.current = null
+    setError((current) => current === marker.error ? null : current)
+  }, [])
+
+  const rememberInteractionError = useCallback((
+    kind: InteractionErrorMarker['kind'],
+    sessionID: string,
+    requestID: string,
+    interactionError: OpenCodeError,
+  ) => {
+    interactionErrorRequestRef.current = {
+      kind,
+      sessionID,
+      requestID,
+      error: interactionError,
+    }
+    setError(interactionError)
+  }, [])
+
   const clearInteractions = useCallback(() => {
     recoveryRevisionRef.current += 1
     sessionRefreshRef.current += 1
@@ -152,6 +199,7 @@ export function useOpenCode(projectId: string | null) {
     pendingRefreshRef.current += 1
     updatePermission(null)
     updateQuestion(null)
+    interactionErrorRequestRef.current = null
     setActivityKey('')
   }, [updatePermission, updateQuestion])
 
@@ -368,13 +416,14 @@ export function useOpenCode(projectId: string | null) {
     }
   }, [loadCapabilities])
 
-  const forgetMissingSession = useCallback(() => {
+  const forgetUnavailableSession = useCallback(() => {
     sessionIDRef.current = null
     sessionStartIndexRef.current = null
     setSessionID(null)
     clearInteractions()
     setIsWorking(false)
     assistantPartsRef.current.clear()
+    interactionErrorRequestRef.current = null
     queueDirectorSave(true)
   }, [clearInteractions, queueDirectorSave])
 
@@ -403,8 +452,8 @@ export function useOpenCode(projectId: string | null) {
     }
 
     if (!result.ok) {
-      if (result.error.code === 'session_missing') {
-        forgetMissingSession()
+      if (isUnavailableSessionError(result.error)) {
+        forgetUnavailableSession()
         return
       }
 
@@ -416,7 +465,7 @@ export function useOpenCode(projectId: string | null) {
     const preservedMessages = messagesRef.current.slice(0, currentStartIndex)
     commitMessages([...preservedMessages, ...result.value.messages], true)
     return result.value.unfinishedInteraction
-  }, [commitMessages, forgetMissingSession])
+  }, [commitMessages, forgetUnavailableSession])
 
   const refreshPendingInteractions = useCallback(async (history: {
     interaction: OpenCodeInterruptedInteraction | undefined
@@ -440,7 +489,7 @@ export function useOpenCode(projectId: string | null) {
       sessionIDRef.current !== expectedSession || pendingRefreshRef.current !== refresh
     ) return
     if (!result.ok) {
-      if (result.error.code === 'session_missing') forgetMissingSession()
+      if (isUnavailableSessionError(result.error)) forgetUnavailableSession()
       else setError(result.error)
       return
     }
@@ -471,7 +520,7 @@ export function useOpenCode(projectId: string | null) {
         setActivityKey('')
       }
     }
-  }, [forgetMissingSession, updatePermission, updateQuestion])
+  }, [forgetUnavailableSession, updatePermission, updateQuestion])
 
   const refreshSession = useCallback(async () => {
     const generation = projectGenerationRef.current
@@ -564,14 +613,22 @@ export function useOpenCode(projectId: string | null) {
     }
 
     if (event.type === 'permission.v2.replied') {
-      permissionRevisionRef.current += 1
-      if (permissionRef.current?.id === event.requestID) updatePermission(null)
+      clearInteractionError('permission', currentSessionID, event.requestID)
+      if (permissionRef.current?.id === event.requestID) {
+        updatePermission(null)
+      } else {
+        permissionRevisionRef.current += 1
+      }
       return
     }
 
     if (event.type === 'question.v2.replied' || event.type === 'question.v2.rejected') {
-      questionRevisionRef.current += 1
-      if (questionRef.current?.id === event.requestID) updateQuestion(null)
+      clearInteractionError('question', currentSessionID, event.requestID)
+      if (questionRef.current?.id === event.requestID) {
+        updateQuestion(null)
+      } else {
+        questionRevisionRef.current += 1
+      }
       return
     }
 
@@ -606,7 +663,14 @@ export function useOpenCode(projectId: string | null) {
         ? 'openCode.activity.retrying'
         : 'openCode.activity.working')
     }
-  }, [commitMessages, queueDirectorSave, refreshSession, updatePermission, updateQuestion])
+  }, [
+    clearInteractionError,
+    commitMessages,
+    queueDirectorSave,
+    refreshSession,
+    updatePermission,
+    updateQuestion,
+  ])
 
   useEffect(() => {
     mountedRef.current = true
@@ -648,6 +712,7 @@ export function useOpenCode(projectId: string | null) {
     projectGenerationRef.current = generation
     projectIdRef.current = projectId
     stateReadyRef.current = false
+    interactionErrorRequestRef.current = null
     recoveryRevisionRef.current += 1
     sessionRefreshRef.current += 1
 
@@ -733,11 +798,8 @@ export function useOpenCode(projectId: string | null) {
   }, [applyStatus, initialStatus, unavailableError])
 
   const ensureSession = useCallback(async () => {
-    if (projectIdRef.current === null) return null
-    if (sessionIDRef.current) {
-      return sessionIDRef.current
-    }
-
+    const projectID = projectIdRef.current
+    if (projectID === null) return null
     const api = window.inkforge?.opencode
 
     if (!api || !primaryAgent) {
@@ -750,9 +812,42 @@ export function useOpenCode(projectId: string | null) {
     }
 
     const generation = projectGenerationRef.current
-    const result = await api.createSession({ projectId: projectIdRef.current, title: 'Inkforge', agent: primaryAgent.name })
+    const existingSessionID = sessionIDRef.current
+    if (existingSessionID) {
+      const validation = await api.validateSession(existingSessionID, projectID)
 
-    if (!mountedRef.current || projectGenerationRef.current !== generation) {
+      if (
+        !mountedRef.current ||
+        projectGenerationRef.current !== generation ||
+        projectIdRef.current !== projectID ||
+        sessionIDRef.current !== existingSessionID
+      ) {
+        return null
+      }
+
+      if (validation.ok) {
+        return existingSessionID
+      }
+
+      if (!isUnavailableSessionError(validation.error)) {
+        setError(validation.error)
+        return null
+      }
+
+      forgetUnavailableSession()
+    }
+
+    const result = await api.createSession({
+      projectId: projectID,
+      title: 'Inkforge',
+      agent: primaryAgent.name,
+    })
+
+    if (
+      !mountedRef.current ||
+      projectGenerationRef.current !== generation ||
+      projectIdRef.current !== projectID
+    ) {
       return null
     }
 
@@ -767,7 +862,7 @@ export function useOpenCode(projectId: string | null) {
     setSessionID(result.value.id)
     queueDirectorSave(true)
     return result.value.id
-  }, [clearInteractions, primaryAgent, queueDirectorSave])
+  }, [clearInteractions, forgetUnavailableSession, primaryAgent, queueDirectorSave])
 
   const sendText = useCallback(async (sourceText: string) => {
     const api = window.inkforge?.opencode
@@ -866,6 +961,9 @@ export function useOpenCode(projectId: string | null) {
     commitMessages((current) => current.map((message) => (
       message.id === localMessageID ? { ...message, status: 'error' } : message
     )), true)
+    if (isUnavailableSessionError(result.error)) {
+      forgetUnavailableSession()
+    }
     setComposer((current) => current || text)
     setError(result.error)
     setIsWorking(false)
@@ -873,6 +971,7 @@ export function useOpenCode(projectId: string | null) {
   }, [
     commitMessages,
     ensureSession,
+    forgetUnavailableSession,
     isWorking,
     primaryAgent,
     selectedModel,
@@ -940,9 +1039,10 @@ export function useOpenCode(projectId: string | null) {
     })
 
     if (!result.ok && projectGenerationRef.current === generation) {
-      setError(result.error)
+      if (isUnavailableSessionError(result.error)) forgetUnavailableSession()
+      else setError(result.error)
     }
-  }, [models, selectedVariant])
+  }, [forgetUnavailableSession, models, selectedVariant])
 
   const chooseVariant = useCallback((variant: string) => {
     if (!selectedModel || (variant && !selectedModel.variants.includes(variant))) {
@@ -963,83 +1063,161 @@ export function useOpenCode(projectId: string | null) {
 
   const answerPermission = useCallback(async (reply: 'once' | 'always' | 'reject') => {
     const api = window.inkforge?.opencode
+    const activePermission = permission
+    const projectID = projectIdRef.current
 
-    if (!api || !permission || !projectIdRef.current || permission.sessionID !== sessionIDRef.current) {
+    if (!api || !activePermission || !projectID || activePermission.sessionID !== sessionIDRef.current) {
       return
     }
 
     const generation = projectGenerationRef.current
+    const sessionID = activePermission.sessionID
+    const requestID = activePermission.id
     const result = await api.replyPermission({
-      projectId: projectIdRef.current,
-      sessionID: permission.sessionID,
-      requestID: permission.id,
+      projectId: projectID,
+      sessionID,
+      requestID,
       reply,
     })
 
-    if (!mountedRef.current || projectGenerationRef.current !== generation || sessionIDRef.current !== permission.sessionID) {
+    if (
+      !mountedRef.current ||
+      projectGenerationRef.current !== generation ||
+      projectIdRef.current !== projectID ||
+      sessionIDRef.current !== sessionID
+    ) {
       return
     }
 
-    if (result.ok) {
-      permissionRevisionRef.current += 1
-      if (permissionRef.current?.id === permission.id) updatePermission(null)
-    } else {
-      setError(result.error)
+    if (!result.ok && isUnavailableSessionError(result.error)) {
+      forgetUnavailableSession()
+      return
     }
-  }, [permission, updatePermission])
+
+    const stillActive = (
+      permissionRef.current?.id === requestID &&
+      permissionRef.current.sessionID === sessionID
+    )
+    if (result.ok) {
+      clearInteractionError('permission', sessionID, requestID)
+      if (stillActive) updatePermission(null)
+      return
+    }
+
+    if (!stillActive) return
+    rememberInteractionError('permission', sessionID, requestID, result.error)
+  }, [
+    clearInteractionError,
+    forgetUnavailableSession,
+    permission,
+    rememberInteractionError,
+    updatePermission,
+  ])
 
   const answerQuestion = useCallback(async (answers: string[][]) => {
     const api = window.inkforge?.opencode
+    const activeQuestion = question
+    const projectID = projectIdRef.current
 
-    if (!api || !question || !projectIdRef.current || question.sessionID !== sessionIDRef.current) {
+    if (!api || !activeQuestion || !projectID || activeQuestion.sessionID !== sessionIDRef.current) {
       return
     }
 
     const generation = projectGenerationRef.current
+    const sessionID = activeQuestion.sessionID
+    const requestID = activeQuestion.id
     const result = await api.replyQuestion({
-      projectId: projectIdRef.current,
-      sessionID: question.sessionID,
-      requestID: question.id,
+      projectId: projectID,
+      sessionID,
+      requestID,
       answers,
     })
 
-    if (!mountedRef.current || projectGenerationRef.current !== generation || sessionIDRef.current !== question.sessionID) {
+    if (
+      !mountedRef.current ||
+      projectGenerationRef.current !== generation ||
+      projectIdRef.current !== projectID ||
+      sessionIDRef.current !== sessionID
+    ) {
       return
     }
 
-    if (result.ok) {
-      questionRevisionRef.current += 1
-      if (questionRef.current?.id === question.id) updateQuestion(null)
-    } else {
-      setError(result.error)
+    if (!result.ok && isUnavailableSessionError(result.error)) {
+      forgetUnavailableSession()
+      return
     }
-  }, [question, updateQuestion])
+
+    const stillActive = (
+      questionRef.current?.id === requestID &&
+      questionRef.current.sessionID === sessionID
+    )
+    if (result.ok) {
+      clearInteractionError('question', sessionID, requestID)
+      if (stillActive) updateQuestion(null)
+      return
+    }
+
+    if (!stillActive) return
+    rememberInteractionError('question', sessionID, requestID, result.error)
+  }, [
+    clearInteractionError,
+    forgetUnavailableSession,
+    question,
+    rememberInteractionError,
+    updateQuestion,
+  ])
 
   const rejectQuestion = useCallback(async () => {
     const api = window.inkforge?.opencode
+    const activeQuestion = question
+    const projectID = projectIdRef.current
 
-    if (!api || !question || !projectIdRef.current || question.sessionID !== sessionIDRef.current) {
+    if (!api || !activeQuestion || !projectID || activeQuestion.sessionID !== sessionIDRef.current) {
       return
     }
 
     const generation = projectGenerationRef.current
+    const sessionID = activeQuestion.sessionID
+    const requestID = activeQuestion.id
     const result = await api.rejectQuestion({
-      projectId: projectIdRef.current,
-      sessionID: question.sessionID,
-      requestID: question.id,
+      projectId: projectID,
+      sessionID,
+      requestID,
     })
 
-    if (!mountedRef.current || projectGenerationRef.current !== generation || sessionIDRef.current !== question.sessionID) {
+    if (
+      !mountedRef.current ||
+      projectGenerationRef.current !== generation ||
+      projectIdRef.current !== projectID ||
+      sessionIDRef.current !== sessionID
+    ) {
       return
     }
 
-    if (result.ok) {
-      questionRevisionRef.current += 1
-      if (questionRef.current?.id === question.id) updateQuestion(null)
-    } else {
-      setError(result.error)
+    if (!result.ok && isUnavailableSessionError(result.error)) {
+      forgetUnavailableSession()
+      return
     }
-  }, [question, updateQuestion])
+
+    const stillActive = (
+      questionRef.current?.id === requestID &&
+      questionRef.current.sessionID === sessionID
+    )
+    if (result.ok) {
+      clearInteractionError('question', sessionID, requestID)
+      if (stillActive) updateQuestion(null)
+      return
+    }
+
+    if (!stillActive) return
+    rememberInteractionError('question', sessionID, requestID, result.error)
+  }, [
+    clearInteractionError,
+    forgetUnavailableSession,
+    question,
+    rememberInteractionError,
+    updateQuestion,
+  ])
 
   const displayedStatus = status.state === 'starting'
     ? initialStatus

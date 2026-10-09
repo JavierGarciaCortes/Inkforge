@@ -193,6 +193,34 @@ function assertIdentifier(value, label) {
   return value
 }
 
+function normalizeWorkspaceDirectory(directory) {
+  const normalized = path.normalize(path.resolve(directory))
+  return process.platform === 'win32' ? normalized.toLowerCase() : normalized
+}
+
+function extractSessionDirectory(payload) {
+  const candidates = [
+    payload,
+    isRecord(payload) ? payload.data : null,
+  ]
+
+  for (const candidate of candidates) {
+    if (!isRecord(candidate)) continue
+    if (typeof candidate.directory === 'string' && candidate.directory.trim()) {
+      return candidate.directory
+    }
+    if (
+      isRecord(candidate.location) &&
+      typeof candidate.location.directory === 'string' &&
+      candidate.location.directory.trim()
+    ) {
+      return candidate.location.directory
+    }
+  }
+
+  return null
+}
+
 function normalizeAgents(payload) {
   let entries = []
 
@@ -632,6 +660,7 @@ class OpenCodeClient {
     this.workspaceGeneration = 0
     this.processGeneration = 0
     this.processSessions = new Set()
+    this.validatedSessionWorkspaces = new Map()
     this.requestedWorkingDirectory = this.workingDirectory
     this.onStatus = onStatus
     this.onEvent = onEvent
@@ -690,7 +719,10 @@ class OpenCodeClient {
   setWorkingDirectory(workingDirectory) {
     const nextWorkingDirectory = workingDirectory === null ? null : path.resolve(workingDirectory)
     const previousRequestedDirectory = this.requestedWorkingDirectory
-    if (nextWorkingDirectory !== previousRequestedDirectory) this.workspaceGeneration += 1
+    if (nextWorkingDirectory !== previousRequestedDirectory) {
+      this.workspaceGeneration += 1
+      this.validatedSessionWorkspaces.clear()
+    }
     this.requestedWorkingDirectory = nextWorkingDirectory
     const previousChange = this.workspaceChangePromise
 
@@ -786,6 +818,7 @@ class OpenCodeClient {
     // Only a real launch resets ownership, never a renderer or SSE reconnect.
     const processGeneration = ++this.processGeneration
     this.processSessions = new Set()
+    this.validatedSessionWorkspaces = new Map()
     this.eventAbortController?.abort()
     this.messageRoles.clear()
     this.visibleParts.clear()
@@ -1086,6 +1119,79 @@ class OpenCodeClient {
     return this.agents.map((agent) => ({ ...agent }))
   }
 
+  invalidateSessionValidation(sessionID) {
+    this.validatedSessionWorkspaces.delete(sessionID)
+  }
+
+  async validateSessionWorkspace(sessionID, workingDirectory) {
+    await this.ensureNarrativeConnected(workingDirectory)
+    const safeSessionID = assertIdentifier(sessionID, 'La sesión')
+    const workspace = normalizeWorkspaceDirectory(workingDirectory)
+
+    if (this.validatedSessionWorkspaces.get(safeSessionID) === workspace) {
+      return
+    }
+
+    const validations = this.validatedSessionWorkspaces
+    const processGeneration = this.processGeneration
+    const workspaceGeneration = this.workspaceGeneration
+    let payload
+
+    try {
+      payload = await this.fetchJson(
+        this.withDirectory(`/session/${encodeURIComponent(safeSessionID)}`),
+      )
+    } catch (error) {
+      const normalized = normalizeError(error)
+      if (normalized.code === 'session_missing' || normalized.httpStatus === 404) {
+        this.invalidateSessionValidation(safeSessionID)
+        throw new OpenCodeError(
+          'session_missing',
+          'La sesión de OpenCode ya no está disponible.',
+          { httpStatus: 404, detail: normalized.detail, retryable: true },
+        )
+      }
+      throw normalized
+    }
+
+    if (
+      validations !== this.validatedSessionWorkspaces ||
+      processGeneration !== this.processGeneration ||
+      workspaceGeneration !== this.workspaceGeneration ||
+      workingDirectory !== this.workingDirectory
+    ) {
+      throw new OpenCodeError(
+        'disconnected',
+        'La instancia de OpenCode o la obra activa ha cambiado.',
+        { retryable: true },
+      )
+    }
+
+    const sessionDirectory = extractSessionDirectory(payload)
+    if (sessionDirectory === null) {
+      throw new OpenCodeError(
+        'incompatible',
+        'OpenCode no devolvió el directorio asociado a la sesión.',
+      )
+    }
+
+    if (normalizeWorkspaceDirectory(sessionDirectory) !== workspace) {
+      this.invalidateSessionValidation(safeSessionID)
+      throw new OpenCodeError(
+        'session_workspace_mismatch',
+        'La sesión de OpenCode pertenece a otra obra.',
+        { retryable: true },
+      )
+    }
+
+    validations.set(safeSessionID, workspace)
+  }
+
+  async validateSession(sessionID, workingDirectory) {
+    await this.validateSessionWorkspace(sessionID, workingDirectory)
+    return { valid: true }
+  }
+
   async createSession(input = {}) {
     await this.ensureNarrativeConnected(input.workingDirectory)
     const processSessions = this.processSessions
@@ -1110,17 +1216,22 @@ class OpenCodeClient {
     if (processSessions !== this.processSessions) {
       throw new OpenCodeError('disconnected', 'La instancia de OpenCode ha cambiado.', { retryable: true })
     }
-    processSessions.add(assertIdentifier(payload.id, 'La sesión'))
+    const sessionID = assertIdentifier(payload.id, 'La sesión')
+    processSessions.add(sessionID)
+    this.validatedSessionWorkspaces.set(
+      sessionID,
+      normalizeWorkspaceDirectory(input.workingDirectory),
+    )
 
     return {
-      id: payload.id,
+      id: sessionID,
       title: typeof payload.title === 'string' ? payload.title : 'Inkforge',
       agent: typeof payload.agent === 'string' ? payload.agent : agent,
     }
   }
 
   async getMessages(sessionID, workingDirectory) {
-    await this.ensureNarrativeConnected(workingDirectory)
+    await this.validateSessionWorkspace(sessionID, workingDirectory)
     const processSessions = this.processSessions
     const safeSessionID = encodeURIComponent(assertIdentifier(sessionID, 'La sesión'))
 
@@ -1137,6 +1248,7 @@ class OpenCodeClient {
       const normalized = normalizeError(error)
 
       if (normalized.httpStatus === 404) {
+        this.invalidateSessionValidation(sessionID)
         throw new OpenCodeError(
           'session_missing',
           'La sesión de OpenCode ya no está disponible.',
@@ -1181,7 +1293,7 @@ class OpenCodeClient {
 
   async sendMessage(input) {
     await this.ensureNarrativeConnected(input?.workingDirectory)
-    const sessionID = encodeURIComponent(assertIdentifier(input?.sessionID, 'La sesión'))
+    const rawSessionID = assertIdentifier(input?.sessionID, 'La sesión')
     const text = typeof input?.text === 'string' ? input.text : ''
 
     if (!text.trim() || text.length > 200000) {
@@ -1189,35 +1301,51 @@ class OpenCodeClient {
     }
 
     this.validateSelection(input.agent, input.model)
+    await this.validateSessionWorkspace(rawSessionID, input.workingDirectory)
+    const sessionID = encodeURIComponent(rawSessionID)
 
     // Mark before issuing real work, even if the request later fails ambiguously.
-    this.processSessions.add(input.sessionID)
+    this.processSessions.add(rawSessionID)
 
-    const payload = await this.fetchJson(this.withDirectory(`/session/${sessionID}/message`), {
-      method: 'POST',
-      body: {
-        agent: input.agent,
-        model: {
-          providerID: input.model.providerID,
-          modelID: input.model.modelID,
+    let payload
+    try {
+      payload = await this.fetchJson(this.withDirectory(`/session/${sessionID}/message`), {
+        method: 'POST',
+        body: {
+          agent: input.agent,
+          model: {
+            providerID: input.model.providerID,
+            modelID: input.model.modelID,
+          },
+          ...(input.model.variant ? { variant: input.model.variant } : {}),
+          parts: [
+            ...(typeof input.system === 'string'
+              ? [{ type: 'text', text: input.system, synthetic: true }]
+              : []),
+            { type: 'text', text },
+          ],
         },
-        ...(input.model.variant ? { variant: input.model.variant } : {}),
-        parts: [
-          ...(typeof input.system === 'string'
-            ? [{ type: 'text', text: input.system, synthetic: true }]
-            : []),
-          { type: 'text', text },
-        ],
-      },
-      timeout: 10 * 60 * 1000,
-    })
+        timeout: 10 * 60 * 1000,
+      })
 
-    const embeddedError = isRecord(payload) && isRecord(payload.info)
-      ? payload.info.error
-      : null
+      const embeddedError = isRecord(payload) && isRecord(payload.info)
+        ? payload.info.error
+        : null
 
-    if (embeddedError) {
-      throw classifyEmbeddedError(embeddedError)
+      if (embeddedError) {
+        throw classifyEmbeddedError(embeddedError)
+      }
+    } catch (error) {
+      const normalized = normalizeError(error)
+      if (normalized.code === 'session_missing' || normalized.httpStatus === 404) {
+        this.invalidateSessionValidation(rawSessionID)
+        throw new OpenCodeError(
+          'session_missing',
+          'La sesión de OpenCode ya no está disponible.',
+          { httpStatus: 404, detail: normalized.detail, retryable: true },
+        )
+      }
+      throw normalized
     }
 
     return { accepted: true }
@@ -1225,8 +1353,10 @@ class OpenCodeClient {
 
   async switchModel(input) {
     await this.ensureNarrativeConnected(input?.workingDirectory)
-    const sessionID = encodeURIComponent(assertIdentifier(input?.sessionID, 'La sesión'))
+    const rawSessionID = assertIdentifier(input?.sessionID, 'La sesión')
     this.validateModel(input.model)
+    await this.validateSessionWorkspace(rawSessionID, input.workingDirectory)
+    const sessionID = encodeURIComponent(rawSessionID)
 
     try {
       await this.fetchJson(this.withDirectory(`/api/session/${sessionID}/model`), {
@@ -1253,12 +1383,14 @@ class OpenCodeClient {
 
   async switchAgent(input) {
     await this.ensureNarrativeConnected(input?.workingDirectory)
-    const sessionID = encodeURIComponent(assertIdentifier(input?.sessionID, 'La sesión'))
+    const rawSessionID = assertIdentifier(input?.sessionID, 'La sesión')
     const agent = assertIdentifier(input?.agent, 'El agente')
 
     if (!this.agents.some((candidate) => candidate.name === agent)) {
       throw new OpenCodeError('invalid_request', 'El agente seleccionado no está disponible.')
     }
+    await this.validateSessionWorkspace(rawSessionID, input.workingDirectory)
+    const sessionID = encodeURIComponent(rawSessionID)
 
     try {
       await this.fetchJson(this.withDirectory(`/api/session/${sessionID}/agent`), {
@@ -1278,8 +1410,7 @@ class OpenCodeClient {
   }
 
   async getPendingInteractions(sessionID, workingDirectory) {
-    await this.ensureNarrativeConnected(workingDirectory)
-    assertIdentifier(sessionID, 'La sesión')
+    await this.validateSessionWorkspace(sessionID, workingDirectory)
     let permissions, questions
     try {
       [permissions, questions] = await Promise.all([
@@ -1314,8 +1445,7 @@ class OpenCodeClient {
   }
 
   async replyPermission(input) {
-    await this.ensureNarrativeConnected(input?.workingDirectory)
-    assertIdentifier(input?.sessionID, 'La sesión')
+    await this.validateSessionWorkspace(input?.sessionID, input?.workingDirectory)
     const requestID = encodeURIComponent(assertIdentifier(input?.requestID, 'El permiso'))
 
     if (!['once', 'always', 'reject'].includes(input?.reply)) {
@@ -1330,8 +1460,7 @@ class OpenCodeClient {
   }
 
   async replyQuestion(input) {
-    await this.ensureNarrativeConnected(input?.workingDirectory)
-    assertIdentifier(input?.sessionID, 'La sesión')
+    await this.validateSessionWorkspace(input?.sessionID, input?.workingDirectory)
     const requestID = encodeURIComponent(assertIdentifier(input?.requestID, 'La pregunta'))
 
     if (
@@ -1349,8 +1478,7 @@ class OpenCodeClient {
   }
 
   async rejectQuestion(input) {
-    await this.ensureNarrativeConnected(input?.workingDirectory)
-    assertIdentifier(input?.sessionID, 'La sesión')
+    await this.validateSessionWorkspace(input?.sessionID, input?.workingDirectory)
     const requestID = encodeURIComponent(assertIdentifier(input?.requestID, 'La pregunta'))
     await this.fetchJson(this.withDirectory(`/question/${requestID}/reject`), {
       method: 'POST',

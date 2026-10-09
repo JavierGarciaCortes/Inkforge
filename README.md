@@ -26,6 +26,7 @@ La aplicación de escritorio ya permite:
 - abrir una Ayuda integrada y localizada con documentación de las funciones disponibles;
 - consultar una guía informativa para preparar proyectos compatibles con una futura importación;
 - conservar una conversación del Director por obra, también después de reiniciar; todos los libros de una saga comparten esa conversación;
+- desarrollar una obra de forma guiada desde una idea o desde material parcial, usando un estado objetivo derivado de sus Markdown reales;
 - recordar la última obra y el último libro activos;
 - usar OpenCode local con streaming y modelos obtenidos dinámicamente de sus proveedores configurados;
 - conservar globalmente el modelo y la variante entre obras y reinicios;
@@ -80,7 +81,9 @@ Markdown reales de la obra
 
 Markdown es la fuente de verdad. Inkforge no mantiene una base de datos paralela para el canon ni una memoria alternativa del manuscrito. `.fiction`, `session_log.json` y `manifiesto.json` no forman parte del estado operativo: la estructura, los manifiestos y la planificación se leen de los Markdown reales.
 
-Las herramientas editoriales Python leen `Proyecto.md`, `Libro.md` y el frontmatter de cada capítulo. `VAULT_PATH` indica la raíz exacta de la obra; en una saga, cada llamada de contenido recibe además `book_scope: Libros/<id>` del libro seleccionado explícitamente. Cambiar de libro no crea otra conversación ni reinicia OpenCode. El servidor MCP se llama `inkforge-context`; se ejecuta desde la infraestructura de Inkforge aunque el workspace sea la obra activa y relee el contenido al atender cada llamada. Los capítulos se ordenan por `capítulo:` en sus Markdown, sin manifiesto JSON ni sincronización aparte. Los análisis de tres actos, Save the Cat y consejos de King o Sanderson son opcionales según la obra y el encargo.
+Las herramientas editoriales Python leen `Proyecto.md`, `Libro.md` y el frontmatter de cada capítulo. `VAULT_PATH` indica la raíz exacta de la obra; en una saga, cada llamada de contenido recibe además `book_scope: Libros/<id>` del libro seleccionado explícitamente. Cambiar de libro conserva la misma conversación y el workspace de la saga, no reinicia OpenCode y aplica el nuevo `book_scope` al turno. Ese aislamiento también rige la exploración directa del filesystem: puede consultarse `Proyecto.md`, las áreas compartidas y el libro activo, pero no recorrer globalmente `Libros/` ni atravesar otros libros. El servidor MCP se llama `inkforge-context`; se ejecuta desde la infraestructura de Inkforge aunque el workspace sea la obra activa y relee el contenido al atender cada llamada. Los capítulos se ordenan por `capítulo:` en sus Markdown, sin manifiesto JSON ni sincronización aparte. Los análisis de tres actos, Save the Cat y consejos de King o Sanderson son opcionales según la obra y el encargo.
+
+Para el desarrollo guiado, el Director consulta `get_development_state` cuando necesita saber desde qué punto partir. La herramienta distingue objetivamente documentos de planificación y canon ausentes, en plantilla o con contenido, y cuenta capítulos, notas y material compartido en `Mundo/`, `Estilo/` y `Referencias/`. No existe estado persistente de onboarding ni cuestionario obligatorio: la conversación se adapta también a obras parcialmente desarrolladas, respeta el libro activo y el reparto novela/saga, y no convierte propuestas o brainstorming en canon sin una orden de escritura.
 
 OpenCode es el backend de integración con IA. Inkforge no implementa una abstracción propia de proveedores, no guarda claves de API y no se conecta directamente a servicios de modelos. El usuario puede utilizar los proveedores y modelos configurados en OpenCode, incluidos modelos locales como Ollama.
 
@@ -171,6 +174,7 @@ Inkforge inicia un servidor OpenCode local enlazado a `127.0.0.1` y descubre sus
 - envía en cada turno el contexto operativo privado y autoritativo como una parte de texto `synthetic`, separada del mensaje visible;
 - filtra partes internas de tipo reasoning, synthetic e ignored para mostrar únicamente texto visible de respuesta;
 - mantiene la sesión al cambiar de modelo;
+- valida las sesiones OpenCode persistidas contra el workspace de la obra activa antes de reutilizarlas;
 - envía la variante seleccionada en el campo `variant` del siguiente mensaje, sin reiniciar la conversación; la variante vacía usa el comportamiento predeterminado de OpenCode;
 - permite reintentar tras un error de modelo incompatible;
 - detiene el proceso local al cerrar Inkforge.
@@ -184,8 +188,6 @@ La raíz técnica de Inkforge mantiene agentes, skills y MCP; el directorio de t
 El chat visible se guarda en `.inkforge/director-chat.json` dentro de cada obra. Cambiar de libro en una saga no crea otra conversación, y las fronteras técnicas de las sesiones OpenCode no dividen el historial visible. Esta continuidad del chat **no es canon ni memoria narrativa**: los Markdown siguen siendo la fuente de verdad.
 
 Sin obra activa, OpenCode puede ofrecer el catálogo de modelos para Ajustes, pero no crear sesiones ni enviar mensajes narrativos contra una raíz genérica.
-
-Algunos modelos del catálogo pueden fallar por restricciones del proveedor, la cuenta o la región. Inkforge todavía puede sustituir el motivo útil devuelto por OpenCode o el proveedor por un error genérico; mejorar esa presentación está pendiente.
 
 ## Estructura del repositorio
 

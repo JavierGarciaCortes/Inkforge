@@ -167,6 +167,7 @@ export type OpenCodeErrorCode =
   | 'incompatible'
   | 'disconnected'
   | 'session_missing'
+  | 'session_workspace_mismatch'
   | 'model_unavailable'
   | 'invalid_credential'
   | 'quota'
@@ -356,6 +357,7 @@ export interface InkforgeBridge {
     listModels: () => Promise<OpenCodeResult<OpenCodeModel[]>>
     listAgents: () => Promise<OpenCodeResult<OpenCodeAgent[]>>
     createSession: (input: { projectId: string | null; title?: string; agent?: string }) => Promise<OpenCodeResult<OpenCodeSession>>
+    validateSession: (sessionID: string, projectId: string) => Promise<OpenCodeResult<{ valid: true }>>
     getMessages: (sessionID: string, projectId: string) => Promise<OpenCodeResult<OpenCodeHistory>>
     getPendingInteractions: (sessionID: string, projectId: string) => Promise<OpenCodeResult<OpenCodePendingInteractions>>
     sendMessage: (input: {

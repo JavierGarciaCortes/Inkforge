@@ -8,6 +8,7 @@ sobre stdin/stdout). Sin dependencias externas.
 Usa VAULT_PATH para la obra y book_scope explícito para los libros de saga.
 
 Tools expuestas:
+  get_development_state()    — estado objetivo actual derivado de los Markdown
   search_bible(query)        — búsqueda en documentos de referencia
   get_character(name, chapter?) — perfil de personaje
   get_chapter_context(num)   — metadatos del capítulo
@@ -31,6 +32,7 @@ from vault import (
     strip_comments, get_chapter_number, get_chapter_title,
 )
 from genre_profiles import list_profiles, read_profile, create_profile, update_profile
+from development_state import get_development_state as read_development_state
 
 try:
     from tools import prose_scanner, editorial_letter
@@ -455,6 +457,62 @@ def mcp_create_genre_profile(name: str, content: str) -> str:
 )
 def mcp_update_genre_profile(name: str, content: str, expected_content: str) -> str:
     return "Perfil actualizado: " + update_profile(name, content, expected_content)
+
+
+def _format_development_inventory(label: str, inventory: dict) -> list[str]:
+    lines = [f"- {label}: {inventory['count']} Markdown"]
+    shown = inventory["paths"][:10]
+    lines.extend(f"  - `{path}`" for path in shown)
+    remaining = inventory["count"] - len(shown)
+    if remaining > 0:
+        lines.append(f"  - … y {remaining} documentos más")
+    return lines
+
+
+@server.tool(
+    name="get_development_state",
+    description=("Estado objetivo actual del desarrollo del libro/obra derivado de los Markdown; "
+                 "indica documentos en plantilla, con contenido o ausentes, capítulos y material "
+                 "existente. No evalúa calidad ni completitud creativa."),
+    properties={},
+)
+def mcp_get_development_state() -> str:
+    state = read_development_state()
+    labels = {"missing": "ausente", "template": "plantilla", "content": "con contenido"}
+    lines = [
+        "# Estado objetivo de desarrollo",
+        "",
+        "Instantánea derivada de los Markdown actuales; no evalúa calidad ni completitud creativa.",
+        "",
+        f"- Obra: {state['project']}",
+        f"- Tipo de obra: {state['project_type']}",
+        f"- Libro actual: {state['book']}",
+        f"- Scope: `{state['book_scope']}`",
+        f"- Capítulos: {state['chapter_count']}",
+        f"- Conserva únicamente el scaffold inicial: {'sí' if state['blank_scaffold'] else 'no'}",
+        "",
+        "## Planificación",
+    ]
+    lines.extend(
+        f"- {name}: {labels[document_state]}"
+        for name, document_state in state["planning_documents"].items()
+    )
+    lines.extend([
+        "",
+        "## Canon",
+        f"- {state['canon_document']['path']}: "
+        f"{labels[state['canon_document']['state']]}",
+        "",
+        "## Notas del libro",
+    ])
+    lines.extend(_format_development_inventory("Notas", state["notes"]))
+    lines.extend(["", "## Material compartido de la obra"])
+    lines.extend(_format_development_inventory("Mundo", state["shared_material"]["world"]))
+    lines.extend(_format_development_inventory("Estilo", state["shared_material"]["style"]))
+    lines.extend(_format_development_inventory(
+        "Referencias", state["shared_material"]["references"]
+    ))
+    return "\n".join(lines)
 
 
 @server.tool(
