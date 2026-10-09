@@ -4,26 +4,21 @@
 import argparse
 import json
 
-from vault import current_book, get_chapters, planning_file, scoped_book
+from development_state import get_development_state
+from vault import planning_file, scoped_book
+
+
+LEGACY_PLANNING_DOCUMENTS = ("Estado.md", "Pendientes.md", "Foreshadowing.md")
 
 
 def snapshot() -> dict:
-    book = current_book()
-    chapters = get_chapters()
+    data = get_development_state()
     planning = {}
-    for name in ("Estado.md", "Pendientes.md", "Foreshadowing.md"):
+    for name in LEGACY_PLANNING_DOCUMENTS:
         path = planning_file(name)
         planning[name] = path.read_text(encoding="utf-8") if path.is_file() else None
-    return {
-        "project": book.project.title,
-        "project_type": book.project.type,
-        "book": book.title,
-        "book_scope": book.scope,
-        "chapters": [{"number": chapter.number, "title": chapter.title,
-                      "pov": chapter.pov, "file": chapter.path.name}
-                     for chapter in chapters],
-        "planning": planning,
-    }
+    data["planning"] = planning
+    return data
 
 
 def main() -> None:
@@ -43,10 +38,21 @@ def main() -> None:
     for chapter in data["chapters"]:
         print(f"  {chapter['number']}: {chapter['title']} [{chapter['pov'] or 'POV sin declarar'}]")
     if not args.quick:
-        for name, content in data["planning"].items():
-            print(f"{name}: {'presente' if content is not None else 'ausente'}")
-            if args.full and content is not None:
-                print(content)
+        print(f"Solo scaffold inicial: {'sí' if data['blank_scaffold'] else 'no'}")
+        print("Planificación gestionada:")
+        for name, state in data["planning_documents"].items():
+            print(f"  {name}: {state}")
+        print(f"Canon de libro: {data['canon_document']['state']}")
+        print(f"Notas Markdown: {data['notes']['count']}")
+        print("Material compartido Markdown: "
+              f"Mundo {data['shared_material']['world']['count']}, "
+              f"Estilo {data['shared_material']['style']['count']}, "
+              f"Referencias {data['shared_material']['references']['count']}")
+        if args.full:
+            for name, content in data["planning"].items():
+                print(f"{name}: {'presente' if content is not None else 'ausente'}")
+                if content is not None:
+                    print(content)
 
 
 if __name__ == "__main__":

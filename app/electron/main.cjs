@@ -742,6 +742,7 @@ function registerOpenCodeHandlers(client) {
   handle('opencode:list-models', () => client.listModels())
   handle('opencode:list-agents', () => client.listAgents())
   handle('opencode:create-session', (payload, scope) => client.createSession({ ...payload, ...scope }), true)
+  handle('opencode:validate-session', (payload, scope) => client.validateSession(payload?.sessionID, scope.workingDirectory), true)
   handle('opencode:get-messages', (payload, scope) => client.getMessages(payload?.sessionID, scope.workingDirectory), true)
   handle('opencode:get-pending-interactions', (payload, scope) => client.getPendingInteractions(payload?.sessionID, scope.workingDirectory), true)
   handle('opencode:send-message', (payload, scope) => client.sendMessage({
